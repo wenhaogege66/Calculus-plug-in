@@ -1,0 +1,165 @@
+
+# AI微积分助教Chrome插件开发规范
+
+## 项目概述
+AI驱动的微积分助教Chrome插件，分为学生端和教师端，支持手写作业批改、错题解析、个性化学习建议。
+
+### 核心功能
+- **学生端**: 手写作业批改、错题解析、个性化复习手册
+- **教师端**: 学情概览、错题分析、教学建议
+- **RAG功能**: 基于微积分教材的智能问答和习题匹配
+
+## 数据库配置 (ClawCloud PostgreSQL)
+
+### 连接信息
+```bash
+# 开发环境连接 (公网访问)
+DATABASE_URL=postgresql://postgres:rtndnmh8@dbprovider.ap-southeast-1.clawcloudrun.com:36527/?directConnection=true
+
+# 内网连接 (服务器间通信，如果需要)
+DATABASE_INTERNAL_URL=postgresql://postgres:rtndnmh8@test-db-postgresql.ns-m464kun1.svc:5432
+
+# 连接参数
+DB_HOST=dbprovider.ap-southeast-1.clawcloudrun.com
+DB_PORT=36527
+DB_USER=postgres
+DB_PASSWORD=rtndnmh8
+DB_NAME=postgres
+```
+
+### 环境变量配置
+```bash
+# .env
+NODE_ENV=development
+DATABASE_URL=postgresql://postgres:rtndnmh8@dbprovider.ap-southeast-1.clawcloudrun.com:36527/?directConnection=true
+JWT_SECRET=your-jwt-secret-here
+OPENAI_API_KEY=your-openai-api-key
+HMER_API_ENDPOINT=https://your-hmer-service.com/api
+MAX_FILE_SIZE=10485760
+```
+
+## 技术栈
+
+### Chrome插件
+- **Manifest Version**: 3
+- **前端**: React 18 + TypeScript
+- **UI库**: Ant Design
+- **状态管理**: Redux Toolkit
+- **构建**: Webpack 5
+
+### 后端服务
+- **API**: Node.js + Express + TypeScript
+- **数据库**: PostgreSQL 14.8.0
+- **ORM**: Prisma
+- **AI服务**: OpenAI GPT-4 + HMER识别
+- **部署**: ClawCloud (ap-southeast-1)
+
+## 项目目录结构
+
+```
+/
+├── manifest.json              # Chrome插件配置
+├── src/                       # 插件前端代码
+│   ├── background/           # Service Worker
+│   ├── content/              # Content Scripts
+│   ├── popup/                # 弹窗界面
+│   ├── sidepanel/            # 侧边栏界面
+│   └── shared/               # 共享组件和工具
+├── server/                   # 后端API服务
+│   ├── src/
+│   │   ├── routes/           # API路由
+│   │   ├── services/         # 业务逻辑
+│   │   ├── controllers/      # 控制器
+│   │   └── utils/            # 工具函数
+│   ├── prisma/               # 数据库Schema
+│   └── .env                  # 环境变量
+└── textbook/                 # 教材内容 (用于RAG)
+    ├── raw/                  # 原始教材文件
+    ├── processed/            # 处理后的内容
+    └── embeddings/           # 向量化数据
+```
+
+## 核心API设计
+
+```typescript
+// 认证
+POST   /api/auth/login
+POST   /api/auth/register
+
+// 作业相关
+POST   /api/submissions          // 提交作业
+GET    /api/submissions/:id      // 获取作业详情
+GET    /api/submissions/my       // 我的作业列表
+
+// AI服务
+POST   /api/ai/hmer             // 手写识别
+POST   /api/ai/grading          // 作业批改
+POST   /api/ai/analysis         // 错题分析
+
+// RAG服务
+POST   /api/rag/query           // 智能问答
+GET    /api/rag/similar         // 查找相似题目
+POST   /api/rag/match-exercise  // 匹配练习题
+
+// 学习分析
+GET    /api/analytics/dashboard  // 学习概览
+GET    /api/analytics/errors     // 错题统计
+```
+
+## RAG系统配置
+
+### 教材处理流程
+1. **内容提取**: PDF/Word → 结构化文本
+2. **内容分类**: 概念/例题/习题/答案
+3. **向量化**: OpenAI Embeddings
+4. **存储**: PostgreSQL + pgvector扩展
+
+### RAG功能
+- **智能问答**: 基于教材内容回答学生疑问
+- **习题匹配**: 根据错题推荐相关练习
+- **概念解释**: 自动查找相关知识点解释
+- **答案验证**: 对照标准答案进行批改
+
+### 向量数据库配置
+```sql
+-- 启用pgvector扩展
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- 创建向量索引
+CREATE INDEX textbook_embedding_idx ON textbook_content 
+USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+```
+
+## 核心功能实现要点
+
+### 手写识别流程
+1. 学生上传作业图片
+2. 调用HMER API识别数学表达式
+3. 转换为LaTeX格式存储
+4. AI分析解题步骤和错误
+
+### RAG问答流程
+1. 学生提问或遇到错题
+2. 向量化查询内容
+3. 搜索相似教材内容
+4. 结合上下文生成回答
+
+### 个性化复习
+1. 分析学生错题模式
+2. 识别薄弱知识点
+3. 从教材中匹配相关内容
+4. 生成个性化复习计划
+
+## 安全和性能
+- JWT Token认证
+- 文件上传大小限制
+- API请求频率限制
+- 数据库查询优化
+- 图片压缩和CDN
+
+## 注意事项
+- Chrome插件遵循Manifest V3规范
+- 数据库连接池配置合理大小
+- AI API调用做好错误处理和重试
+- 向量搜索性能优化
+- 教材版权问题需要注意
