@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI微积分助教 - 侧边栏</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 100%;
+      height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f7fa;
+      overflow-x: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .header p {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    .container {
+      padding: 20px;
+      height: calc(100vh - 80px);
+      overflow-y: auto;
+    }
+
+    .upload-section {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .upload-area {
+      border: 2px dashed #ddd;
+      border-radius: 8px;
+      padding: 30px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-bottom: 15px;
+    }
+
+    .upload-area:hover {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+
+    .upload-area.dragover {
+      border-color: #667eea;
+      background: #f0f2ff;
+    }
+
+    .upload-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .upload-text {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 5px;
+    }
+
+    .upload-hint {
+      font-size: 12px;
+      color: #999;
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    .btn:hover {
+      background: #5a6fd8;
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+    }
+
+    .btn-secondary:hover {
+      background: #5a6268;
+    }
+
+    .results-section {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: none;
+    }
+
+    .result-item {
+      border: 1px solid #eee;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      background: #fafbfc;
+    }
+
+    .result-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .result-header {
+      display: flex;
+      justify-content: between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .result-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .result-score {
+      font-size: 18px;
+      font-weight: bold;
+      color: #667eea;
+    }
+
+    .result-content {
+      font-size: 13px;
+      color: #666;
+      line-height: 1.5;
+    }
+
+    .math-expression {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 4px;
+      padding: 8px;
+      margin: 8px 0;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+    }
+
+    .error-highlight {
+      background: #fff5f5;
+      border-left: 3px solid #f56565;
+      padding: 8px 12px;
+      margin: 8px 0;
+    }
+
+    .suggestion {
+      background: #f0f9ff;
+      border-left: 3px solid #3b82f6;
+      padding: 8px 12px;
+      margin: 8px 0;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px 20px;
+      color: #666;
+    }
+
+    .loading-spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .status {
+      padding: 10px 15px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 13px;
+      display: none;
+    }
+
+    .status.success {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+    }
+
+    .status.error {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+    }
+
+    .status.info {
+      background: #cce7ff;
+      border: 1px solid #b3d9ff;
+      color: #004085;
+    }
+
+    .progress {
+      width: 100%;
+      height: 6px;
+      background: #e9ecef;
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 10px 0;
+      display: none;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #999;
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 15px;
+    }
+
+    .tabs {
+      display: flex;
+      background: white;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .tab {
+      flex: 1;
+      padding: 12px 16px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 14px;
+      color: #666;
+      background: #f8f9fa;
+      border: none;
+      transition: all 0.3s ease;
+    }
+
+    .tab.active {
+      background: #667eea;
+      color: white;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📚 AI微积分助教</h1>
+    <p>智能批改 · 错题分析 · 学习建议</p>
+  </div>
+
+  <div class="container">
+    <!-- 状态显示 -->
+    <div class="status" id="status"></div>
+
+    <!-- 进度条 -->
+    <div class="progress" id="progress">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <!-- 标签页 -->
+    <div class="tabs">
+      <button class="tab active" data-tab="upload">📤 上传作业</button>
+      <button class="tab" data-tab="results">📊 批改结果</button>
+      <button class="tab" data-tab="history">📋 历史记录</button>
+    </div>
+
+    <!-- 上传作业标签页 -->
+    <div class="tab-content active" id="upload-tab">
+      <div class="upload-section">
+        <div class="section-title">
+          <span>📝</span>
+          上传作业文件
+        </div>
+        
+        <div class="upload-area" id="uploadArea">
+          <div class="upload-icon">📄</div>
+          <div class="upload-text">点击上传或拖拽文件到这里</div>
+          <div class="upload-hint">支持 PDF、TXT、JPG、PNG 格式，最大10MB</div>
+        </div>
+
+        <input type="file" id="fileInput" class="file-input" accept=".pdf,.txt,.jpg,.jpeg,.png" multiple>
+        
+        <button class="btn" id="uploadBtn">选择文件</button>
+        <button class="btn btn-secondary" id="pasteBtn">粘贴图片</button>
+      </div>
+    </div>
+
+    <!-- 批改结果标签页 -->
+    <div class="tab-content" id="results-tab">
+      <div class="results-section" id="resultsSection">
+        <div class="section-title">
+          <span>🎯</span>
+          最新批改结果
+        </div>
+        
+        <div id="resultsContainer">
+          <div class="empty-state">
+            <div class="empty-icon">📝</div>
+            <p>还没有批改结果</p>
+            <p>上传作业开始AI批改吧！</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 历史记录标签页 -->
+    <div class="tab-content" id="history-tab">
+      <div class="upload-section">
+        <div class="section-title">
+          <span>📚</span>
+          历史记录
+        </div>
+        
+        <div id="historyContainer">
+          <div class="empty-state">
+            <div class="empty-icon">📊</div>
+            <p>历史记录功能开发中</p>
+            <p>敬请期待...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="index.js"></script>
+  <script src="../student/homework-upload.js"></script>
+</body>
+</html> 
