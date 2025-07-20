@@ -482,7 +482,14 @@ export class HomeworkUpload {
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '处理失败';
-      this.showError(errorMessage);
+      
+      // 检查是否是网络连接错误（后端未部署）
+      if (errorMessage.includes('网络请求失败') || errorMessage.includes('Failed to fetch')) {
+        this.showError('后端服务还未部署，目前只能预览界面功能。请等待后端API开发完成。');
+      } else {
+        this.showError(`处理失败: ${errorMessage}`);
+      }
+      
       this.hideProgress();
     }
   }

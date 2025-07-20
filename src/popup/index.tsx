@@ -236,14 +236,56 @@ document.addEventListener('DOMContentLoaded', function() {
   // 打开侧边栏
   async function openSidePanel() {
     try {
-      const [tab] = await (chrome as any).tabs.query({ active: true, currentWindow: true });
-      if (tab.id) {
-        await (chrome as any).sidePanel.open({ tabId: tab.id });
-        window.close(); // 关闭popup
+      // 检查Chrome版本和API可用性
+      if (typeof chrome === 'undefined') {
+        throw new Error('Chrome扩展API不可用');
       }
+
+      // 尝试不同的方式打开侧边栏
+      if ((chrome as any).sidePanel && (chrome as any).sidePanel.open) {
+        // Chrome 114+ 的新API
+        const [tab] = await (chrome as any).tabs.query({ active: true, currentWindow: true });
+        if (!tab || !tab.id) {
+          throw new Error('无法获取当前标签页');
+        }
+        await (chrome as any).sidePanel.open({ tabId: tab.id });
+        window.close();
+      } else if ((chrome as any).sidePanel && (chrome as any).sidePanel.setOptions) {
+        // 备用方案：设置侧边栏选项
+        await (chrome as any).sidePanel.setOptions({
+          path: 'sidepanel/index.html',
+          enabled: true
+        });
+        showStatus('侧边栏已启用，请点击浏览器侧边栏按钮打开', 'success');
+      } else {
+        // 降级方案：打开新标签页
+        const url = chrome.runtime.getURL('sidepanel/index.html');
+        await (chrome as any).tabs.create({ url });
+        window.close();
+      }
+      
     } catch (error) {
       console.error('打开侧边栏失败:', error);
-      showStatus('打开侧边栏失败', 'error');
+      
+      // 显示用户友好的错误信息
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
+      
+      if (errorMessage.includes('API Unavailable') || errorMessage.includes('sidePanel')) {
+        showStatus('Chrome版本不支持侧边栏，正在新标签页中打开...', 'info');
+        
+        // 备选方案：新标签页打开
+        setTimeout(async () => {
+          try {
+            const url = chrome.runtime.getURL('sidepanel/index.html');
+            await (chrome as any).tabs.create({ url });
+            window.close();
+          } catch (fallbackError) {
+            showStatus('请手动打开插件进行使用', 'error');
+          }
+        }, 1000);
+      } else {
+        showStatus(`打开失败: ${errorMessage}`, 'error');
+      }
     }
   }
 

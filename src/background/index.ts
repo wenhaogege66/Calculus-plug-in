@@ -1,7 +1,5 @@
 // Chrome插件Service Worker后台脚本
 
-declare const chrome: any;
-
 // 插件安装时初始化
 chrome.runtime.onInstalled.addListener(() => {
   console.log('AI微积分助教插件已安装');
@@ -17,23 +15,27 @@ chrome.runtime.onInstalled.addListener(() => {
     }
   });
 
-  // 创建上下文菜单
-  chrome.contextMenus.create({
-    id: 'uploadHomework',
-    title: '上传作业到AI助教',
-    contexts: ['page']
-  });
-});
-
-// 上下文菜单点击处理
-chrome.contextMenus.onClicked.addListener((info: any, tab: any) => {
-  if (info.menuItemId === 'uploadHomework') {
-    // 打开侧边栏
-    if (tab?.id) {
-      chrome.sidePanel.open({ tabId: tab.id });
-    }
+  // 创建上下文菜单 (如果API可用)
+  if (chrome.contextMenus) {
+    chrome.contextMenus.create({
+      id: 'uploadHomework',
+      title: '上传作业到AI助教',
+      contexts: ['page']
+    });
   }
 });
+
+// 上下文菜单点击处理 (如果API可用)
+if (chrome.contextMenus && chrome.contextMenus.onClicked) {
+  chrome.contextMenus.onClicked.addListener((info: any, tab: any) => {
+    if (info.menuItemId === 'uploadHomework') {
+      // 打开侧边栏
+      if (tab?.id && chrome.sidePanel) {
+        chrome.sidePanel.open({ tabId: tab.id });
+      }
+    }
+  });
+}
 
 // 处理来自content script和popup的消息
 chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: any) => {

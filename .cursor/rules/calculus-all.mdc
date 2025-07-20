@@ -1,6 +1,8 @@
 
 # AI微积分助教Chrome插件开发规范
 
+-不要为了功能的实现用mock数据
+
 ## 环境变量配置
 ```bash
 # .env
@@ -14,84 +16,6 @@ MYSCRIPT_HMAC_KEY=c3bb9617-8d2e-4e6f-b4d2-1c9f8a2682fa
 CHROMA_HOST=localhost
 CHROMA_PORT=8000
 MAX_FILE_SIZE=10485760
-```
-
-## 数据库Schema
-```sql
--- 用户表
-CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    role VARCHAR(20) NOT NULL DEFAULT 'student',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- 作业提交表
-CREATE TABLE submissions (
-    id SERIAL PRIMARY KEY,
-    student_id INTEGER REFERENCES users(id),
-    title VARCHAR(200),
-    file_urls TEXT[],
-    myscript_result JSONB,
-    ai_grading JSONB,
-    score INTEGER,
-    submitted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- 错题记录表
-CREATE TABLE error_records (
-    id SERIAL PRIMARY KEY,
-    submission_id INTEGER REFERENCES submissions(id),
-    student_id INTEGER REFERENCES users(id),
-    question_content JSONB,
-    student_answer JSONB,
-    correct_answer JSONB,
-    error_type VARCHAR(50),
-    knowledge_points TEXT[],
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-## Chrome插件Manifest配置
-```json
-{
-  "manifest_version": 3,
-  "name": "AI微积分助教",
-  "version": "1.0.0",
-  "description": "智能微积分学习助手",
-  
-  "permissions": [
-    "storage",
-    "activeTab",
-    "scripting"
-  ],
-  
-  "host_permissions": [
-    "https://ap-southeast-1.run.claw.cloud/*"
-  ],
-  
-  "background": {
-    "service_worker": "background/index.js"
-  },
-  
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content/index.js"],
-      "css": ["content/styles.css"]
-    }
-  ],
-  
-  "action": {
-    "default_popup": "popup/index.html"
-  },
-  
-  "side_panel": {
-    "default_path": "sidepanel/index.html"
-  }
-}
 ```
 
 ## API路由设计

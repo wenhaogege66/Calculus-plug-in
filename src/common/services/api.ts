@@ -6,7 +6,7 @@ export class ApiService {
   private baseUrl: string;
   private apiKey?: string;
 
-  constructor(baseUrl: string = 'https://ap-southeast-1.run.claw.cloud/api') {
+  constructor(baseUrl: string = 'http://localhost:3000/api') {
     this.baseUrl = baseUrl;
   }
 
