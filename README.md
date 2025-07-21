@@ -1,237 +1,150 @@
-# AI微积分助教Chrome插件
+# AI微积分助教 Chrome插件
 
-## 📚 项目概述
-
-AI驱动的微积分助教Chrome插件，分为学生端和教师端，支持手写作业批改、错题解析、个性化学习建议。
-
-### 🎯 核心功能
-
-#### 学生端功能
-- **手写作业批改**: 上传PDF/图片作业，MyScript识别数学表达式
-- **AI智能批改**: Deepseek AI分析解题步骤，标注错误和改进建议
-- **错题解析**: 详细的错误分析和正确解法说明
-- **个性化复习手册**: 基于错题生成针对性复习内容
-- **智能问答**: 基于教材内容的RAG问答系统
-
-#### 教师端功能
-- **学情概览**: 班级整体学习情况统计分析
-- **错题分析**: 全班常见错误模式和知识点薄弱环节
-- **教学建议**: AI生成的针对性教学建议
-- **优秀作业推荐**: 自动识别和推荐优秀作业
+基于Plasmo框架开发的智能微积分学习助手，支持作业批改和个性化学习建议。
 
 ## 🏗️ 技术架构
 
 ### 前端技术栈
-- **Chrome插件**: Manifest V3 + React 18 + TypeScript
-- **UI组件**: Ant Design
-- **状态管理**: Redux Toolkit
-- **构建工具**: Webpack 5
+- **Chrome插件**: Plasmo框架 + React 18 + TypeScript
+- **UI组件**: 原生CSS + 响应式设计
+- **状态管理**: React Hooks + Context
+- **构建工具**: Plasmo内置构建系统
 
 ### 后端技术栈
-- **API服务**: Node.js + Express + TypeScript
-- **数据库**: PostgreSQL (用户数据、作业记录)
-- **向量数据库**: Chroma (教材内容、RAG搜索)
-- **AI服务**: 
-  - Deepseek (智能批改和问答)
-  - MyScript Interactive Ink (手写识别)
-- **部署**: ClawCloud容器化部署
+- **API服务**: Node.js + Fastify + TypeScript
+- **数据库**: Neon PostgreSQL (云数据库)
+- **AI服务**: MyScript (OCR) + Deepseek (批改)
 
 ### 数据流架构
 ```
-Chrome插件 -> Express API -> {
-  PostgreSQL (结构化数据)
-  Chroma (向量搜索)
-  MyScript API (手写识别)
-  Deepseek API (AI分析)
-}
+Chrome插件 (Plasmo) → Fastify API → Neon PostgreSQL
+                  ↓
+               MyScript OCR
+                  ↓
+               Deepseek AI
 ```
 
 ## 🚀 快速开始
 
 ### 环境要求
-- Node.js 18+
-- Python 3.8+ (用于Chroma)
-- Chrome浏览器
-- PostgreSQL 数据库
+- Node.js >= 18
+- pnpm >= 8
+- Chrome浏览器 >= 88
+- Neon PostgreSQL账户
 
 ### 安装依赖
 ```bash
-# 安装Node.js依赖
+# 安装前端依赖
+pnpm install
+
+# 安装后端依赖
+cd backend
 npm install
-
-# 安装Python依赖 (Chroma)
-pip install chromadb
-
-# 启动Chroma服务
-chroma run --host localhost --port 8000
 ```
 
-### 开发环境启动
+### 环境配置
 ```bash
-# 启动后端API服务
-npm run dev:server
+# 复制环境变量文件
+cp env.example backend/.env
 
-# 构建Chrome插件
-npm run dev:extension
-
-# 处理教材内容 (有教材后执行)
-npm run process-textbook
+# 编辑backend/.env，填入您的配置:
+# - DATABASE_URL: Neon PostgreSQL连接字符串
+# - DEEPSEEK_API_KEY: Deepseek AI API密钥
+# - MYSCRIPT_*: MyScript OCR配置
 ```
 
-### Chrome插件安装
-1. 打开 `chrome://extensions/`
-2. 开启"开发者模式"
-3. 点击"加载已解压的扩展程序"
-4. 选择项目的 `dist/` 目录
+### 数据库初始化
+```bash
+cd backend
+npm run db:init
+```
+
+### 开发环境
+```bash
+# 启动前端开发服务器
+pnpm dev
+
+# 启动后端服务器
+cd backend
+npm run dev
+```
+
+### 构建项目
+```bash
+# 构建Chrome扩展
+pnpm build
+
+# 构建后端
+cd backend
+npm run build
+```
 
 ## 📁 项目结构
 
 ```
-/
-├── README.md                  # 项目说明
-├── .cursor/rules/             # 开发规范
-├── src/                       # Chrome插件前端
-│   ├── background/           # Service Worker
-│   ├── content/              # Content Scripts
-│   ├── popup/                # 弹窗界面
-│   ├── sidepanel/            # 侧边栏界面
-│   └── shared/               # 共享组件
-├── server/                   # 后端API服务
+Calculus/
+├── popup.tsx              # Popup界面 (React组件)
+├── sidepanel.tsx          # 侧边栏界面 (React组件)
+├── background.ts          # Service Worker
+├── *.css                  # 样式文件
+├── backend/               # Fastify后端服务
 │   ├── src/
-│   │   ├── routes/           # API路由
-│   │   ├── services/         # 业务逻辑
-│   │   └── db/               # 数据库操作
-│   ├── chroma/               # Chroma向量数据
-│   └── textbook/             # 教材内容处理
-├── docker/                   # 容器化配置
-├── scripts/                  # 工具脚本
-└── dist/                     # 构建输出
+│   │   ├── app.ts        # Fastify应用
+│   │   └── db/           # 数据库相关
+│   └── package.json
+├── book/                  # 微积分教材PDF
+└── .cursor/              # Cursor IDE规则
 ```
 
-## 🎮 功能演示
+## 🔧 Chrome扩展加载
 
-### 学生使用流程
-1. **上传作业**: 在任意网页点击插件，上传PDF/图片作业
-2. **自动识别**: MyScript识别手写数学表达式
-3. **AI批改**: Deepseek分析解题过程，标注错误
-4. **查看结果**: 侧边栏显示详细批改结果和建议
-5. **智能问答**: 遇到问题可基于教材内容提问
+1. 运行 `pnpm build` 构建项目
+2. 打开 Chrome 浏览器，访问 `chrome://extensions/`
+3. 开启"开发者模式"
+4. 点击"加载已解压的扩展程序"
+5. 选择 `build/chrome-mv3-prod` 目录
 
-### 教师使用流程
-1. **查看统计**: 插件显示班级学习情况概览
-2. **错题分析**: 查看全班常见错误和知识点掌握情况
-3. **教学调整**: 根据AI建议调整教学重点
-4. **优秀推荐**: 自动推荐优秀作业供学习参考
+## 📖 使用指南
 
-## 🔧 配置说明
+1. **上传作业**: 在popup或侧边栏中上传PDF、图片等作业文件
+2. **AI批改**: 系统自动进行手写识别和AI批改
+3. **查看结果**: 在侧边栏查看批改结果和学习建议
 
-### 环境变量配置
-复制 `.env.example` 为 `.env` 并配置以下变量：
+## 🛠️ API接口
 
-```bash
-# 数据库配置
-DATABASE_URL=postgresql://user:pass@host:port/db
-
-# AI服务配置
-DEEPSEEK_API_KEY=your-deepseek-api-key
-MYSCRIPT_APPLICATION_KEY=your-myscript-app-key
-MYSCRIPT_HMAC_KEY=your-myscript-hmac-key
-
-# Chroma配置
-CHROMA_HOST=localhost
-CHROMA_PORT=8000
-
-# 其他配置
-JWT_SECRET=your-jwt-secret
-MAX_FILE_SIZE=10485760
-```
-
-### MyScript配置
-1. 访问 [MyScript Developer Portal](https://developer.myscript.com/)
-2. 创建应用获取 Application Key 和 HMAC Key
-3. 配置为数学表达式识别模式
-
-### Deepseek配置
-1. 访问 [Deepseek平台](https://platform.deepseek.com/)
-2. 获取API密钥
-3. 配置到环境变量中
-
-## 🐳 容器化部署
-
-### Docker部署
-```bash
-# 构建镜像
-docker build -t calculus-ai-extension .
-
-# 运行容器
-docker run -p 3000:3000 -p 8000:8000 \
-  -e DATABASE_URL="your-db-url" \
-  -e DEEPSEEK_API_KEY="your-key" \
-  calculus-ai-extension
-```
-
-### ClawCloud部署
-1. 推送代码到Git仓库
-2. 在ClawCloud创建新应用
-3. 配置环境变量
-4. 部署并启动服务
-
-## 📊 API文档
-
-### 认证接口
-- `POST /api/auth/login` - 用户登录
-- `POST /api/auth/register` - 用户注册
-
-### 作业接口
+### 主要端点
+- `GET /api/health` - 系统健康检查
+- `POST /api/files` - 文件上传
 - `POST /api/submissions` - 提交作业
-- `GET /api/submissions/:id` - 获取作业详情
-- `GET /api/submissions/my` - 我的作业列表
+- `POST /api/ocr/myscript` - MyScript识别
+- `POST /api/ai/deepseek/grade` - AI批改
 
-### AI服务接口
-- `POST /api/ai/myscript` - MyScript手写识别
-- `POST /api/ai/grading` - AI作业批改
-- `POST /api/ai/analysis` - 错题分析
+### 示例请求
+```javascript
+// 文件上传
+const formData = new FormData();
+formData.append('file', file);
+const response = await fetch('http://localhost:3000/api/files', {
+  method: 'POST',
+  body: formData
+});
+```
 
-### RAG接口 (开发中)
-- `POST /api/rag/query` - 智能问答
-- `GET /api/rag/similar` - 查找相似题目
+## 🔗 相关文档
 
-## 🤝 贡献指南
+- [Plasmo框架文档](https://docs.plasmo.com/)
+- [Fastify文档](https://www.fastify.io/)
+- [Neon PostgreSQL](https://neon.tech/)
+- [MyScript API](https://developer.myscript.com/)
+- [Deepseek API](https://platform.deepseek.com/)
 
-### 开发流程
-1. Fork项目到个人仓库
-2. 创建功能分支: `git checkout -b feature/new-feature`
-3. 提交更改: `git commit -m 'Add new feature'`
-4. 推送分支: `git push origin feature/new-feature`
-5. 创建Pull Request
+## 📝 开发说明
 
-### 代码规范
-- 遵循TypeScript严格模式
-- 使用ESLint和Prettier格式化代码
-- 编写单元测试覆盖核心功能
-- 提交信息使用约定式提交格式
+- 前端使用Plasmo框架，遵循React开发规范
+- 后端使用Fastify，支持插件化架构
+- 数据库使用Neon PostgreSQL，支持SSL连接
+- AI服务集成MyScript和Deepseek，提供OCR和批改功能
 
-## 📝 许可证
+## 🔄 版本历史
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
-
-## 📧 联系我们
-
-- 项目地址: [GitHub Repository](https://github.com/username/calculus-ai-extension)
-- 问题反馈: [Issues](https://github.com/username/calculus-ai-extension/issues)
-- 邮箱: your-email@example.com
-
-## 🔄 更新日志
-
-### v1.0.0 (开发中)
-- ✅ Chrome插件基础框架
-- ✅ MyScript手写识别集成
-- ✅ Deepseek AI批改功能
-- ✅ 基础的作业上传和处理
-- 🚧 RAG智能问答系统 (等待教材)
-- 🚧 教师端功能
-- 🚧 数据分析和可视化
-
----
-
-⭐ 如果这个项目对您有帮助，请给我们一个Star！ 
+- v1.0.0: 基础功能完成，支持文件上传和AI批改

@@ -1,8 +1,8 @@
-// Chrome插件Service Worker后台脚本
+// AI微积分助教 - Plasmo Background Script
 
 // 插件安装时初始化
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('AI微积分助教插件已安装');
+  console.log('AI微积分助教插件已安装 (Plasmo版本)');
   
   // 初始化存储
   chrome.storage.sync.set({
@@ -15,7 +15,7 @@ chrome.runtime.onInstalled.addListener(() => {
     }
   });
 
-  // 创建上下文菜单 (如果API可用)
+  // 创建上下文菜单
   if (chrome.contextMenus) {
     chrome.contextMenus.create({
       id: 'uploadHomework',
@@ -25,7 +25,7 @@ chrome.runtime.onInstalled.addListener(() => {
   }
 });
 
-// 上下文菜单点击处理 (如果API可用)
+// 上下文菜单点击处理
 if (chrome.contextMenus && chrome.contextMenus.onClicked) {
   chrome.contextMenus.onClicked.addListener((info: any, tab: any) => {
     if (info.menuItemId === 'uploadHomework') {
@@ -46,7 +46,7 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: a
       handleFileUpload(message.data)
         .then((result: any) => sendResponse({ success: true, data: result }))
         .catch((error: any) => sendResponse({ success: false, error: error.message }));
-      return true; // 保持消息通道开放用于异步响应
+      return true;
 
     case 'GET_USER_STATUS':
       chrome.storage.sync.get(['isLoggedIn', 'userProfile'], (result: any) => {
@@ -56,6 +56,18 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: a
 
     case 'SAVE_SUBMISSION':
       handleSaveSubmission(message.data)
+        .then((result: any) => sendResponse({ success: true, data: result }))
+        .catch((error: any) => sendResponse({ success: false, error: error.message }));
+      return true;
+
+    case 'PROCESS_MYSCRIPT':
+      callMyScriptAPI(message.data)
+        .then((result: any) => sendResponse({ success: true, data: result }))
+        .catch((error: any) => sendResponse({ success: false, error: error.message }));
+      return true;
+
+    case 'PROCESS_DEEPSEEK':
+      callDeepseekAPI(message.data)
         .then((result: any) => sendResponse({ success: true, data: result }))
         .catch((error: any) => sendResponse({ success: false, error: error.message }));
       return true;
@@ -70,16 +82,9 @@ async function handleFileUpload(fileData: { file: File; type: string }) {
   try {
     const formData = new FormData();
     formData.append('file', fileData.file);
-    formData.append('type', fileData.type);
 
-    // 获取用户token
-    const storage = await chrome.storage.sync.get(['userToken']);
-    
-    const response = await fetch('https://ap-southeast-1.run.claw.cloud/api/upload', {
+    const response = await fetch('http://localhost:3000/api/files', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${storage.userToken}`
-      },
       body: formData
     });
 
@@ -98,13 +103,10 @@ async function handleFileUpload(fileData: { file: File; type: string }) {
 // 保存作业提交
 async function handleSaveSubmission(submissionData: any) {
   try {
-    const storage = await chrome.storage.sync.get(['userToken']);
-    
-    const response = await fetch('https://ap-southeast-1.run.claw.cloud/api/submissions', {
+    const response = await fetch('http://localhost:3000/api/submissions', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${storage.userToken}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(submissionData)
     });
@@ -124,13 +126,10 @@ async function handleSaveSubmission(submissionData: any) {
 // MyScript识别处理
 async function callMyScriptAPI(imageData: string) {
   try {
-    const storage = await chrome.storage.sync.get(['userToken']);
-    
-    const response = await fetch('https://ap-southeast-1.run.claw.cloud/api/ai/myscript', {
+    const response = await fetch('http://localhost:3000/api/ocr/myscript', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${storage.userToken}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ imageData })
     });
@@ -149,15 +148,12 @@ async function callMyScriptAPI(imageData: string) {
 // Deepseek AI批改处理
 async function callDeepseekAPI(content: string) {
   try {
-    const storage = await chrome.storage.sync.get(['userToken']);
-    
-    const response = await fetch('https://ap-southeast-1.run.claw.cloud/api/ai/grading', {
+    const response = await fetch('http://localhost:3000/api/ai/deepseek/grade', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${storage.userToken}`
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ content })
+      body: JSON.stringify({ recognizedContent: content })
     });
 
     if (!response.ok) {
@@ -169,14 +165,4 @@ async function callDeepseekAPI(content: string) {
     console.error('Deepseek批改失败:', error);
     throw error;
   }
-}
-
-// 导出供其他模块使用
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).backgroundAPI = {
-    callMyScriptAPI,
-    callDeepseekAPI,
-    handleFileUpload,
-    handleSaveSubmission
-  };
 } 

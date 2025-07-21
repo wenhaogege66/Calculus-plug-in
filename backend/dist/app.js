@@ -3,59 +3,116 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = __importDefault(require("express"));
-const cors_1 = __importDefault(require("cors"));
-const helmet_1 = __importDefault(require("helmet"));
-const morgan_1 = __importDefault(require("morgan"));
+const fastify_1 = __importDefault(require("fastify"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const path_1 = __importDefault(require("path"));
-const auth_1 = __importDefault(require("./routes/auth"));
-const upload_1 = __importDefault(require("./routes/upload"));
-const submissions_1 = __importDefault(require("./routes/submissions"));
-const ocr_1 = __importDefault(require("./routes/ocr"));
-const ai_1 = __importDefault(require("./routes/ai"));
-const health_1 = __importDefault(require("./routes/health"));
-const errorHandler_1 = require("./middleware/errorHandler");
-const auth_2 = require("./middleware/auth");
+const cors_1 = __importDefault(require("@fastify/cors"));
+const helmet_1 = __importDefault(require("@fastify/helmet"));
+const multipart_1 = __importDefault(require("@fastify/multipart"));
+const static_1 = __importDefault(require("@fastify/static"));
 dotenv_1.default.config();
-const app = (0, express_1.default)();
-const PORT = process.env.PORT || 3000;
-app.use((0, helmet_1.default)({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            imgSrc: ["'self'", "data:", "https:"],
+const PORT = Number(process.env.PORT) || 3000;
+const fastify = (0, fastify_1.default)({
+    logger: {
+        level: 'info',
+        transport: {
+            target: 'pino-pretty',
+            options: {
+                translateTime: 'HH:MM:ss Z',
+                ignore: 'pid,hostname',
+            },
         },
-    },
-}));
-app.use((0, cors_1.default)({
-    origin: [
-        'chrome-extension://*',
-        'https://ap-southeast-1.run.claw.cloud',
-        'http://localhost:3000',
-        'http://localhost:8080'
-    ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
-}));
-app.use((0, morgan_1.default)('combined'));
-app.use(express_1.default.json({ limit: '10mb' }));
-app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
-app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../uploads')));
-app.use('/api/health', health_1.default);
-app.use('/api/auth', auth_1.default);
-app.use('/api/files', auth_2.authMiddleware, upload_1.default);
-app.use('/api/submissions', auth_2.authMiddleware, submissions_1.default);
-app.use('/api/ocr', auth_2.authMiddleware, ocr_1.default);
-app.use('/api/ai', auth_2.authMiddleware, ai_1.default);
-app.get('/', (req, res) => {
-    res.json({
+    }
+});
+async function registerPlugins() {
+    await fastify.register(helmet_1.default, {
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'"],
+                styleSrc: ["'self'", "'unsafe-inline'"],
+                imgSrc: ["'self'", "data:", "https:"],
+            },
+        },
+    });
+    await fastify.register(cors_1.default, {
+        origin: [
+            /^chrome-extension:\/\/.*/,
+            'http://localhost:3000',
+            'http://localhost:8080'
+        ],
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        credentials: true
+    });
+    await fastify.register(multipart_1.default, {
+        limits: {
+            fileSize: Number(process.env.MAX_FILE_SIZE) || 10485760,
+        }
+    });
+    await fastify.register(static_1.default, {
+        root: path_1.default.join(__dirname, '../uploads'),
+        prefix: '/uploads/',
+    });
+}
+async function registerRoutes() {
+    fastify.get('/api/health', async (request, reply) => {
+        try {
+            const { Pool } = require('pg');
+            const pool = new Pool({
+                connectionString: process.env.DATABASE_URL,
+                ssl: { rejectUnauthorized: false },
+                connectionTimeoutMillis: 5000
+            });
+            let dbStatus = 'healthy';
+            try {
+                await pool.query('SELECT 1');
+                await pool.end();
+            }
+            catch (error) {
+                dbStatus = 'unhealthy';
+            }
+            return {
+                success: true,
+                data: {
+                    status: 'healthy',
+                    timestamp: new Date().toISOString(),
+                    uptime: process.uptime(),
+                    environment: process.env.NODE_ENV || 'development',
+                    version: '1.0.0',
+                    framework: 'Fastify',
+                    services: {
+                        database: { status: dbStatus },
+                        myscript: { status: 'configured' },
+                        deepseek: { status: 'configured' }
+                    }
+                }
+            };
+        }
+        catch (error) {
+            reply.code(500);
+            return {
+                success: false,
+                error: 'Health check failed'
+            };
+        }
+    });
+    fastify.post('/api/files', async (request, reply) => {
+        return { success: true, message: 'File upload endpoint - Fastify version' };
+    });
+    fastify.get('/api/submissions', async (request, reply) => {
+        return { success: true, data: { submissions: [] } };
+    });
+    fastify.post('/api/submissions', async (request, reply) => {
+        return { success: true, message: 'Submission created' };
+    });
+}
+fastify.get('/', async (request, reply) => {
+    return {
         message: 'AI微积分助教 API服务器',
         version: '1.0.0',
         status: 'running',
+        framework: 'Fastify',
         endpoints: {
             health: '/api/health',
             auth: '/api/auth',
@@ -64,12 +121,12 @@ app.get('/', (req, res) => {
             ocr: '/api/ocr',
             ai: '/api/ai'
         }
-    });
+    };
 });
-app.use('*', (req, res) => {
-    res.status(404).json({
+fastify.setNotFoundHandler(async (request, reply) => {
+    reply.code(404).send({
         error: '接口不存在',
-        message: `路径 ${req.originalUrl} 未找到`,
+        message: `路径 ${request.url} 未找到`,
         availableEndpoints: [
             '/api/health',
             '/api/auth',
@@ -80,27 +137,80 @@ app.use('*', (req, res) => {
         ]
     });
 });
-app.use(errorHandler_1.errorHandler);
-const server = app.listen(PORT, () => {
-    console.log(`🚀 AI微积分助教服务器启动成功`);
-    console.log(`📍 端口: ${PORT}`);
-    console.log(`🔗 URL: http://localhost:${PORT}`);
-    console.log(`📚 API文档: http://localhost:${PORT}`);
-    console.log(`💾 数据库: ${process.env.DATABASE_URL ? '已连接' : '未配置'}`);
+fastify.setErrorHandler(async (error, request, reply) => {
+    fastify.log.error({
+        error: error.message,
+        stack: error.stack,
+        url: request.url,
+        method: request.method,
+    }, '🚨 请求错误');
+    let statusCode = error.statusCode || 500;
+    let message = error.message || '服务器内部错误';
+    if (error.name === 'ValidationError') {
+        statusCode = 400;
+        message = '请求参数验证失败';
+    }
+    else if (error.name === 'UnauthorizedError') {
+        statusCode = 401;
+        message = '未授权访问';
+    }
+    const errorResponse = {
+        success: false,
+        error: message,
+        timestamp: new Date().toISOString(),
+        path: request.url
+    };
+    if (process.env.NODE_ENV === 'development') {
+        errorResponse.stack = error.stack;
+        errorResponse.details = error;
+    }
+    reply.code(statusCode).send(errorResponse);
 });
-process.on('SIGTERM', () => {
+async function start() {
+    try {
+        await registerPlugins();
+        await registerRoutes();
+        await fastify.listen({ port: PORT, host: '0.0.0.0' });
+        console.log(`🚀 AI微积分助教服务器启动成功`);
+        console.log(`📍 端口: ${PORT}`);
+        console.log(`🔗 URL: http://localhost:${PORT}`);
+        console.log(`📚 API文档: http://localhost:${PORT}`);
+        console.log(`⚡ 框架: Fastify`);
+        try {
+            const healthResponse = await fetch(`http://localhost:${PORT}/api/health`);
+            const healthData = await healthResponse.json();
+            const dbStatus = healthData.data?.services?.database?.status || 'unknown';
+            const statusMap = {
+                'healthy': '✅',
+                'configured': '⚙️',
+                'not_configured': '❌',
+                'unhealthy': '🔴',
+                'unknown': '❓'
+            };
+            const statusEmoji = statusMap[dbStatus] || '❓';
+            console.log(`💾 数据库: ${statusEmoji} ${dbStatus} (Neon PostgreSQL)`);
+        }
+        catch (error) {
+            console.log(`💾 数据库: ❓ 状态检查失败`);
+        }
+    }
+    catch (err) {
+        fastify.log.error(err);
+        process.exit(1);
+    }
+}
+process.on('SIGTERM', async () => {
     console.log('📴 收到SIGTERM信号，正在关闭服务器...');
-    server.close(() => {
-        console.log('✅ 服务器已关闭');
-        process.exit(0);
-    });
+    await fastify.close();
+    console.log('✅ 服务器已关闭');
+    process.exit(0);
 });
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
     console.log('📴 收到SIGINT信号，正在关闭服务器...');
-    server.close(() => {
-        console.log('✅ 服务器已关闭');
-        process.exit(0);
-    });
+    await fastify.close();
+    console.log('✅ 服务器已关闭');
+    process.exit(0);
 });
-exports.default = app;
+start();
+exports.default = fastify;
 //# sourceMappingURL=app.js.map

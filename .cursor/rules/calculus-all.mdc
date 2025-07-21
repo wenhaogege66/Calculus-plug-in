@@ -1,41 +1,56 @@
 
 # AI微积分助教Chrome插件开发规范
 
--不要为了功能的实现用mock数据
+## 技术栈
+- **前端**: Plasmo框架 + React 18 + TypeScript
+- **后端**: Fastify + TypeScript + Node.js
+- **数据库**: Neon PostgreSQL (云数据库)
+- **AI服务**: MyScript (OCR) + Deepseek (批改)
+
+## 开发原则
+- 不要为了功能的实现用mock数据
+- 使用真实的数据库和API服务
+- 遵循TypeScript严格模式
 
 ## 环境变量配置
 ```bash
-# .env
-DATABASE_URL=postgresql://postgres:bxw4gpgq@dbprovider.ap-southeast-1.clawcloudrun.com:40493/?directConnection=true
+# .env - 请替换为您的实际配置
+DATABASE_URL=postgresql://neondb_owner:npg_yuJDVHP49ivl@ep-hidden-bonus-a1x6rmyd-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
 JWT_SECRET=wenhaogege
 DEEPSEEK_API_KEY=sk-bddc9add46604b01a44ac29c4abd7152
 MYSCRIPT_API_ENDPOINT=https://cloud.myscript.com/api/v4.0/iink
 MYSCRIPT_WEBSOCKET_ENDPOINT=wss://cloud.myscript.com/api/v4.0/iink/ws
 MYSCRIPT_APPLICATION_KEY=531d295e-bc63-47c1-bcb0-9a49b5a6fb46
 MYSCRIPT_HMAC_KEY=c3bb9617-8d2e-4e6f-b4d2-1c9f8a2682fa
-CHROMA_HOST=localhost
-CHROMA_PORT=8000
 MAX_FILE_SIZE=10485760
+PORT=3000
 ```
 
-## API路由设计
+## Fastify API路由设计
 ```typescript
-// 作业相关
-POST   /api/submissions          // 提交作业
-GET    /api/submissions/:id      // 获取作业详情
-PUT    /api/submissions/:id      // 更新批改结果
-
-// AI服务
-POST   /api/ai/myscript         // MyScript手写识别
-POST   /api/ai/grading          // Deepseek AI批改
-POST   /api/ai/analysis         // 错题分析
-
-// RAG服务 (预留)
-POST   /api/rag/query           // 智能问答
-GET    /api/rag/similar         // 查找相似题目
+// 健康检查
+GET    /api/health              // 系统健康检查
 
 // 文件上传
-POST   /api/upload              // 文件上传
+POST   /api/files               // 文件上传
+
+// 作业相关
+GET    /api/submissions         // 获取作业列表
+POST   /api/submissions         // 提交新作业
+GET    /api/submissions/:id     // 获取作业详情
+PUT    /api/submissions/:id     // 更新批改结果
+
+// OCR识别
+POST   /api/ocr/myscript        // MyScript手写识别
+
+// AI批改服务
+POST   /api/ai/deepseek/grade   // Deepseek AI批改
+GET    /api/ai/config/check     // AI服务配置检查
+
+// 用户认证 (预留)
+POST   /api/auth/login          // 用户登录
+POST   /api/auth/register       // 用户注册
+GET    /api/auth/me             // 获取当前用户
 ```
 
 ## MyScript配置
@@ -64,29 +79,24 @@ const deepseekConfig = {
 };
 ```
 
-## Chroma配置 (预留)
-```javascript
-import { ChromaClient } from 'chromadb';
-import { Chroma } from "langchain/vectorstores/chroma";
 
-const chromaClient = new ChromaClient({
-  path: process.env.CHROMA_HOST || 'http://localhost:8000'
-});
-
-const vectorStore = new Chroma(embeddings, {
-  collectionName: "calculus_textbook",
-  url: process.env.CHROMA_HOST || 'http://localhost:8000'
-});
-```
 
 ## 开发规范
+
+### 前端 (Plasmo框架)
 - TypeScript严格模式
-- 组件使用PascalCase命名
+- React组件使用PascalCase命名
+- 使用React Hooks + Context进行状态管理
+- 遵循Plasmo框架约定的文件结构
+- Chrome Storage API用于本地缓存
+
+### 后端 (Fastify)
 - API路由使用kebab-case
 - 文件上传限制: 10MB
-- 错误处理统一格式: `{ code, message, data }`
+- 错误处理统一格式: `{ success: boolean, error?: string, data?: any }`
 - 异步操作使用async/await
-- Chrome Storage API用于本地缓存
+- 使用Fastify插件系统
+- 数据库查询使用PostgreSQL原生SQL
 
 ## 文件上传处理
 ```javascript
