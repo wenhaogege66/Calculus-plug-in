@@ -28,6 +28,121 @@
   opacity: 0.8;
 }
 
+/* 加载状态样式 */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  padding: 20px;
+  text-align: center;
+}
+
+.loading-icon {
+  font-size: 32px;
+  margin-bottom: 10px;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 用户状态区域 */
+.user-section {
+  padding: 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 8px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.3);
+}
+
+.user-details {
+  flex: 1;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.user-role {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 12px;
+  width: auto;
+  margin: 0;
+}
+
+.btn-secondary {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255,255,255,0.25);
+}
+
+/* 登录区域 */
+.login-section {
+  text-align: center;
+}
+
+.login-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 15px;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.login-icon {
+  font-size: 16px;
+}
+
+.btn-github {
+  background: #333;
+  border: 1px solid #444;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-github:hover:not(:disabled) {
+  background: #444;
+  border-color: #555;
+  transform: translateY(-1px);
+}
+
+.github-icon {
+  font-size: 16px;
+}
+
 .content {
   padding: 20px;
 }
@@ -50,6 +165,17 @@
 .upload-area.dragover {
   border-color: #ffffff;
   background: rgba(255,255,255,0.2);
+}
+
+.upload-area.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-style: solid;
+}
+
+.upload-area.disabled:hover {
+  border-color: rgba(255,255,255,0.3);
+  background: transparent;
 }
 
 .upload-icon {

@@ -1,11 +1,159 @@
-import React, { useState, useRef } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import "./popup.css"
+
+// 用户信息接口
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  avatar_url?: string;
+  role: string;
+  auth_type: string;
+}
 
 function IndexPopup() {
   const [status, setStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' }>({ message: '', type: 'info' })
   const [isUploading, setIsUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // 组件初始化时检查登录状态
+  useEffect(() => {
+    checkLoginStatus()
+  }, [])
+
+  // 检查登录状态
+  const checkLoginStatus = async () => {
+    setIsLoading(true)
+    try {
+      const token = await getStoredToken()
+      if (token) {
+        const userInfo = await verifyToken(token)
+        if (userInfo.success) {
+          setUser(userInfo.data.user)
+          setIsLoggedIn(true)
+          showStatus(`欢迎回来，${userInfo.data.user.username}！`, 'success')
+        } else {
+          // Token无效，清除存储
+          await chrome.storage.sync.remove(['authToken'])
+          setIsLoggedIn(false)
+        }
+      } else {
+        setIsLoggedIn(false)
+      }
+    } catch (error) {
+      console.error('检查登录状态失败:', error)
+      setIsLoggedIn(false)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // 获取存储的token
+  const getStoredToken = (): Promise<string | null> => {
+    return new Promise((resolve) => {
+      chrome.storage.sync.get(['authToken'], (result) => {
+        resolve(result.authToken || null)
+      })
+    })
+  }
+
+  // 存储token
+  const storeToken = (token: string): Promise<void> => {
+    return new Promise((resolve) => {
+      chrome.storage.sync.set({ authToken: token }, () => {
+        resolve()
+      })
+    })
+  }
+
+  // 验证token
+  const verifyToken = async (token: string) => {
+    try {
+      const response = await fetch('http://localhost:3000/api/auth/verify', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      return await response.json()
+    } catch (error) {
+      console.error('Token验证失败:', error)
+      return { success: false, error: '网络错误' }
+    }
+  }
+
+  // GitHub登录
+  const handleGitHubLogin = async () => {
+    try {
+      showStatus('正在重定向到GitHub登录...', 'info')
+      
+      // 获取GitHub OAuth授权URL
+      const response = await fetch('http://localhost:3000/api/auth/github')
+      const data = await response.json()
+      
+      if (data.success) {
+        // 打开GitHub OAuth页面
+        const authWindow = window.open(data.data.authUrl, 'github-auth', 'width=600,height=700')
+        
+        // 监听OAuth回调消息
+        const messageListener = (event: MessageEvent) => {
+          if (event.data?.type === 'GITHUB_AUTH_SUCCESS') {
+            const { token, user: userData } = event.data
+            
+            // 存储token并更新状态
+            storeToken(token).then(() => {
+              setUser(userData)
+              setIsLoggedIn(true)
+              showStatus(`GitHub登录成功！欢迎 ${userData.username}`, 'success')
+              
+              // 关闭认证窗口
+              if (authWindow) {
+                authWindow.close()
+              }
+            })
+            
+            // 移除事件监听器
+            window.removeEventListener('message', messageListener)
+          }
+        }
+        
+        window.addEventListener('message', messageListener)
+        
+        // 检查窗口是否被关闭
+        const checkClosed = setInterval(() => {
+          if (authWindow?.closed) {
+            clearInterval(checkClosed)
+            window.removeEventListener('message', messageListener)
+            showStatus('登录已取消', 'info')
+          }
+        }, 1000)
+        
+      } else {
+        showStatus('获取登录链接失败', 'error')
+      }
+    } catch (error) {
+      console.error('GitHub登录失败:', error)
+      showStatus('登录失败，请重试', 'error')
+    }
+  }
+
+  // 登出
+  const handleLogout = async () => {
+    try {
+      await chrome.storage.sync.remove(['authToken'])
+      setUser(null)
+      setIsLoggedIn(false)
+      showStatus('已成功登出', 'info')
+    } catch (error) {
+      console.error('登出失败:', error)
+      showStatus('登出失败', 'error')
+    }
+  }
 
   // 显示状态信息
   const showStatus = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -62,6 +210,11 @@ function IndexPopup() {
 
   // 处理文件
   const handleFiles = (files: File[]) => {
+    if (!isLoggedIn) {
+      showStatus('请先登录后再上传文件', 'error')
+      return
+    }
+
     const supportedTypes = ['application/pdf', 'text/plain', 'image/jpeg', 'image/png']
     const validFiles = files.filter(file => supportedTypes.includes(file.type))
 
@@ -127,6 +280,18 @@ function IndexPopup() {
     }
   }
 
+  // 加载状态
+  if (isLoading) {
+    return (
+      <div className="popup-container">
+        <div className="loading">
+          <div className="loading-icon">⏳</div>
+          <div>正在检查登录状态...</div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="popup-container">
       <div className="header">
@@ -134,17 +299,50 @@ function IndexPopup() {
         <p>智能作业批改 · 错题解析</p>
       </div>
 
+      {/* 用户状态区域 */}
+      <div className="user-section">
+        {isLoggedIn && user ? (
+          <div className="user-info">
+            <img 
+              src={user.avatar_url || '/icon48.png'} 
+              alt="用户头像" 
+              className="user-avatar"
+            />
+            <div className="user-details">
+              <div className="user-name">{user.username}</div>
+              <div className="user-role">{user.role === 'student' ? '学生' : '教师'}</div>
+            </div>
+            <button className="btn btn-secondary btn-small" onClick={handleLogout}>
+              登出
+            </button>
+          </div>
+        ) : (
+          <div className="login-section">
+            <div className="login-prompt">
+              <span className="login-icon">🔐</span>
+              <span>请先登录以使用完整功能</span>
+            </div>
+            <button className="btn btn-github" onClick={handleGitHubLogin}>
+              <span className="github-icon">🐱</span>
+              使用 GitHub 登录
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="content">
         {/* 上传区域 */}
         <div 
-          className={`upload-area ${dragOver ? 'dragover' : ''}`}
-          onClick={() => fileInputRef.current?.click()}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
+          className={`upload-area ${dragOver ? 'dragover' : ''} ${!isLoggedIn ? 'disabled' : ''}`}
+          onClick={() => isLoggedIn && fileInputRef.current?.click()}
+          onDragOver={isLoggedIn ? handleDragOver : undefined}
+          onDragLeave={isLoggedIn ? handleDragLeave : undefined}
+          onDrop={isLoggedIn ? handleDrop : undefined}
         >
           <div className="upload-icon">📄</div>
-          <div className="upload-text">拖拽文件到这里或点击上传</div>
+          <div className="upload-text">
+            {isLoggedIn ? '拖拽文件到这里或点击上传' : '请先登录后上传文件'}
+          </div>
           <div className="upload-hint">支持 PDF、TXT、JPG、PNG 格式</div>
         </div>
 

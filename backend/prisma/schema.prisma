@@ -1,0 +1,139 @@
+// AI微积分助教 - Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表（支持GitHub OAuth）
+model User {
+  id       Int      @id @default(autoincrement())
+  username String   @db.VarChar(100)
+  email    String   @unique @db.VarChar(255)
+  
+  // 认证相关
+  passwordHash String?   @map("password_hash") @db.VarChar(255)
+  authType     AuthType  @default(LOCAL) @map("auth_type")
+  
+  // GitHub OAuth字段
+  githubId       String? @unique @map("github_id") @db.VarChar(50)
+  githubUsername String? @map("github_username") @db.VarChar(100)
+  avatarUrl      String? @map("avatar_url") @db.VarChar(500)
+  
+  // 用户信息
+  role    UserRole @default(STUDENT)
+  profile Json     @default("{}")
+  
+  // 时间戳
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  // 关联关系
+  fileUploads    FileUpload[]
+  submissions    Submission[]
+  
+  @@map("users")
+}
+
+// 文件上传表
+model FileUpload {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  filename     String   @db.VarChar(255)
+  originalName String   @map("original_name") @db.VarChar(255)
+  filePath     String   @map("file_path") @db.VarChar(500)
+  mimeType     String   @map("mime_type") @db.VarChar(100)
+  fileSize     Int      @map("file_size")
+  uploadType   String   @default("manual") @map("upload_type") @db.VarChar(50)
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  
+  // 关联
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submissions Submission[]
+  
+  @@map("file_uploads")
+}
+
+// 作业提交表
+model Submission {
+  id           Int               @id @default(autoincrement())
+  userId       Int               @map("user_id")
+  fileUploadId Int               @map("file_upload_id")
+  status       SubmissionStatus  @default(UPLOADED)
+  submittedAt  DateTime          @default(now()) @map("submitted_at")
+  completedAt  DateTime?         @map("completed_at")
+  metadata     Json              @default("{}")
+  
+  // 关联
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileUpload   FileUpload        @relation(fields: [fileUploadId], references: [id], onDelete: Cascade)
+  myscriptResults MyScriptResult[]
+  deepseekResults DeepseekResult[]
+  
+  @@map("submissions")
+}
+
+// MyScript OCR结果表
+model MyScriptResult {
+  id             Int      @id @default(autoincrement())
+  submissionId   Int      @map("submission_id")
+  recognizedText String?  @map("recognized_text") @db.Text
+  confidenceScore Decimal? @map("confidence_score") @db.Decimal(5, 4)
+  processingTime Int?     @map("processing_time") // 毫秒
+  rawResult      Json?    @map("raw_result")
+  createdAt      DateTime @default(now()) @map("created_at")
+  
+  // 关联
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  
+  @@map("myscript_results")
+}
+
+// Deepseek AI批改结果表
+model DeepseekResult {
+  id             Int      @id @default(autoincrement())
+  submissionId   Int      @map("submission_id")
+  score          Int?     // 0-100分
+  maxScore       Int      @default(100) @map("max_score")
+  feedback       String?  @db.Text
+  errors         Json     @default("[]")
+  suggestions    Json     @default("[]")
+  strengths      Json     @default("[]")
+  processingTime Int?     @map("processing_time") // 毫秒
+  rawResult      Json?    @map("raw_result")
+  createdAt      DateTime @default(now()) @map("created_at")
+  
+  // 关联
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  
+  @@map("deepseek_results")
+}
+
+// 枚举类型
+enum AuthType {
+  LOCAL  @map("local")
+  GITHUB @map("github")
+  
+  @@map("auth_type")
+}
+
+enum UserRole {
+  STUDENT @map("student")
+  TEACHER @map("teacher")
+  
+  @@map("user_role")
+}
+
+enum SubmissionStatus {
+  UPLOADED   @map("uploaded")
+  PROCESSING @map("processing")
+  COMPLETED  @map("completed")
+  FAILED     @map("failed")
+  
+  @@map("submission_status")
+} 

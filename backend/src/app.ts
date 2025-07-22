@@ -3,17 +3,24 @@
 import Fastify from 'fastify';
 import dotenv from 'dotenv';
 import path from 'path';
+import { PrismaClient } from '@prisma/client';
 
 // 插件导入
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
+import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
 import staticFiles from '@fastify/static';
+
+// 路由导入
+import { authRoutes } from './routes/auth';
+import { requireAuth, optionalAuth } from './middleware/auth';
 
 // 加载环境变量
 dotenv.config();
 
 const PORT = Number(process.env.PORT) || 3000;
+const prisma = new PrismaClient();
 
 // 创建 Fastify 实例
 const fastify = Fastify({
@@ -41,6 +48,11 @@ async function registerPlugins() {
         imgSrc: ["'self'", "data:", "https:"],
       },
     },
+  });
+
+  // JWT插件
+  await fastify.register(jwt, {
+    secret: process.env.JWT_SECRET || 'fallback-secret-key'
   });
 
   // CORS配置
@@ -71,22 +83,16 @@ async function registerPlugins() {
 
 // 注册路由
 async function registerRoutes() {
-  // 暂时使用简化的路由，稍后重构
+  // 注册认证路由
+  await fastify.register(authRoutes, { prefix: '/api' });
   
   // 健康检查路由
   fastify.get('/api/health', async (request, reply) => {
     try {
-      const { Pool } = require('pg');
-      const pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        ssl: { rejectUnauthorized: false },
-        connectionTimeoutMillis: 5000
-      });
-      
       let dbStatus = 'healthy';
       try {
-        await pool.query('SELECT 1');
-        await pool.end();
+        // 使用Prisma进行数据库连接测试
+        await prisma.$queryRaw`SELECT 1`;
       } catch (error) {
         dbStatus = 'unhealthy';
       }
@@ -100,8 +106,9 @@ async function registerRoutes() {
           environment: process.env.NODE_ENV || 'development',
           version: '1.0.0',
           framework: 'Fastify',
+          orm: 'Prisma',
           services: {
-            database: { status: dbStatus },
+            database: { status: dbStatus, type: 'PostgreSQL (Neon)' },
             myscript: { status: 'configured' },
             deepseek: { status: 'configured' }
           }
@@ -115,18 +122,50 @@ async function registerRoutes() {
       };
     }
   });
-  
-  // 临时的简化路由
-  fastify.post('/api/files', async (request, reply) => {
-    return { success: true, message: 'File upload endpoint - Fastify version' };
+
+  // 文件上传路由 (需要认证)
+  fastify.post('/api/files', { preHandler: requireAuth }, async (request, reply) => {
+    return { 
+      success: true, 
+      message: 'File upload endpoint - Fastify + Prisma version',
+      user: request.currentUser 
+    };
   });
   
-  fastify.get('/api/submissions', async (request, reply) => {
-    return { success: true, data: { submissions: [] } };
+  // 获取提交记录 (需要认证)
+  fastify.get('/api/submissions', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const submissions = await prisma.submission.findMany({
+        where: { userId: request.currentUser!.id },
+        include: {
+          fileUpload: true,
+          myscriptResults: true,
+          deepseekResults: true,
+        },
+        orderBy: { submittedAt: 'desc' },
+        take: 10 // 限制返回最近10条
+      });
+
+      return { 
+        success: true, 
+        data: { submissions }
+      };
+    } catch (error) {
+      fastify.log.error('获取提交记录失败:', error);
+      return reply.code(500).send({
+        success: false,
+        error: '获取提交记录失败'
+      });
+    }
   });
   
-  fastify.post('/api/submissions', async (request, reply) => {
-    return { success: true, message: 'Submission created' };
+  // 创建提交 (需要认证)
+  fastify.post('/api/submissions', { preHandler: requireAuth }, async (request, reply) => {
+    return { 
+      success: true, 
+      message: 'Submission created',
+      user: request.currentUser 
+    };
   });
 }
 
@@ -137,6 +176,8 @@ fastify.get('/', async (request, reply) => {
     version: '1.0.0',
     status: 'running',
     framework: 'Fastify',
+    orm: 'Prisma',
+    database: 'PostgreSQL (Neon)',
     endpoints: {
       health: '/api/health',
       auth: '/api/auth',
@@ -214,7 +255,7 @@ async function start() {
     console.log(`📍 端口: ${PORT}`);
     console.log(`🔗 URL: http://localhost:${PORT}`);
     console.log(`📚 API文档: http://localhost:${PORT}`);
-    console.log(`⚡ 框架: Fastify`);
+    console.log(`⚡ 框架: Fastify + Prisma`);
     
     // 检查数据库连接状态
     try {
@@ -232,7 +273,7 @@ async function start() {
       
       const statusEmoji = statusMap[dbStatus] || '❓';
       
-      console.log(`💾 数据库: ${statusEmoji} ${dbStatus} (Neon PostgreSQL)`);
+      console.log(`💾 数据库: ${statusEmoji} ${dbStatus} (PostgreSQL via Prisma)`);
     } catch (error) {
       console.log(`💾 数据库: ❓ 状态检查失败`);
     }
@@ -245,6 +286,7 @@ async function start() {
 // 优雅关闭
 process.on('SIGTERM', async () => {
   console.log('📴 收到SIGTERM信号，正在关闭服务器...');
+  await prisma.$disconnect();
   await fastify.close();
   console.log('✅ 服务器已关闭');
   process.exit(0);
@@ -252,6 +294,7 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
   console.log('📴 收到SIGINT信号，正在关闭服务器...');
+  await prisma.$disconnect();
   await fastify.close();
   console.log('✅ 服务器已关闭');
   process.exit(0);

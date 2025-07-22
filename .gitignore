@@ -27,6 +27,7 @@ yarn-error.log*
 
 # local env files
 .env
+.env.local
 .env*.local
 
 # build output
@@ -52,3 +53,5 @@ backend/uploads/
 
 # logs
 *.log
+
+/generated/prisma
