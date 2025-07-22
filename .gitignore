@@ -3,6 +3,7 @@
 
 /book
 /homework
+/dist
 
 # dependencies
 /node_modules
