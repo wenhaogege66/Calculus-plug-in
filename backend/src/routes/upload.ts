@@ -11,7 +11,7 @@ const prisma = new PrismaClient();
 
 export async function uploadRoutes(fastify: FastifyInstance) {
   // 文件上传端点
-  fastify.post('/files', { preHandler: requireAuth }, async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/files', { preHandler: requireAuth }, async (request, reply) => {
     try {
       const data = await request.file();
       
@@ -22,7 +22,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const { filename, mimetype, file } = data;
+      const { filename, mimetype } = data;
       
       // 检查文件大小
       const buffer = await data.toBuffer();
@@ -118,7 +118,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
   });
 
   // 获取用户文件列表
-  fastify.get('/files', { preHandler: requireAuth }, async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/files', { preHandler: requireAuth }, async (request, reply) => {
     try {
       const files = await prisma.fileUpload.findMany({
         where: { userId: request.currentUser!.id },
@@ -147,11 +147,9 @@ export async function uploadRoutes(fastify: FastifyInstance) {
   });
 
   // 下载文件
-  fastify.get('/files/:fileId/download', { preHandler: requireAuth }, async (request: FastifyRequest<{
-    Params: { fileId: string }
-  }>, reply: FastifyReply) => {
+  fastify.get('/files/:fileId/download', { preHandler: requireAuth }, async (request, reply) => {
     try {
-      const fileId = parseInt(request.params.fileId);
+      const fileId = parseInt((request.params as any).fileId);
       
       const file = await prisma.fileUpload.findFirst({
         where: {
@@ -196,11 +194,9 @@ export async function uploadRoutes(fastify: FastifyInstance) {
   });
 
   // 删除文件
-  fastify.delete('/files/:fileId', { preHandler: requireAuth }, async (request: FastifyRequest<{
-    Params: { fileId: string }
-  }>, reply: FastifyReply) => {
+  fastify.delete('/files/:fileId', { preHandler: requireAuth }, async (request, reply) => {
     try {
-      const fileId = parseInt(request.params.fileId);
+      const fileId = parseInt((request.params as any).fileId);
       
       const file = await prisma.fileUpload.findFirst({
         where: {

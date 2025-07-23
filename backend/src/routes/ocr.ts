@@ -9,15 +9,9 @@ const prisma = new PrismaClient();
 
 export async function ocrRoutes(fastify: FastifyInstance) {
   // MyScript手写识别
-  fastify.post('/ocr/myscript', { preHandler: requireAuth }, async (request: FastifyRequest<{
-    Body: {
-      submissionId: number;
-      imageData?: string; // base64编码的图片数据
-      fileId?: number;    // 或者文件ID
-    }
-  }>, reply: FastifyReply) => {
+  fastify.post('/ocr/myscript', { preHandler: requireAuth }, async (request, reply) => {
     try {
-      const { submissionId, imageData, fileId } = request.body;
+      const { submissionId, imageData, fileId } = request.body as any;
       
       if (!submissionId) {
         return reply.code(400).send({
@@ -101,9 +95,9 @@ export async function ocrRoutes(fastify: FastifyInstance) {
       fastify.log.error('MyScript OCR处理失败:', error);
       
       // 更新提交状态为失败
-      if (request.body?.submissionId) {
+      if ((request.body as any)?.submissionId) {
         await prisma.submission.update({
-          where: { id: request.body.submissionId },
+          where: { id: (request.body as any).submissionId },
           data: { status: 'FAILED' }
         }).catch(() => {}); // 忽略更新失败
       }
@@ -116,11 +110,9 @@ export async function ocrRoutes(fastify: FastifyInstance) {
   });
 
   // 获取OCR结果
-  fastify.get('/ocr/results/:submissionId', { preHandler: requireAuth }, async (request: FastifyRequest<{
-    Params: { submissionId: string }
-  }>, reply: FastifyReply) => {
+  fastify.get('/ocr/results/:submissionId', { preHandler: requireAuth }, async (request, reply) => {
     try {
-      const submissionId = parseInt(request.params.submissionId);
+      const submissionId = parseInt((request.params as any).submissionId);
       
       // 验证提交记录是否属于当前用户
       const submission = await prisma.submission.findFirst({

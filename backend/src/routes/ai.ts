@@ -9,16 +9,9 @@ const prisma = new PrismaClient();
 
 export async function aiRoutes(fastify: FastifyInstance) {
   // Deepseek AI批改作业
-  fastify.post('/ai/grade', { preHandler: requireAuth }, async (request: FastifyRequest<{
-    Body: {
-      submissionId: number;
-      recognizedText: string;
-      subject?: string;
-      exerciseType?: string;
-    }
-  }>, reply: FastifyReply) => {
+  fastify.post('/ai/grade', { preHandler: requireAuth }, async (request, reply) => {
     try {
-      const { submissionId, recognizedText, subject = '微积分', exerciseType = '练习题' } = request.body;
+      const { submissionId, recognizedText, subject = '微积分', exerciseType = '练习题' } = request.body as any;
       
       if (!submissionId || !recognizedText) {
         return reply.code(400).send({
@@ -95,9 +88,9 @@ export async function aiRoutes(fastify: FastifyInstance) {
       fastify.log.error('Deepseek AI批改失败:', error);
       
       // 更新提交状态为失败
-      if (request.body?.submissionId) {
+      if ((request.body as any)?.submissionId) {
         await prisma.submission.update({
-          where: { id: request.body.submissionId },
+          where: { id: (request.body as any).submissionId },
           data: { status: 'FAILED' }
         }).catch(() => {}); // 忽略更新失败
       }
@@ -110,11 +103,9 @@ export async function aiRoutes(fastify: FastifyInstance) {
   });
 
   // 获取批改结果
-  fastify.get('/ai/results/:submissionId', { preHandler: requireAuth }, async (request: FastifyRequest<{
-    Params: { submissionId: string }
-  }>, reply: FastifyReply) => {
+  fastify.get('/ai/results/:submissionId', { preHandler: requireAuth }, async (request, reply) => {
     try {
-      const submissionId = parseInt(request.params.submissionId);
+      const submissionId = parseInt((request.params as any).submissionId);
       
       // 验证提交记录是否属于当前用户
       const submission = await prisma.submission.findFirst({
@@ -152,18 +143,9 @@ export async function aiRoutes(fastify: FastifyInstance) {
   });
 
   // 生成带批注的PDF
-  fastify.post('/ai/annotate-pdf', { preHandler: requireAuth }, async (request: FastifyRequest<{
-    Body: {
-      submissionId: number;
-      errors: Array<{
-        position: { x: number; y: number; page: number };
-        message: string;
-        type: 'error' | 'suggestion' | 'strength';
-      }>;
-    }
-  }>, reply: FastifyReply) => {
+  fastify.post('/ai/annotate-pdf', { preHandler: requireAuth }, async (request, reply) => {
     try {
-      const { submissionId, errors } = request.body;
+      const { submissionId, errors } = request.body as any;
       
       if (!submissionId || !errors) {
         return reply.code(400).send({

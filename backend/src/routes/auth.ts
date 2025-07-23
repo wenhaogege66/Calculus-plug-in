@@ -50,17 +50,9 @@ export async function authRoutes(fastify: FastifyInstance) {
   });
 
   // GitHub OAuth回调处理 (Supabase Auth处理)
-  fastify.get('/auth/github/callback', async (request: FastifyRequest<{
-    Querystring: { 
-      access_token?: string; 
-      refresh_token?: string; 
-      expires_in?: string;
-      token_type?: string;
-      error?: string;
-    }
-  }>, reply: FastifyReply) => {
+  fastify.get('/auth/github/callback', async (request, reply) => {
     try {
-      const { access_token, refresh_token, error: oauthError } = request.query;
+      const { access_token, refresh_token, error: oauthError } = request.query as any;
       
       if (oauthError) {
         return reply.code(400).send({
@@ -207,6 +199,88 @@ export async function authRoutes(fastify: FastifyInstance) {
       `;
       
       return reply.code(500).type('text/html').send(errorPage);
+    }
+  });
+
+  // 处理从前端重定向过来的OAuth结果
+  fastify.post('/auth/github/process-token', async (request, reply) => {
+    try {
+      const { access_token, refresh_token } = request.body as any;
+      
+      if (!access_token) {
+        return reply.code(400).send({
+          success: false,
+          error: '缺少访问令牌'
+        });
+      }
+
+      // 直接解析JWT token获取用户信息
+      const tokenParts = access_token.split('.');
+      if (tokenParts.length !== 3) {
+        return reply.code(400).send({
+          success: false,
+          error: '无效的JWT token格式'
+        });
+      }
+
+      // 解码JWT payload
+      const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+      
+      if (!payload.user_metadata || !payload.email) {
+        return reply.code(400).send({
+          success: false,
+          error: 'JWT token中缺少用户信息'
+        });
+      }
+
+      // 从JWT中提取用户信息
+      const userMetadata = payload.user_metadata;
+      const supabaseUserId = payload.sub;
+      
+      // 查找或创建用户记录
+      let user = await findOrCreateSupabaseUser({
+        supabaseUserId: supabaseUserId,
+        email: payload.email,
+        username: userMetadata.user_name || userMetadata.name || userMetadata.preferred_username || 'GitHub用户',
+        avatarUrl: userMetadata.avatar_url,
+        githubId: userMetadata.provider_id || userMetadata.sub,
+        githubUsername: userMetadata.user_name || userMetadata.preferred_username
+      });
+
+      // 生成我们自己的JWT token
+      const tokenPayload: JWTPayload = {
+        userId: user.id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        authType: user.authType,
+        supabaseUserId: supabaseUserId
+      };
+      
+      const token = fastify.jwt.sign(tokenPayload, {
+        expiresIn: '7d'
+      });
+
+      return {
+        success: true,
+        data: {
+          token,
+          user: {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+            avatarUrl: user.avatarUrl
+          }
+        }
+      };
+
+    } catch (error) {
+      fastify.log.error('Token处理失败:', error);
+      return reply.code(500).send({
+        success: false,
+        error: `Token处理失败: ${error instanceof Error ? error.message : '未知错误'}`
+      });
     }
   });
 
