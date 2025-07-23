@@ -57,3 +57,4 @@ backend/uploads/
 
 /generated/prisma
 backend/.env.example
+backend/dist/*
