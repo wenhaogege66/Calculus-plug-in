@@ -39,8 +39,8 @@ Chrome插件 (Plasmo) → GitHub OAuth → Fastify API → Prisma ORM → Neon P
 - Node.js >= 18
 - pnpm >= 8
 - Chrome浏览器 >= 88
-- Neon PostgreSQL账户
-- GitHub OAuth应用
+- Supabase账户
+- GitHub OAuth应用（在Supabase中配置）
 
 ### 安装依赖
 ```bash
@@ -52,19 +52,48 @@ cd backend
 npm install
 ```
 
-### 环境配置
+### Supabase配置
+
+#### 1. 创建Supabase项目
+1. 访问 [supabase.com](https://supabase.com) 创建新项目
+2. 记录项目URL和anon public key
+
+#### 2. 配置GitHub OAuth
+1. 在Supabase Dashboard → Authentication → Settings → Auth Providers
+2. 启用GitHub provider
+3. 创建GitHub OAuth App：
+   - 访问 GitHub Settings → Developer settings → OAuth Apps
+   - Authorization callback URL: `https://your-project.supabase.co/auth/v1/callback`
+4. 将GitHub Client ID和Secret配置到Supabase
+
+#### 3. 创建Storage Buckets
+在Supabase Dashboard → Storage中创建以下buckets：
+- `assignments` (作业文件)
+- `avatars` (用户头像) 
+- `annotated` (批改后的文件)
+
+#### 4. 配置环境变量
 ```bash
 # 复制环境变量文件
-cp env.example backend/.env
+cp .env.example .env
 
-# 编辑backend/.env，填入您的配置:
-DATABASE_URL=postgresql://user:password@host/database?sslmode=require
+# 编辑.env，填入您的配置:
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.your-project.supabase.co:5432/postgres
 JWT_SECRET=your-jwt-secret
-GITHUB_CLIENT_ID=your-github-client-id
-GITHUB_CLIENT_SECRET=your-github-client-secret
-GITHUB_CALLBACK_URL=http://localhost:3000/api/auth/github/callback
 DEEPSEEK_API_KEY=your-deepseek-api-key
-# MyScript配置...
+
+# Supabase配置
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# MyScript配置
+MYSCRIPT_API_ENDPOINT=https://cloud.myscript.com/api/v4.0/iink
+MYSCRIPT_APPLICATION_KEY=your-app-key
+MYSCRIPT_HMAC_KEY=your-hmac-key
+
+# 文件上传配置  
+MAX_FILE_SIZE=104857600  # 100MB
 ```
 
 ### 数据库初始化

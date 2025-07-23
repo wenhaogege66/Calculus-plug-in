@@ -67,10 +67,10 @@ async function registerPlugins() {
     credentials: true
   });
 
-  // 文件上传支持
+  // 文件上传支持 - 100MB限制
   await fastify.register(multipart, {
     limits: {
-      fileSize: Number(process.env.MAX_FILE_SIZE) || 10485760, // 10MB
+      fileSize: Number(process.env.MAX_FILE_SIZE) || 104857600, // 100MB
     }
   });
 
@@ -107,8 +107,10 @@ async function registerRoutes() {
           version: '1.0.0',
           framework: 'Fastify',
           orm: 'Prisma',
+          database: 'Supabase',
           services: {
-            database: { status: dbStatus, type: 'PostgreSQL (Neon)' },
+            database: { status: dbStatus, type: 'PostgreSQL (Supabase)' },
+            storage: { status: 'configured', type: 'Supabase Storage' },
             myscript: { status: 'configured' },
             deepseek: { status: 'configured' }
           }
@@ -123,13 +125,39 @@ async function registerRoutes() {
     }
   });
 
-  // 文件上传路由 (需要认证)
+  // 简化的文件上传路由 (需要认证)
   fastify.post('/api/files', { preHandler: requireAuth }, async (request, reply) => {
-    return { 
-      success: true, 
-      message: 'File upload endpoint - Fastify + Prisma version',
-      user: request.currentUser 
-    };
+    try {
+      const data = await request.file();
+      
+      if (!data) {
+        return reply.code(400).send({
+          success: false,
+          error: '没有收到文件'
+        });
+      }
+
+      const { filename, mimetype } = data;
+      const buffer = await data.toBuffer();
+      const fileSize = buffer.length;
+      
+      return { 
+        success: true, 
+        message: '文件上传功能正在开发中',
+        data: {
+          filename,
+          mimetype,
+          fileSize,
+          user: request.currentUser
+        }
+      };
+    } catch (error) {
+      fastify.log.error('文件上传处理失败:', error);
+      return reply.code(500).send({
+        success: false,
+        error: '文件上传处理失败'
+      });
+    }
   });
   
   // 获取提交记录 (需要认证)
@@ -167,6 +195,24 @@ async function registerRoutes() {
       user: request.currentUser 
     };
   });
+
+  // OCR识别路由
+  fastify.post('/api/ocr/myscript', { preHandler: requireAuth }, async (request, reply) => {
+    return {
+      success: true,
+      message: 'OCR功能正在开发中',
+      user: request.currentUser
+    };
+  });
+
+  // AI批改路由
+  fastify.post('/api/ai/grade', { preHandler: requireAuth }, async (request, reply) => {
+    return {
+      success: true,
+      message: 'AI批改功能正在开发中', 
+      user: request.currentUser
+    };
+  });
 }
 
 // 根路径
@@ -177,7 +223,9 @@ fastify.get('/', async (request, reply) => {
     status: 'running',
     framework: 'Fastify',
     orm: 'Prisma',
-    database: 'PostgreSQL (Neon)',
+    database: 'Supabase',
+    auth: 'Supabase Auth + GitHub OAuth',
+    storage: 'Supabase Storage',
     endpoints: {
       health: '/api/health',
       auth: '/api/auth',
@@ -255,7 +303,7 @@ async function start() {
     console.log(`📍 端口: ${PORT}`);
     console.log(`🔗 URL: http://localhost:${PORT}`);
     console.log(`📚 API文档: http://localhost:${PORT}`);
-    console.log(`⚡ 框架: Fastify + Prisma`);
+    console.log(`⚡ 框架: Fastify + Prisma + Supabase`);
     
     // 检查数据库连接状态
     try {
@@ -273,7 +321,9 @@ async function start() {
       
       const statusEmoji = statusMap[dbStatus] || '❓';
       
-      console.log(`💾 数据库: ${statusEmoji} ${dbStatus} (PostgreSQL via Prisma)`);
+      console.log(`💾 数据库: ${statusEmoji} ${dbStatus} (Supabase PostgreSQL)`);
+      console.log(`📁 存储: ⚙️ configured (Supabase Storage)`);
+      console.log(`🔐 认证: ⚙️ configured (Supabase Auth + GitHub)`);
     } catch (error) {
       console.log(`💾 数据库: ❓ 状态检查失败`);
     }

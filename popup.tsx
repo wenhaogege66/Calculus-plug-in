@@ -1,398 +1,385 @@
-import React, { useState, useRef, useEffect } from "react"
-import "./popup.css"
+import React, { useState, useEffect } from 'react';
+import { Storage } from '@plasmohq/storage';
+import { supabase, API_BASE_URL, type User, type AuthState } from './src/common/config/supabase';
+import './popup.css';
 
-// 用户信息接口
-interface User {
-  id: number;
-  username: string;
-  email: string;
-  avatar_url?: string;
-  role: string;
-  auth_type: string;
-}
+const storage = new Storage();
 
-function IndexPopup() {
-  const [status, setStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' }>({ message: '', type: 'info' })
-  const [isUploading, setIsUploading] = useState(false)
-  const [dragOver, setDragOver] = useState(false)
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+function Popup() {
+  const [authState, setAuthState] = useState<AuthState>({
+    isAuthenticated: false,
+    user: null,
+    token: null,
+    loading: true
+  });
 
-  // 组件初始化时检查登录状态
+  const [uploadStatus, setUploadStatus] = useState<{
+    uploading: boolean;
+    progress: number;
+    message: string;
+  }>({
+    uploading: false,
+    progress: 0,
+    message: ''
+  });
+
+  // 初始化认证状态
   useEffect(() => {
-    checkLoginStatus()
-  }, [])
+    initializeAuth();
+    
+    // 监听来自OAuth回调窗口的消息
+    window.addEventListener('message', handleAuthMessage);
+    
+    return () => {
+      window.removeEventListener('message', handleAuthMessage);
+    };
+  }, []);
 
-  // 检查登录状态
-  const checkLoginStatus = async () => {
-    setIsLoading(true)
+  const initializeAuth = async () => {
     try {
-      const token = await getStoredToken()
-      if (token) {
-        const userInfo = await verifyToken(token)
-        if (userInfo.success) {
-          setUser(userInfo.data.user)
-          setIsLoggedIn(true)
-          showStatus(`欢迎回来，${userInfo.data.user.username}！`, 'success')
+      // 从storage获取保存的token
+      const savedToken = await storage.get('auth_token');
+      const savedUser = await storage.get('user_info');
+
+      if (savedToken && savedUser) {
+        // 验证token是否仍然有效
+        const isValid = await verifyToken(savedToken);
+        if (isValid) {
+          setAuthState({
+            isAuthenticated: true,
+            user: savedUser,
+            token: savedToken,
+            loading: false
+          });
+          return;
         } else {
-          // Token无效，清除存储
-          await chrome.storage.sync.remove(['authToken'])
-          setIsLoggedIn(false)
+          // Token无效，清除storage
+          await storage.remove('auth_token');
+          await storage.remove('user_info');
         }
-      } else {
-        setIsLoggedIn(false)
       }
+
+      setAuthState(prev => ({ ...prev, loading: false }));
     } catch (error) {
-      console.error('检查登录状态失败:', error)
-      setIsLoggedIn(false)
-    } finally {
-      setIsLoading(false)
+      console.error('初始化认证状态失败:', error);
+      setAuthState(prev => ({ ...prev, loading: false }));
     }
-  }
+  };
 
-  // 获取存储的token
-  const getStoredToken = (): Promise<string | null> => {
-    return new Promise((resolve) => {
-      chrome.storage.sync.get(['authToken'], (result) => {
-        resolve(result.authToken || null)
-      })
-    })
-  }
-
-  // 存储token
-  const storeToken = (token: string): Promise<void> => {
-    return new Promise((resolve) => {
-      chrome.storage.sync.set({ authToken: token }, () => {
-        resolve()
-      })
-    })
-  }
-
-  // 验证token
-  const verifyToken = async (token: string) => {
+  const verifyToken = async (token: string): Promise<boolean> => {
     try {
-      const response = await fetch('http://localhost:3000/api/auth/verify', {
-        method: 'GET',
+      const response = await fetch(`${API_BASE_URL}/auth/verify`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${token}`
         }
-      })
-      return await response.json()
+      });
+      return response.ok;
     } catch (error) {
-      console.error('Token验证失败:', error)
-      return { success: false, error: '网络错误' }
+      console.error('Token验证失败:', error);
+      return false;
     }
-  }
+  };
 
-  // GitHub登录
+  const handleAuthMessage = async (event: MessageEvent) => {
+    if (event.data?.type === 'SUPABASE_AUTH_SUCCESS') {
+      const { token, user } = event.data;
+      
+      // 保存认证信息
+      await storage.set('auth_token', token);
+      await storage.set('user_info', user);
+      
+      setAuthState({
+        isAuthenticated: true,
+        user: user,
+        token: token,
+        loading: false
+      });
+
+      setUploadStatus({
+        uploading: false,
+        progress: 100,
+        message: '登录成功！'
+      });
+
+      // 3秒后清除消息
+      setTimeout(() => {
+        setUploadStatus(prev => ({ ...prev, message: '' }));
+      }, 3000);
+    }
+  };
+
   const handleGitHubLogin = async () => {
     try {
-      showStatus('正在重定向到GitHub登录...', 'info')
-      
-      // 获取GitHub OAuth授权URL
-      const response = await fetch('http://localhost:3000/api/auth/github')
-      const data = await response.json()
-      
-      if (data.success) {
-        // 打开GitHub OAuth页面
-        const authWindow = window.open(data.data.authUrl, 'github-auth', 'width=600,height=700')
-        
-        // 监听OAuth回调消息
-        const messageListener = (event: MessageEvent) => {
-          if (event.data?.type === 'GITHUB_AUTH_SUCCESS') {
-            const { token, user: userData } = event.data
-            
-            // 存储token并更新状态
-            storeToken(token).then(() => {
-              setUser(userData)
-              setIsLoggedIn(true)
-              showStatus(`GitHub登录成功！欢迎 ${userData.username}`, 'success')
-              
-              // 关闭认证窗口
-              if (authWindow) {
-                authWindow.close()
-              }
-            })
-            
-            // 移除事件监听器
-            window.removeEventListener('message', messageListener)
-          }
-        }
-        
-        window.addEventListener('message', messageListener)
-        
+      setUploadStatus({
+        uploading: true,
+        progress: 0,
+        message: '正在跳转到GitHub登录...'
+      });
+
+      // 获取GitHub OAuth URL
+      const response = await fetch(`${API_BASE_URL}/auth/github`);
+      const result = await response.json();
+
+      if (result.success && result.data?.authUrl) {
+        // 在新窗口中打开GitHub OAuth
+        const authWindow = window.open(
+          result.data.authUrl,
+          'github-auth',
+          'width=500,height=600,scrollbars=yes,resizable=yes'
+        );
+
         // 检查窗口是否被关闭
         const checkClosed = setInterval(() => {
           if (authWindow?.closed) {
-            clearInterval(checkClosed)
-            window.removeEventListener('message', messageListener)
-            showStatus('登录已取消', 'info')
+            clearInterval(checkClosed);
+            setUploadStatus({
+              uploading: false,
+              progress: 0,
+              message: ''
+            });
           }
-        }, 1000)
-        
+        }, 1000);
+
       } else {
-        showStatus('获取登录链接失败', 'error')
+        throw new Error(result.error || 'GitHub OAuth初始化失败');
       }
     } catch (error) {
-      console.error('GitHub登录失败:', error)
-      showStatus('登录失败，请重试', 'error')
+      console.error('GitHub登录失败:', error);
+      setUploadStatus({
+        uploading: false,
+        progress: 0,
+        message: `登录失败: ${error instanceof Error ? error.message : '未知错误'}`
+      });
     }
-  }
+  };
 
-  // 登出
   const handleLogout = async () => {
     try {
-      await chrome.storage.sync.remove(['authToken'])
-      setUser(null)
-      setIsLoggedIn(false)
-      showStatus('已成功登出', 'info')
-    } catch (error) {
-      console.error('登出失败:', error)
-      showStatus('登出失败', 'error')
-    }
-  }
+      // 清除本地存储
+      await storage.remove('auth_token');
+      await storage.remove('user_info');
+      
+      // 从Supabase登出
+      await supabase.auth.signOut();
 
-  // 显示状态信息
-  const showStatus = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    setStatus({ message, type })
-    
-    if (type !== 'error') {
+      setAuthState({
+        isAuthenticated: false,
+        user: null,
+        token: null,
+        loading: false
+      });
+
+      setUploadStatus({
+        uploading: false,
+        progress: 0,
+        message: '已退出登录'
+      });
+
       setTimeout(() => {
-        setStatus({ message: '', type: 'info' })
-      }, 3000)
+        setUploadStatus(prev => ({ ...prev, message: '' }));
+      }, 2000);
+    } catch (error) {
+      console.error('登出失败:', error);
     }
-  }
+  };
 
-  // 发送消息到background脚本
-  const sendMessageToBackground = (message: any): Promise<any> => {
-    return new Promise((resolve) => {
-      if (typeof chrome !== 'undefined' && chrome.runtime) {
-        chrome.runtime.sendMessage(message, (response: any) => {
-          resolve(response || { success: false, error: 'No response' })
-        })
-      } else {
-        resolve({ success: false, error: 'Chrome runtime not available' })
-      }
-    })
-  }
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  // 处理文件选择
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (files && files.length > 0) {
-      handleFiles(Array.from(files))
-    }
-  }
-
-  // 处理拖拽事件
-  const handleDragOver = (event: React.DragEvent) => {
-    event.preventDefault()
-    setDragOver(true)
-  }
-
-  const handleDragLeave = (event: React.DragEvent) => {
-    event.preventDefault()
-    setDragOver(false)
-  }
-
-  const handleDrop = (event: React.DragEvent) => {
-    event.preventDefault()
-    setDragOver(false)
-    
-    const files = event.dataTransfer?.files
-    if (files && files.length > 0) {
-      handleFiles(Array.from(files))
-    }
-  }
-
-  // 处理文件
-  const handleFiles = (files: File[]) => {
-    if (!isLoggedIn) {
-      showStatus('请先登录后再上传文件', 'error')
-      return
+    if (!authState.isAuthenticated || !authState.token) {
+      setUploadStatus({
+        uploading: false,
+        progress: 0,
+        message: '请先登录'
+      });
+      return;
     }
 
-    const supportedTypes = ['application/pdf', 'text/plain', 'image/jpeg', 'image/png']
-    const validFiles = files.filter(file => supportedTypes.includes(file.type))
-
-    if (validFiles.length === 0) {
-      showStatus('请选择支持的文件格式 (PDF, TXT, JPG, PNG)', 'error')
-      return
-    }
-
-    const maxSize = 10 * 1024 * 1024 // 10MB
-    const oversizedFiles = validFiles.filter(file => file.size > maxSize)
-    
-    if (oversizedFiles.length > 0) {
-      showStatus('文件大小不能超过10MB', 'error')
-      return
-    }
-
-    uploadFiles(validFiles)
-  }
-
-  // 上传文件
-  const uploadFiles = async (files: File[]) => {
-    setIsUploading(true)
-    showStatus('正在上传文件...', 'info')
-    
     try {
-      const results = []
-      for (const file of files) {
-        const result = await sendMessageToBackground({
-          type: 'UPLOAD_FILE',
-          data: { file, type: 'popup' }
-        })
-        results.push(result)
-      }
+      setUploadStatus({
+        uploading: true,
+        progress: 0,
+        message: '正在上传文件...'
+      });
 
-      const successCount = results.filter(r => r.success).length
-      const failCount = results.length - successCount
+      const formData = new FormData();
+      formData.append('file', file);
 
-      if (failCount === 0) {
-        showStatus(`成功上传 ${successCount} 个文件`, 'success')
-        // 自动打开全屏界面
-        setTimeout(() => {
-          openFullScreen()
-        }, 2000)
+      const response = await fetch(`${API_BASE_URL}/files`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authState.token}`
+        },
+        body: formData
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setUploadStatus({
+          uploading: false,
+          progress: 100,
+          message: '文件上传成功！'
+        });
       } else {
-        showStatus(`成功 ${successCount} 个，失败 ${failCount} 个`, 'error')
+        throw new Error(result.error || '文件上传失败');
       }
     } catch (error) {
-      showStatus('上传失败，请重试', 'error')
-    } finally {
-      setIsUploading(false)
+      console.error('文件上传失败:', error);
+      setUploadStatus({
+        uploading: false,
+        progress: 0,
+        message: `上传失败: ${error instanceof Error ? error.message : '未知错误'}`
+      });
     }
-  }
 
-  // 打开全屏界面
-  const openFullScreen = async () => {
-    try {
-      showStatus('正在打开全屏界面...', 'info')
-      const url = chrome.runtime.getURL('sidepanel.html')
-      await chrome.tabs.create({ url })
-      window.close()
-    } catch (error) {
-      showStatus('打开失败，请重试', 'error')
-    }
-  }
+    // 清空文件输入
+    event.target.value = '';
 
-  // 加载状态
-  if (isLoading) {
+    // 3秒后清除消息
+    setTimeout(() => {
+      setUploadStatus(prev => ({ ...prev, message: '' }));
+    }, 3000);
+  };
+
+  if (authState.loading) {
     return (
       <div className="popup-container">
+        <div className="popup-header">
+          <h2>AI微积分助教</h2>
+        </div>
         <div className="loading">
-          <div className="loading-icon">⏳</div>
-          <div>正在检查登录状态...</div>
+          <div className="spinner"></div>
+          <p>正在加载...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="popup-container">
-      <div className="header">
-        <h1>📚 AI微积分助教</h1>
-        <p>智能作业批改 · 错题解析</p>
+      <div className="popup-header">
+        <h2>AI微积分助教</h2>
+        <p>基于Supabase的智能作业批改助手</p>
       </div>
 
-      {/* 用户状态区域 */}
-      <div className="user-section">
-        {isLoggedIn && user ? (
+      {!authState.isAuthenticated ? (
+        // 未登录状态
+        <div className="auth-section">
+          <div className="auth-prompt">
+            <h3>请先登录</h3>
+            <p>使用GitHub账户登录以上传作业</p>
+          </div>
+          
+          <button
+            className="github-login-btn"
+            onClick={handleGitHubLogin}
+            disabled={uploadStatus.uploading}
+          >
+            {uploadStatus.uploading ? (
+              <>
+                <div className="spinner small"></div>
+                连接中...
+              </>
+            ) : (
+              <>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                </svg>
+                使用GitHub登录
+              </>
+            )}
+          </button>
+
+          {uploadStatus.message && (
+            <div className={`status-message ${uploadStatus.message.includes('失败') ? 'error' : 'success'}`}>
+              {uploadStatus.message}
+            </div>
+          )}
+        </div>
+      ) : (
+        // 已登录状态
+        <div className="main-section">
           <div className="user-info">
-            <img 
-              src={user.avatar_url || '/icon48.png'} 
-              alt="用户头像" 
-              className="user-avatar"
-            />
+            <div className="user-avatar">
+              {authState.user?.avatarUrl ? (
+                <img src={authState.user.avatarUrl} alt="头像" />
+              ) : (
+                <div className="avatar-placeholder">
+                  {authState.user?.username?.charAt(0).toUpperCase() || 'U'}
+                </div>
+              )}
+            </div>
             <div className="user-details">
-              <div className="user-name">{user.username}</div>
-              <div className="user-role">{user.role === 'student' ? '学生' : '教师'}</div>
+              <h3>{authState.user?.username}</h3>
+              <p>{authState.user?.email}</p>
+              <span className="user-role">
+                {authState.user?.role === 'student' ? '学生' : '教师'}
+              </span>
             </div>
-            <button className="btn btn-secondary btn-small" onClick={handleLogout}>
-              登出
+            <button className="logout-btn" onClick={handleLogout}>
+              退出
             </button>
           </div>
-        ) : (
-          <div className="login-section">
-            <div className="login-prompt">
-              <span className="login-icon">🔐</span>
-              <span>请先登录以使用完整功能</span>
+
+          <div className="upload-section">
+            <h3>上传作业</h3>
+            <div className="upload-area">
+              <input
+                type="file"
+                id="file-input"
+                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                onChange={handleFileUpload}
+                disabled={uploadStatus.uploading}
+              />
+              <label htmlFor="file-input" className="upload-label">
+                {uploadStatus.uploading ? (
+                  <>
+                    <div className="spinner"></div>
+                    上传中... {uploadStatus.progress}%
+                  </>
+                ) : (
+                  <>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                    </svg>
+                    点击上传PDF或图片文件
+                  </>
+                )}
+              </label>
             </div>
-            <button className="btn btn-github" onClick={handleGitHubLogin}>
-              <span className="github-icon">🐱</span>
-              使用 GitHub 登录
+            
+            <div className="file-info">
+              <p>支持格式: PDF, JPG, PNG, GIF, WebP</p>
+              <p>最大大小: 100MB</p>
+            </div>
+
+            {uploadStatus.message && (
+              <div className={`status-message ${uploadStatus.message.includes('失败') ? 'error' : 'success'}`}>
+                {uploadStatus.message}
+              </div>
+            )}
+          </div>
+
+          <div className="actions-section">
+            <button 
+              className="action-btn primary"
+              onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL('sidepanel.html') })}
+            >
+              查看批改结果
+            </button>
+            <button 
+              className="action-btn secondary"
+              onClick={() => chrome.sidePanel?.open({ windowId: chrome.windows.WINDOW_ID_CURRENT })}
+            >
+              打开侧边栏
             </button>
           </div>
-        )}
-      </div>
-
-      <div className="content">
-        {/* 上传区域 */}
-        <div 
-          className={`upload-area ${dragOver ? 'dragover' : ''} ${!isLoggedIn ? 'disabled' : ''}`}
-          onClick={() => isLoggedIn && fileInputRef.current?.click()}
-          onDragOver={isLoggedIn ? handleDragOver : undefined}
-          onDragLeave={isLoggedIn ? handleDragLeave : undefined}
-          onDrop={isLoggedIn ? handleDrop : undefined}
-        >
-          <div className="upload-icon">📄</div>
-          <div className="upload-text">
-            {isLoggedIn ? '拖拽文件到这里或点击上传' : '请先登录后上传文件'}
-          </div>
-          <div className="upload-hint">支持 PDF、TXT、JPG、PNG 格式</div>
         </div>
-
-        <input 
-          type="file" 
-          ref={fileInputRef}
-          className="file-input" 
-          accept=".pdf,.txt,.jpg,.jpeg,.png" 
-          multiple
-          onChange={handleFileSelect}
-        />
-
-        {/* 状态显示 */}
-        {status.message && (
-          <div className={`status status-${status.type}`}>
-            {status.message}
-          </div>
-        )}
-
-        {/* 功能按钮 */}
-        <button 
-          className="btn btn-primary" 
-          onClick={openFullScreen}
-          disabled={isUploading}
-        >
-          打开全屏界面
-        </button>
-
-        {/* 功能介绍 */}
-        <div className="features">
-          <div className="feature-item">
-            <span className="feature-icon">✏️</span>
-            <span>手写识别与AI批改</span>
-          </div>
-          <div className="feature-item">
-            <span className="feature-icon">🎯</span>
-            <span>错题分析与解法指导</span>
-          </div>
-          <div className="feature-item">
-            <span className="feature-icon">💡</span>
-            <span>个性化学习建议</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="footer">
-        Version 1.0.0 · AI驱动的智能学习助手
-      </div>
+      )}
     </div>
-  )
+  );
 }
 
-export default IndexPopup
+export default Popup;

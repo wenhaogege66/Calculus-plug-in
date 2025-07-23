@@ -23,6 +23,7 @@
     "@fastify/multipart": "^9.0.3",
     "@fastify/static": "^8.2.0",
     "@prisma/client": "^6.12.0",
+    "@supabase/supabase-js": "^2.52.0",
     "axios": "^1.6.0",
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",
