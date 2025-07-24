@@ -1,103 +1,207 @@
+# AI微积分助教项目开发规范
 
-# AI微积分助教Chrome插件开发规范
+## 📖 项目介绍
 
-## 技术栈
-- **前端**: Plasmo框架 + React 18 + TypeScript
-- **后端**: Fastify + TypeScript + Node.js
-- **数据库**: Neon PostgreSQL (云数据库)
-- **AI服务**: MyScript (OCR) + Deepseek (批改)
+**AI微积分助教**是一个基于Chrome扩展的智能作业批改系统，旨在帮助学生提交手写作业并获得AI智能批改反馈。
 
-## 开发原则
-- 不要为了功能的实现用mock数据
-- 使用真实的数据库和API服务
-- 遵循TypeScript严格模式
+### 🎯 核心功能
+- **GitHub OAuth登录**: 通过Supabase Auth集成GitHub登录
+- **作业上传**: 支持PDF和图片格式，最大100MB
+- **手写识别**: 集成MyScript OCR识别手写内容
+- **AI批改**: 使用Deepseek AI进行智能批改和错误分析
+- **权限管理**: 学生只能查看自己的作业，教师可查看所有作业
+- **PDF标注**: 在作业上直接标注错误和建议
 
-## Fastify API路由设计
+### 🛠 技术栈
+- **前端**: Chrome扩展 (Plasmo框架) + React + TypeScript
+- **后端**: Fastify + Prisma ORM + TypeScript
+- **数据库**: Supabase PostgreSQL
+- **存储**: Supabase Storage
+- **认证**: Supabase Auth + GitHub OAuth
+- **AI服务**: MyScript OCR + Deepseek AI
+
+## 🏗 项目架构
+
+```
+Calculus/
+├── src/                    # Chrome扩展源码
+│   ├── popup/             # 弹出窗口界面
+│   ├── content/           # 内容脚本
+│   ├── background/        # 后台脚本
+│   └── common/            # 共享代码和配置
+├── backend/               # 后端API服务器
+│   ├── src/
+│   │   ├── routes/        # API路由
+│   │   ├── middleware/    # 中间件
+│   │   ├── config/        # 配置文件
+│   │   └── db/           # 数据库相关
+│   └── prisma/           # Prisma模式和迁移
+└── build/                # 构建输出
+    ├── chrome-mv3-dev/   # 开发版本
+    └── chrome-mv3-prod/  # 生产版本
+```
+
+## 🔧 开发规范
+
+### 💻 代码规范
+1. **TypeScript优先**: 所有新代码必须使用TypeScript
+2. **ESLint规则**: 遵循项目ESLint配置
+3. **命名约定**:
+   - 文件名: kebab-case (如: `user-service.ts`)
+   - 函数/变量: camelCase (如: `getCurrentUser`)
+   - 常量: UPPER_SNAKE_CASE (如: `MAX_FILE_SIZE`)
+   - 组件: PascalCase (如: `HomeworkUpload`)
+
+### 🗃 数据库规范
+1. **Prisma模式**: 所有数据库变更通过Prisma schema
+2. **迁移管理**: 使用`npx prisma migrate dev`创建迁移
+3. **命名规范**: 表名用snake_case，字段名用camelCase
+
+### 🔐 安全规范
+1. **环境变量**: 敏感信息必须通过环境变量配置
+2. **JWT验证**: 所有API端点必须进行适当的认证
+3. **RLS策略**: 数据库必须启用行级安全策略
+4. **文件验证**: 上传文件必须进行类型和大小验证
+
+### 📂 文件上传规范
+- **支持格式**: PDF, JPG, JPEG, PNG
+- **大小限制**: 100MB
+- **存储路径**: `/assignments/{userId}/{fileId}`
+- **命名格式**: `{timestamp}_{originalName}`
+
+### 🔄 API规范
+1. **统一响应格式**:
 ```typescript
-// 健康检查
-GET    /api/health              // 系统健康检查
-
-// 文件上传
-POST   /api/files               // 文件上传
-
-// 作业相关
-GET    /api/submissions         // 获取作业列表
-POST   /api/submissions         // 提交新作业
-GET    /api/submissions/:id     // 获取作业详情
-PUT    /api/submissions/:id     // 更新批改结果
-
-// OCR识别
-POST   /api/ocr/myscript        // MyScript手写识别
-
-// AI批改服务
-POST   /api/ai/deepseek/grade   // Deepseek AI批改
-GET    /api/ai/config/check     // AI服务配置检查
-
-// 用户认证 (预留)
-POST   /api/auth/login          // 用户登录
-POST   /api/auth/register       // 用户注册
-GET    /api/auth/me             // 获取当前用户
+{
+  success: boolean;
+  data?: any;
+  error?: string;
+  timestamp?: string;
+}
 ```
 
-## MyScript配置
-```javascript
-const myScriptConfig = {
-  apiEndpoint: process.env.MYSCRIPT_API_ENDPOINT,
-  wsEndpoint: process.env.MYSCRIPT_WEBSOCKET_ENDPOINT,
-  applicationKey: process.env.MYSCRIPT_APPLICATION_KEY,
-  hmacKey: process.env.MYSCRIPT_HMAC_KEY,
-  recognitionParams: {
-    type: 'MATH',
-    protocol: 'REST',
-    apiVersion: '4.0',
-    mimeTypes: ['application/vnd.myscript.jiix', 'application/mathml+xml']
-  }
-};
+2. **错误处理**: 统一错误中间件处理
+3. **认证头**: `Authorization: Bearer {jwt_token}`
+4. **CORS设置**: 支持Chrome扩展域名
+
+### 🧪 测试规范
+1. **单元测试**: 核心业务逻辑必须有测试
+2. **集成测试**: API端点集成测试
+3. **手动测试**: 使用TESTING.md中的测试流程
+
+## 🌐 环境配置
+
+### 必需环境变量
+
+#### 后端 (backend/.env)
+```bash
+# 数据库
+DATABASE_URL="postgresql://..."
+
+# Supabase配置
+NEXT_PUBLIC_SUPABASE_URL="https://xxx.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIs..."
+SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIs..."
+
+# JWT密钥
+JWT_SECRET="your-super-secret-key"
+
+# API密钥
+MYSCRIPT_APPLICATION_KEY="your-myscript-key"
+MYSCRIPT_HMAC_KEY="your-myscript-hmac-key"
+DEEPSEEK_API_KEY="your-deepseek-key"
+
+# 文件设置
+MAX_FILE_SIZE=104857600  # 100MB
+
+# 服务器设置
+PORT=3000
+NODE_ENV=development
 ```
 
-## Deepseek AI配置
-```javascript
-const deepseekConfig = {
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: 'https://api.deepseek.com/v1',
-  model: 'deepseek-chat',
-  maxTokens: 4000
-};
+#### 前端 (.env)
+```bash
+PLASMO_PUBLIC_SUPABASE_URL="https://xxx.supabase.co"
+PLASMO_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIs..."
+PLASMO_PUBLIC_API_URL="http://localhost:3000/api"
 ```
 
+## 🚀 开发工作流
 
+### 启动开发环境
+```bash
+# 1. 启动后端
+cd backend && npm run dev
 
-## 开发规范
+# 2. 启动前端开发（新终端）
+pnpm dev
 
-### 前端 (Plasmo框架)
-- TypeScript严格模式
-- React组件使用PascalCase命名
-- 使用React Hooks + Context进行状态管理
-- 遵循Plasmo框架约定的文件结构
-- Chrome Storage API用于本地缓存
+# 3. 构建生产版本
+pnpm build
 
-### 后端 (Fastify)
-- API路由使用kebab-case
-- 文件上传限制: 10MB
-- 错误处理统一格式: `{ success: boolean, error?: string, data?: any }`
-- 异步操作使用async/await
-- 使用Fastify插件系统
-- 数据库查询使用PostgreSQL原生SQL
-
-## 文件上传处理
-```javascript
-// 支持的文件类型
-const SUPPORTED_TYPES = [
-  'application/pdf',
-  'text/plain',
-  'image/jpeg',
-  'image/png'
-];
-
-// 文件处理流程
-// 1. 验证文件类型和大小
-// 2. 上传到服务器
-// 3. PDF/图片提取文本
-// 4. MyScript识别数学表达式
-// 5. Deepseek AI批改
+# 4. 数据库操作
+cd backend && npx prisma studio
 ```
+
+### Chrome扩展开发
+1. **开发模式**: 使用`pnpm dev`，支持热重载
+2. **测试构建**: 使用`pnpm build`创建生产版本
+3. **扩展安装**: Chrome浏览器加载`build/chrome-mv3-prod`目录
+
+### Git工作流
+1. **功能分支**: 从main创建feature分支
+2. **提交规范**: 使用语义化提交信息
+3. **代码审查**: PR必须经过代码审查
+4. **测试验证**: 提交前运行完整测试
+
+## 📋 部署规范
+
+### 后端部署
+1. **环境准备**: 生产环境变量配置
+2. **数据库迁移**: `npx prisma migrate deploy`
+3. **依赖安装**: `npm ci --only=production`
+4. **进程管理**: 使用PM2或Docker
+
+### Chrome扩展发布
+1. **构建检查**: 确保生产构建无错误
+2. **清单验证**: 检查manifest.json配置
+3. **权限审查**: 最小权限原则
+4. **商店发布**: 遵循Chrome Web Store政策
+
+## 🐛 故障排除
+
+### 常见问题
+1. **WebSocket连接失败**: 检查Plasmo开发服务器是否运行
+2. **JWT验证失败**: 检查token格式和过期时间
+3. **文件上传失败**: 检查Supabase Storage配置
+4. **数据库连接**: 检查DATABASE_URL和网络连接
+
+### 调试技巧
+1. **后端日志**: 使用Fastify内置logger
+2. **前端调试**: Chrome DevTools扩展调试
+3. **数据库查询**: 使用Prisma Studio
+4. **API测试**: 使用curl或Postman
+
+## 📚 相关文档
+
+- [Prisma文档](https://www.prisma.io/docs/)
+- [Fastify文档](https://www.fastify.io/docs/)
+- [Plasmo文档](https://docs.plasmo.com/)
+- [Supabase文档](https://supabase.com/docs)
+- [Chrome扩展文档](https://developer.chrome.com/docs/extensions/)
+
+## 👥 团队协作
+
+### 代码审查清单
+- [ ] 代码符合项目规范
+- [ ] 添加必要的错误处理
+- [ ] 更新相关文档
+- [ ] 通过所有测试
+- [ ] 环境变量正确配置
+
+### 发布检查清单
+- [ ] 功能完整测试
+- [ ] 性能影响评估
+- [ ] 安全漏洞检查
+- [ ] 向后兼容性确认
+- [ ] 用户文档更新

@@ -3,7 +3,6 @@
 
 /book
 /homework
-/dist
 
 # dependencies
 /node_modules
@@ -35,7 +34,6 @@ yarn-error.log*
 out/
 build/
 dist/
-backend/dist/
 backend/uploads/
 
 # plasmo
@@ -57,4 +55,3 @@ backend/uploads/
 
 /generated/prisma
 backend/.env.example
-backend/dist/*

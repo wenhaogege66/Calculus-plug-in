@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Storage } from '@plasmohq/storage';
-import { supabase, API_BASE_URL, type User, type AuthState } from './src/common/config/supabase';
-import './popup.css';
+import { supabase, API_BASE_URL, type User, type AuthState } from './common/config/supabase';
+
+import "./popup.css"
 
 const storage = new Storage();
 
@@ -187,24 +188,30 @@ function Popup() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // 强制检查认证状态
     if (!authState.isAuthenticated || !authState.token) {
       setUploadStatus({
         uploading: false,
         progress: 0,
-        message: '请先登录'
+        message: '⚠️ 请先登录后再上传文件'
       });
+      
+      // 清空文件选择
+      event.target.value = '';
       return;
     }
 
     try {
       setUploadStatus({
         uploading: true,
-        progress: 0,
+        progress: 20,
         message: '正在上传文件...'
       });
 
       const formData = new FormData();
       formData.append('file', file);
+
+      setUploadStatus(prev => ({ ...prev, progress: 50 }));
 
       const response = await fetch(`${API_BASE_URL}/files`, {
         method: 'POST',
@@ -220,8 +227,36 @@ function Popup() {
         setUploadStatus({
           uploading: false,
           progress: 100,
-          message: '文件上传成功！'
+          message: '✅ 文件上传成功！正在创建提交记录...'
         });
+
+        // 创建提交记录
+        const submissionResponse = await fetch(`${API_BASE_URL}/submissions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authState.token}`
+          },
+          body: JSON.stringify({
+            fileUploadId: result.data.fileId
+          })
+        });
+
+        const submissionResult = await submissionResponse.json();
+        
+        if (submissionResult.success) {
+          setUploadStatus({
+            uploading: false,
+            progress: 100,
+            message: '🎉 提交成功！点击侧边栏查看处理进度'
+          });
+        } else {
+          setUploadStatus({
+            uploading: false,
+            progress: 100,
+            message: '⚠️ 文件上传成功，但创建提交记录失败'
+          });
+        }
       } else {
         throw new Error(result.error || '文件上传失败');
       }
@@ -230,17 +265,39 @@ function Popup() {
       setUploadStatus({
         uploading: false,
         progress: 0,
-        message: `上传失败: ${error instanceof Error ? error.message : '未知错误'}`
+        message: `❌ 上传失败: ${error instanceof Error ? error.message : '未知错误'}`
       });
     }
 
     // 清空文件输入
     event.target.value = '';
 
-    // 3秒后清除消息
+    // 5秒后清除消息
     setTimeout(() => {
       setUploadStatus(prev => ({ ...prev, message: '' }));
-    }, 3000);
+    }, 5000);
+  };
+
+  const openSidePanel = async () => {
+    try {
+      // 使用Chrome扩展API打开侧边栏
+      if (chrome?.sidePanel) {
+        await chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT });
+      } else {
+        // 降级处理：在新标签页中打开
+        await chrome.tabs.create({ 
+          url: chrome.runtime.getURL('sidepanel.html'),
+          active: true
+        });
+      }
+    } catch (error) {
+      console.error('打开侧边栏失败:', error);
+      setUploadStatus({
+        uploading: false,
+        progress: 0,
+        message: '❌ 打开侧边栏失败，请检查浏览器权限'
+      });
+    }
   };
 
   if (authState.loading) {
@@ -268,7 +325,7 @@ function Popup() {
         // 未登录状态
         <div className="auth-section">
           <div className="auth-prompt">
-            <h3>请先登录</h3>
+            <h3>🔐 请先登录</h3>
             <p>使用GitHub账户登录以上传作业</p>
           </div>
           
@@ -292,8 +349,19 @@ function Popup() {
             )}
           </button>
 
+          {/* 登录提示 */}
+          <div className="auth-notice">
+            <h4>⚠️ 登录后才能使用的功能：</h4>
+            <ul>
+              <li>📤 上传作业文件</li>
+              <li>🔍 OCR手写识别</li>
+              <li>🤖 AI智能批改</li>
+              <li>📊 查看批改历史</li>
+            </ul>
+          </div>
+
           {uploadStatus.message && (
-            <div className={`status-message ${uploadStatus.message.includes('失败') ? 'error' : 'success'}`}>
+            <div className={`status-message ${uploadStatus.message.includes('失败') || uploadStatus.message.includes('❌') ? 'error' : 'success'}`}>
               {uploadStatus.message}
             </div>
           )}
@@ -315,7 +383,7 @@ function Popup() {
               <h3>{authState.user?.username}</h3>
               <p>{authState.user?.email}</p>
               <span className="user-role">
-                {authState.user?.role === 'student' ? '学生' : '教师'}
+                {authState.user?.role === 'STUDENT' ? '🎓 学生' : '👨‍🏫 教师'}
               </span>
             </div>
             <button className="logout-btn" onClick={handleLogout}>
@@ -324,7 +392,7 @@ function Popup() {
           </div>
 
           <div className="upload-section">
-            <h3>上传作业</h3>
+            <h3>📤 上传作业</h3>
             <div className="upload-area">
               <input
                 type="file"
@@ -351,12 +419,12 @@ function Popup() {
             </div>
             
             <div className="file-info">
-              <p>支持格式: PDF, JPG, PNG, GIF, WebP</p>
-              <p>最大大小: 100MB</p>
+              <p>📋 支持格式: PDF, JPG, PNG, GIF, WebP</p>
+              <p>📏 最大大小: 100MB</p>
             </div>
 
             {uploadStatus.message && (
-              <div className={`status-message ${uploadStatus.message.includes('失败') ? 'error' : 'success'}`}>
+              <div className={`status-message ${uploadStatus.message.includes('失败') || uploadStatus.message.includes('❌') ? 'error' : 'success'}`}>
                 {uploadStatus.message}
               </div>
             )}
@@ -365,15 +433,15 @@ function Popup() {
           <div className="actions-section">
             <button 
               className="action-btn primary"
-              onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL('sidepanel.html') })}
+              onClick={openSidePanel}
             >
-              查看批改结果
+              📊 查看批改结果
             </button>
             <button 
               className="action-btn secondary"
-              onClick={() => chrome.sidePanel?.open({ windowId: chrome.windows.WINDOW_ID_CURRENT })}
+              onClick={() => chrome.tabs.create({ url: `${API_BASE_URL.replace('/api', '')}` })}
             >
-              打开侧边栏
+              🌐 打开后端管理
             </button>
           </div>
         </div>

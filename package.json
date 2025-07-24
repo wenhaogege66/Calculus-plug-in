@@ -2,40 +2,38 @@
   "name": "calculus-ai-assistant",
   "displayName": "AI微积分助教",
   "version": "1.0.0",
-  "description": "智能微积分学习助手，支持作业批改和个性化学习建议",
-  "author": "AI Calculus Assistant Team",
+  "description": "基于AI的微积分作业智能批改助手",
+  "author": "AI微积分助教团队",
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",
+    "build:firefox": "plasmo build --target=firefox-mv2",
     "package": "plasmo package"
   },
   "dependencies": {
-    "plasmo": "0.90.5",
+    "@plasmohq/messaging": "^0.6.2",
+    "@plasmohq/storage": "^1.9.3",
+    "@supabase/supabase-js": "^2.39.0",
+    "plasmo": "0.84.0",
     "react": "18.2.0",
     "react-dom": "18.2.0"
   },
   "devDependencies": {
-    "@ianvs/prettier-plugin-sort-imports": "4.1.1",
     "@types/chrome": "0.0.258",
     "@types/node": "20.11.5",
     "@types/react": "18.2.48",
     "@types/react-dom": "18.2.18",
-    "prettier": "3.2.4",
     "typescript": "5.3.3"
   },
   "manifest": {
+    "host_permissions": [
+      "http://localhost:3000/*",
+      "https://gwvnlvhceylybrefugit.supabase.co/*"
+    ],
     "permissions": [
       "storage",
       "activeTab",
-      "scripting",
-      "contextMenus",
-      "sidePanel",
-      "tabs"
-    ],
-    "host_permissions": [
-      "http://localhost:3000/*",
-      "https://cloud.myscript.com/*",
-      "https://api.deepseek.com/*"
+      "sidePanel"
     ]
   },
   "packageManager": "pnpm@10.13.1+sha512.37ebf1a5c7a30d5fabe0c5df44ee8da4c965ca0c5af3dbab28c3a1681b70a256218d05c81c9c0dcf767ef6b8551eb5b960042b9ed4300c59242336377e01cfad"

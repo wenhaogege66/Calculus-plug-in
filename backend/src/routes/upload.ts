@@ -1,7 +1,7 @@
 // 文件上传路由 - Supabase Storage
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { supabase, STORAGE_BUCKETS } from '../config/supabase';
+import { supabase, supabaseAdmin, STORAGE_BUCKETS } from '../config/supabase';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
 import path from 'path';
@@ -57,8 +57,9 @@ export async function uploadRoutes(fastify: FastifyInstance) {
       const uniqueFilename = `${uuidv4()}${fileExt}`;
       const filePath = `assignments/${request.currentUser!.id}/${uniqueFilename}`;
 
-      // 上传到Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      // 使用admin客户端上传到Supabase Storage
+      const storageClient = supabaseAdmin || supabase;
+      let { data: uploadData, error: uploadError } = await storageClient.storage
         .from(STORAGE_BUCKETS.ASSIGNMENTS)
         .upload(filePath, buffer, {
           contentType: mimetype,
@@ -67,13 +68,45 @@ export async function uploadRoutes(fastify: FastifyInstance) {
 
       if (uploadError) {
         fastify.log.error('Supabase Storage上传失败:', uploadError);
-        return reply.code(500).send({
-          success: false,
-          error: '文件上传失败'
-        });
+        
+        // 如果bucket不存在，尝试创建
+        if (uploadError.message?.includes('bucket') || uploadError.message?.includes('not found')) {
+          fastify.log.info('尝试创建Storage bucket...');
+          const { error: bucketError } = await storageClient.storage.createBucket(STORAGE_BUCKETS.ASSIGNMENTS, {
+            public: false,
+            allowedMimeTypes: allowedTypes,
+            fileSizeLimit: maxSize
+          });
+          
+          if (bucketError) {
+            fastify.log.error('创建bucket失败:', bucketError);
+          } else {
+            // 重试上传
+            const { data: retryUploadData, error: retryUploadError } = await storageClient.storage
+              .from(STORAGE_BUCKETS.ASSIGNMENTS)
+              .upload(filePath, buffer, {
+                contentType: mimetype,
+                upsert: false
+              });
+            
+            if (retryUploadError) {
+              fastify.log.error('重试上传失败:', retryUploadError);
+              return reply.code(500).send({
+                success: false,
+                error: `文件上传失败: ${retryUploadError.message}`
+              });
+            }
+            uploadData = retryUploadData;
+          }
+        } else {
+          return reply.code(500).send({
+            success: false,
+            error: `文件上传失败: ${uploadError.message}`
+          });
+        }
       }
 
-      // 获取文件的公共URL
+      // 获取文件的公共URL (使用supabase客户端，因为admin不能生成公共URL)
       const { data: publicUrlData } = supabase.storage
         .from(STORAGE_BUCKETS.ASSIGNMENTS)
         .getPublicUrl(filePath);
@@ -89,7 +122,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
           fileSize: fileSize,
           uploadType: 'assignment',
           metadata: {
-            supabaseKey: uploadData.path,
+            supabaseKey: uploadData?.path || filePath,
             publicUrl: publicUrlData.publicUrl
           }
         }
@@ -112,7 +145,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
       fastify.log.error('文件上传处理失败:', error);
       return reply.code(500).send({
         success: false,
-        error: '文件上传处理失败'
+        error: `文件上传处理失败: ${error instanceof Error ? error.message : '未知错误'}`
       });
     }
   });
