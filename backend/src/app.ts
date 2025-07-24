@@ -217,6 +217,154 @@ async function registerRoutes() {
   });
 }
 
+// OAuth回调处理
+fastify.get('/auth/callback', async (request, reply) => {
+  const callbackPage = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>AI微积分助教 - 登录处理中</title>
+      <meta charset="utf-8">
+      <style>
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+          text-align: center; 
+          padding: 50px; 
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          margin: 0;
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .container { 
+          max-width: 500px; 
+          background: rgba(255,255,255,0.95); 
+          padding: 40px; 
+          border-radius: 12px; 
+          box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+          color: #333;
+        }
+        .loading { margin-bottom: 20px; }
+        .spinner { 
+          border: 4px solid #f3f3f3; 
+          border-top: 4px solid #667eea; 
+          border-radius: 50%; 
+          width: 50px; 
+          height: 50px; 
+          animation: spin 1s linear infinite; 
+          margin: 20px auto; 
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>🎓 AI微积分助教</h1>
+        <div id="status">
+          <div class="loading">
+            <div class="spinner"></div>
+            <p>正在处理GitHub登录...</p>
+          </div>
+        </div>
+        <div id="result" style="display: none;"></div>
+      </div>
+      
+      <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabase = createClient(
+          'https://gwvnlvhceylybrefugit.supabase.co',
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3dm5sdmhjZXlseWJyZWZ1Z2l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxNjQzMTYsImV4cCI6MjA2ODc0MDMxNn0.upzdvJvbRr2Wca6Lr6eVCx4FAjkI2dhdyyw044vzKmE'
+        );
+        
+        async function handleAuth() {
+          const statusDiv = document.getElementById('status');
+          const resultDiv = document.getElementById('result');
+          
+          try {
+            // 获取当前session
+            const { data: { session }, error } = await supabase.auth.getSession();
+            
+            if (error) {
+              throw new Error(\`获取session失败: \${error.message}\`);
+            }
+            
+            if (!session) {
+              throw new Error('未找到有效的登录session');
+            }
+            
+            // 发送session信息到后端，获取我们的JWT token
+            const response = await fetch('/api/auth/supabase/exchange', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                access_token: session.access_token,
+                refresh_token: session.refresh_token,
+                user: session.user
+              })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+              statusDiv.style.display = 'none';
+              resultDiv.style.display = 'block';
+              resultDiv.innerHTML = \`
+                <div class="success">
+                  <h2>✅ 登录成功！</h2>
+                  <p>欢迎，\${result.data.user.username}！</p>
+                  <p>窗口将自动关闭...</p>
+                </div>
+              \`;
+              
+              // 向Chrome扩展发送登录成功消息
+              if (window.opener && window.opener.postMessage) {
+                window.opener.postMessage({
+                  type: 'GITHUB_AUTH_SUCCESS',
+                  token: result.data.token,
+                  user: result.data.user
+                }, '*');
+              }
+              
+              // 3秒后关闭窗口
+              setTimeout(() => {
+                window.close();
+              }, 3000);
+              
+            } else {
+              throw new Error(result.error || '登录处理失败');
+            }
+            
+          } catch (error) {
+            console.error('登录处理失败:', error);
+            statusDiv.style.display = 'none';
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = \`
+              <div class="error">
+                <h2>❌ 登录失败</h2>
+                <p>\${error.message}</p>
+                <button onclick="window.close()" style="margin-top: 20px; padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">关闭窗口</button>
+              </div>
+            \`;
+          }
+        }
+        
+        // 页面加载时执行
+        handleAuth();
+      </script>
+    </body>
+    </html>
+  `;
+
+  return reply.type('text/html').send(callbackPage);
+});
+
 // 根路径 - 处理OAuth重定向
 fastify.get('/', async (request, reply) => {
   // 如果URL包含访问令牌片段，显示处理页面
@@ -330,7 +478,7 @@ fastify.get('/', async (request, reply) => {
               // 向Chrome扩展发送消息
               if (window.opener && window.opener.postMessage) {
                 window.opener.postMessage({
-                  type: 'SUPABASE_AUTH_SUCCESS',
+                  type: 'GITHUB_AUTH_SUCCESS',
                   token: data.data.token,
                   user: data.data.user
                 }, '*');

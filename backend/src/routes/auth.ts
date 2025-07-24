@@ -23,7 +23,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/callback?next=${encodeURIComponent('http://localhost:3000/api/auth/github/callback')}`
+          redirectTo: `http://localhost:3000/auth/callback`
         }
       });
       
@@ -154,7 +154,7 @@ export async function authRoutes(fastify: FastifyInstance) {
             // 尝试向Chrome扩展发送登录成功消息
             if (window.opener && window.opener.postMessage) {
               window.opener.postMessage({
-                type: 'SUPABASE_AUTH_SUCCESS',
+                type: 'GITHUB_AUTH_SUCCESS',
                 token: '${token}',
                 user: ${JSON.stringify({
                   id: user.id,
@@ -199,6 +199,68 @@ export async function authRoutes(fastify: FastifyInstance) {
       `;
       
       return reply.code(500).type('text/html').send(errorPage);
+    }
+  });
+
+  // 处理Supabase OAuth session交换
+  fastify.post('/auth/supabase/exchange', async (request, reply) => {
+    try {
+      const { access_token, refresh_token, user } = request.body as any;
+      
+      if (!access_token || !user) {
+        return reply.code(400).send({
+          success: false,
+          error: '缺少必要的session信息'
+        });
+      }
+
+      // 从Supabase用户信息中提取数据
+      const supabaseUser = user;
+      
+      // 查找或创建用户记录
+      let dbUser = await findOrCreateSupabaseUser({
+        supabaseUserId: supabaseUser.id,
+        email: supabaseUser.email,
+        username: supabaseUser.user_metadata?.user_name || supabaseUser.user_metadata?.name || supabaseUser.user_metadata?.preferred_username || 'GitHub用户',
+        avatarUrl: supabaseUser.user_metadata?.avatar_url,
+        githubId: supabaseUser.user_metadata?.provider_id || supabaseUser.user_metadata?.sub,
+        githubUsername: supabaseUser.user_metadata?.user_name || supabaseUser.user_metadata?.preferred_username
+      });
+
+      // 生成我们自己的JWT token
+      const tokenPayload: JWTPayload = {
+        userId: dbUser.id,
+        email: dbUser.email,
+        username: dbUser.username,
+        role: dbUser.role,
+        authType: dbUser.authType,
+        supabaseUserId: supabaseUser.id
+      };
+      
+      const token = fastify.jwt.sign(tokenPayload, {
+        expiresIn: '7d'
+      });
+
+      return {
+        success: true,
+        data: {
+          token,
+          user: {
+            id: dbUser.id,
+            username: dbUser.username,
+            email: dbUser.email,
+            role: dbUser.role,
+            avatarUrl: dbUser.avatarUrl
+          }
+        }
+      };
+
+    } catch (error) {
+      fastify.log.error('Supabase session交换失败:', error);
+      return reply.code(500).send({
+        success: false,
+        error: `Session交换失败: ${error instanceof Error ? error.message : '未知错误'}`
+      });
     }
   });
 

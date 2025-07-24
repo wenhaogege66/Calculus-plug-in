@@ -48,7 +48,7 @@ function Popup() {
         if (isValid) {
           setAuthState({
             isAuthenticated: true,
-            user: savedUser,
+            user: typeof savedUser === 'string' ? JSON.parse(savedUser) : savedUser,
             token: savedToken,
             loading: false
           });
@@ -82,7 +82,10 @@ function Popup() {
   };
 
   const handleAuthMessage = async (event: MessageEvent) => {
-    if (event.data?.type === 'SUPABASE_AUTH_SUCCESS') {
+    console.log('收到消息:', event.data);
+    
+    if (event.data?.type === 'GITHUB_AUTH_SUCCESS') {
+      console.log('GitHub登录成功，处理认证信息...');
       const { token, user } = event.data;
       
       // 保存认证信息
@@ -99,13 +102,15 @@ function Popup() {
       setUploadStatus({
         uploading: false,
         progress: 100,
-        message: '登录成功！'
+        message: '✅ 登录成功！'
       });
 
       // 3秒后清除消息
       setTimeout(() => {
         setUploadStatus(prev => ({ ...prev, message: '' }));
       }, 3000);
+    } else {
+      console.log('收到其他类型消息:', event.data?.type);
     }
   };
 
@@ -121,25 +126,78 @@ function Popup() {
       const response = await fetch(`${API_BASE_URL}/auth/github`);
       const result = await response.json();
 
-      if (result.success && result.data?.authUrl) {
-        // 在新窗口中打开GitHub OAuth
-        const authWindow = window.open(
-          result.data.authUrl,
-          'github-auth',
-          'width=500,height=600,scrollbars=yes,resizable=yes'
-        );
+            if (result.success && result.data?.authUrl) {
+        setUploadStatus({
+          uploading: true,
+          progress: 50,
+          message: '🔗 正在打开GitHub登录页面...'
+        });
 
-        // 检查窗口是否被关闭
-        const checkClosed = setInterval(() => {
-          if (authWindow?.closed) {
-            clearInterval(checkClosed);
-            setUploadStatus({
-              uploading: false,
-              progress: 0,
-              message: ''
+        // 使用chrome.tabs API在新标签页中打开OAuth URL（如果可用）
+        if (chrome?.tabs) {
+          try {
+            // 在Chrome扩展中，使用tabs API打开新标签页
+            chrome.tabs.create({ 
+              url: result.data.authUrl,
+              active: true 
             });
+          } catch (error) {
+            console.log('chrome.tabs不可用，降级使用window.open');
+            // 降级处理：使用window.open
+            const authWindow = window.open(
+              result.data.authUrl,
+              'github-auth',
+              'width=550,height=650,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=yes'
+            );
+            
+            if (!authWindow) {
+              throw new Error('无法打开OAuth窗口，请检查浏览器是否阻止了弹窗');
+            }
           }
-        }, 1000);
+        } else {
+          // 在普通网页环境中，使用window.open
+          const authWindow = window.open(
+            result.data.authUrl,
+            'github-auth',
+            'width=550,height=650,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=yes'
+          );
+          
+          if (!authWindow) {
+            throw new Error('无法打开OAuth窗口，请检查浏览器是否阻止了弹窗');
+          }
+        }
+
+        setUploadStatus({
+          uploading: true,
+          progress: 75,
+          message: '⏳ 正在处理GitHub登录...'
+        });
+
+        // 设置超时检查
+        const authTimeout = setTimeout(() => {
+          setUploadStatus({
+            uploading: false,
+            progress: 0,
+            message: '⚠️ 登录超时，请重试'
+          });
+          setTimeout(() => {
+            setUploadStatus(prev => ({ ...prev, message: '' }));
+          }, 3000);
+        }, 120000); // 120秒超时
+
+        // 清除超时的清理函数
+        const clearAuthTimeout = () => {
+          clearTimeout(authTimeout);
+        };
+
+        // 临时添加消息监听器来清除超时
+        const tempMessageHandler = (event: MessageEvent) => {
+          if (event.data?.type === 'GITHUB_AUTH_SUCCESS') {
+            clearAuthTimeout();
+            window.removeEventListener('message', tempMessageHandler);
+          }
+        };
+        window.addEventListener('message', tempMessageHandler);
 
       } else {
         throw new Error(result.error || 'GitHub OAuth初始化失败');
@@ -383,7 +441,7 @@ function Popup() {
               <h3>{authState.user?.username}</h3>
               <p>{authState.user?.email}</p>
               <span className="user-role">
-                {authState.user?.role === 'STUDENT' ? '🎓 学生' : '👨‍🏫 教师'}
+                {authState.user?.role === 'student' ? '🎓 学生' : '👨‍🏫 教师'}
               </span>
             </div>
             <button className="logout-btn" onClick={handleLogout}>
