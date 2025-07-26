@@ -24,6 +24,47 @@ function Popup() {
     message: ''
   });
 
+  // 检测是否在全屏模式（新标签页）
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  useEffect(() => {
+    // 检测是否在新标签页中打开（全屏模式）
+    const checkFullscreenMode = () => {
+      // 如果URL包含chrome-extension://且路径是popup.html，且窗口尺寸大于popup限制，说明是全屏模式
+      const isInTab = window.location.href.includes('chrome-extension://') && 
+                      window.location.pathname.includes('popup.html') &&
+                      (window.innerWidth > 600 || window.innerHeight > 580);
+      setIsFullscreen(isInTab);
+      
+      // 在全屏模式下移除CSS尺寸限制
+      if (isInTab) {
+        const style = document.createElement('style');
+        style.textContent = `
+          html, body {
+            width: 100% !important;
+            height: 100% !important;
+            min-width: 100% !important;
+            min-height: 100% !important;
+            max-width: none !important;
+            max-height: none !important;
+          }
+          .popup-container {
+            min-height: 100vh !important;
+            max-height: none !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    };
+    
+    checkFullscreenMode();
+    window.addEventListener('resize', checkFullscreenMode);
+    
+    return () => {
+      window.removeEventListener('resize', checkFullscreenMode);
+    };
+  }, []);
+
   // 初始化认证状态
   useEffect(() => {
     initializeAuth();
@@ -31,10 +72,169 @@ function Popup() {
     // 监听来自OAuth回调窗口的消息
     window.addEventListener('message', handleAuthMessage);
     
+    // 监听来自background script的消息
+    const handleRuntimeMessage = (message: any, sender: any, sendResponse: any) => {
+      console.log('Popup收到runtime消息:', message);
+      if (message.type === 'GITHUB_AUTH_SUCCESS') {
+        handleAuthMessage({ data: message } as MessageEvent);
+        sendResponse({ success: true });
+      }
+    };
+    
+    chrome.runtime.onMessage.addListener(handleRuntimeMessage);
+    
+    // 监听BroadcastChannel消息（额外的通信渠道）
+    let broadcastChannel: BroadcastChannel | null = null;
+    try {
+      broadcastChannel = new BroadcastChannel('oauth-success');
+      broadcastChannel.addEventListener('message', (event) => {
+        console.log('收到BroadcastChannel消息:', event.data);
+        if (event.data.type === 'GITHUB_AUTH_SUCCESS') {
+          handleAuthMessage({ data: event.data } as MessageEvent);
+        }
+      });
+    } catch (error) {
+      console.log('BroadcastChannel不可用:', error);
+    }
+    
+    // 定期检查LocalStorage（备用方案）
+    const checkLocalStorage = () => {
+      try {
+        const authData = localStorage.getItem('oauth_auth_data');
+        if (authData) {
+          const parsed = JSON.parse(authData);
+          // 检查数据是否是最近的（5分钟内）
+          if (Date.now() - parsed.timestamp < 5 * 60 * 1000) {
+            console.log('从LocalStorage检测到OAuth数据:', parsed);
+            handleAuthMessage({ 
+              data: {
+                type: 'GITHUB_AUTH_SUCCESS',
+                token: parsed.token,
+                user: parsed.user
+              }
+            } as MessageEvent);
+            localStorage.removeItem('oauth_auth_data'); // 清除已处理的数据
+          }
+        }
+      } catch (error) {
+        console.error('LocalStorage检查失败:', error);
+      }
+    };
+    
+    // 立即检查一次LocalStorage
+    checkLocalStorage();
+    
+    // 每秒检查LocalStorage
+    const localStorageInterval = setInterval(checkLocalStorage, 1000);
+    
+    // 监听storage变化，用于OAuth回调后的状态同步
+    const handleStorageChange = async (changes: any) => {
+      if (changes.oauth_success) {
+        const authData = changes.oauth_success.newValue;
+        if (authData) {
+          console.log('检测到OAuth成功，处理认证信息...');
+          
+          // 确保数据格式正确
+          let parsedData: any = authData;
+          if (typeof authData === 'string') {
+            try {
+              parsedData = JSON.parse(authData);
+            } catch (e) {
+              console.error('解析OAuth数据失败:', e);
+              return;
+            }
+          }
+          
+          // 验证数据结构
+          if (!parsedData || !parsedData.user || !parsedData.token) {
+            console.error('OAuth数据结构无效:', parsedData);
+            return;
+          }
+          
+          setAuthState({
+            isAuthenticated: true,
+            user: parsedData.user,
+            token: parsedData.token,
+            loading: false
+          });
+
+          setUploadStatus({
+            uploading: false,
+            progress: 100,
+            message: '✅ 登录成功！'
+          });
+
+          // 清除临时标志
+          await storage.remove('oauth_success');
+          
+          // 3秒后清除消息
+          setTimeout(() => {
+            setUploadStatus(prev => ({ ...prev, message: '' }));
+          }, 3000);
+        }
+      }
+    };
+
+    // 监听storage变化
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    
+    // 定期检查OAuth状态更新（为了处理popup关闭后重新打开的情况）
+    const oauthCheckInterval = setInterval(async () => {
+      const oauthSuccess = await storage.get('oauth_success');
+      if (oauthSuccess && !authState.isAuthenticated) {
+        console.log('检测到延迟的OAuth成功状态');
+        
+        // 确保数据格式正确
+        let parsedData: any = oauthSuccess;
+        if (typeof oauthSuccess === 'string') {
+          try {
+            parsedData = JSON.parse(oauthSuccess);
+          } catch (e) {
+            console.error('解析OAuth数据失败:', e);
+            return;
+          }
+        }
+        
+        // 验证数据结构
+        if (!parsedData || !parsedData.user || !parsedData.token) {
+          console.error('OAuth数据结构无效:', parsedData);
+          return;
+        }
+        
+        setAuthState({
+          isAuthenticated: true,
+          user: parsedData.user,
+          token: parsedData.token,
+          loading: false
+        });
+
+        setUploadStatus({
+          uploading: false,
+          progress: 100,
+          message: '✅ 登录成功！'
+        });
+
+        // 清除临时标志
+        await storage.remove('oauth_success');
+        
+        // 3秒后清除消息
+        setTimeout(() => {
+          setUploadStatus(prev => ({ ...prev, message: '' }));
+        }, 3000);
+      }
+    }, 1000); // 每秒检查一次
+    
     return () => {
       window.removeEventListener('message', handleAuthMessage);
+      chrome.runtime.onMessage.removeListener(handleRuntimeMessage);
+      chrome.storage.onChanged.removeListener(handleStorageChange);
+      clearInterval(oauthCheckInterval);
+      clearInterval(localStorageInterval);
+      if (broadcastChannel) {
+        broadcastChannel.close();
+      }
     };
-  }, []);
+  }, [authState.isAuthenticated]);
 
   const initializeAuth = async () => {
     try {
@@ -42,22 +242,42 @@ function Popup() {
       const savedToken = await storage.get('auth_token');
       const savedUser = await storage.get('user_info');
 
+      console.log('初始化认证状态 - Token:', savedToken ? '存在' : '不存在', 'User:', savedUser ? '存在' : '不存在');
+
       if (savedToken && savedUser) {
-        // 验证token是否仍然有效
+        // 首先设置认证状态，然后在后台验证token
+        setAuthState({
+          isAuthenticated: true,
+          user: typeof savedUser === 'string' ? JSON.parse(savedUser) : savedUser,
+          token: savedToken,
+          loading: false
+        });
+
+        // 在后台验证token是否仍然有效
         const isValid = await verifyToken(savedToken);
-        if (isValid) {
-          setAuthState({
-            isAuthenticated: true,
-            user: typeof savedUser === 'string' ? JSON.parse(savedUser) : savedUser,
-            token: savedToken,
-            loading: false
-          });
-          return;
-        } else {
-          // Token无效，清除storage
+        if (!isValid) {
+          console.log('Token已过期，需要重新登录');
+          // Token无效，清除storage并重置状态
           await storage.remove('auth_token');
           await storage.remove('user_info');
+          setAuthState({
+            isAuthenticated: false,
+            user: null,
+            token: null,
+            loading: false
+          });
+          setUploadStatus({
+            uploading: false,
+            progress: 0,
+            message: '⚠️ 登录已过期，请重新登录'
+          });
+          setTimeout(() => {
+            setUploadStatus(prev => ({ ...prev, message: '' }));
+          }, 3000);
+        } else {
+          console.log('Token验证成功，保持登录状态');
         }
+        return;
       }
 
       setAuthState(prev => ({ ...prev, loading: false }));
@@ -173,31 +393,7 @@ function Popup() {
           message: '⏳ 正在处理GitHub登录...'
         });
 
-        // 设置超时检查
-        const authTimeout = setTimeout(() => {
-          setUploadStatus({
-            uploading: false,
-            progress: 0,
-            message: '⚠️ 登录超时，请重试'
-          });
-          setTimeout(() => {
-            setUploadStatus(prev => ({ ...prev, message: '' }));
-          }, 3000);
-        }, 120000); // 120秒超时
-
-        // 清除超时的清理函数
-        const clearAuthTimeout = () => {
-          clearTimeout(authTimeout);
-        };
-
-        // 临时添加消息监听器来清除超时
-        const tempMessageHandler = (event: MessageEvent) => {
-          if (event.data?.type === 'GITHUB_AUTH_SUCCESS') {
-            clearAuthTimeout();
-            window.removeEventListener('message', tempMessageHandler);
-          }
-        };
-        window.addEventListener('message', tempMessageHandler);
+        console.log('OAuth登录流程已启动，等待回调...');
 
       } else {
         throw new Error(result.error || 'GitHub OAuth初始化失败');
@@ -372,11 +568,39 @@ function Popup() {
     );
   }
 
+  const openFullscreen = async () => {
+    try {
+      // 在新标签页中打开完整的popup界面
+      await chrome.tabs.create({ 
+        url: chrome.runtime.getURL('popup.html'),
+        active: true
+      });
+    } catch (error) {
+      console.error('打开全屏模式失败:', error);
+      setUploadStatus({
+        uploading: false,
+        progress: 0,
+        message: '❌ 打开全屏模式失败，请检查浏览器权限'
+      });
+    }
+  };
+
   return (
     <div className="popup-container">
       <div className="popup-header">
         <h2>AI微积分助教</h2>
         <p>基于Supabase的智能作业批改助手</p>
+        {!isFullscreen && (
+          <button 
+            className="fullscreen-btn"
+            onClick={openFullscreen}
+            title="全屏显示"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7,14H5v5h5v-2H7V14z M5,10h2V7h3V5H5V10z M17,7h-3V5h5v5h-2V7z M14,14v2h3v3h2v-5H14z"/>
+            </svg>
+          </button>
+        )}
       </div>
 
       {!authState.isAuthenticated ? (
@@ -419,7 +643,7 @@ function Popup() {
           </div>
 
           {uploadStatus.message && (
-            <div className={`status-message ${uploadStatus.message.includes('失败') || uploadStatus.message.includes('❌') ? 'error' : 'success'}`}>
+            <div className={`status-message ${uploadStatus.message.includes('失败') || uploadStatus.message.includes('❌') || uploadStatus.message.includes('超时') || uploadStatus.message.includes('⚠️') ? 'error' : 'success'}`}>
               {uploadStatus.message}
             </div>
           )}
@@ -482,7 +706,7 @@ function Popup() {
             </div>
 
             {uploadStatus.message && (
-              <div className={`status-message ${uploadStatus.message.includes('失败') || uploadStatus.message.includes('❌') ? 'error' : 'success'}`}>
+              <div className={`status-message ${uploadStatus.message.includes('失败') || uploadStatus.message.includes('❌') || uploadStatus.message.includes('超时') || uploadStatus.message.includes('⚠️') ? 'error' : 'success'}`}>
                 {uploadStatus.message}
               </div>
             )}

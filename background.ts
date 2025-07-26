@@ -42,6 +42,13 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: a
   console.log('Background收到消息:', message);
 
   switch (message.type) {
+    case 'GITHUB_AUTH_SUCCESS':
+      // 处理OAuth成功消息
+      handleOAuthSuccess(message.data)
+        .then((result: any) => sendResponse({ success: true, data: result }))
+        .catch((error: any) => sendResponse({ success: false, error: error.message }));
+      return true;
+
     case 'UPLOAD_FILE':
       handleFileUpload(message.data)
         .then((result: any) => sendResponse({ success: true, data: result }))
@@ -163,6 +170,45 @@ async function callDeepseekAPI(content: string) {
     return await response.json();
   } catch (error) {
     console.error('Deepseek批改失败:', error);
+    throw error;
+  }
+} 
+
+// OAuth成功处理
+async function handleOAuthSuccess(authData: { token: string; user: any }) {
+  try {
+    console.log('Background处理OAuth成功:', authData);
+    
+    // 保存认证信息到Chrome storage
+    await chrome.storage.local.set({
+      'oauth_success': authData,
+      'auth_token': authData.token,
+      'user_info': authData.user,
+      'isLoggedIn': true,
+      'userProfile': authData.user
+    });
+
+    console.log('OAuth数据已保存到storage');
+    
+    // 通知所有popup实例
+    try {
+      const views = chrome.extension.getViews({ type: 'popup' });
+      views.forEach(view => {
+        if (view.window && view.window.postMessage) {
+          view.window.postMessage({
+            type: 'GITHUB_AUTH_SUCCESS',
+            token: authData.token,
+            user: authData.user
+          }, '*');
+        }
+      });
+    } catch (error) {
+      console.log('通知popup失败:', error);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('OAuth处理失败:', error);
     throw error;
   }
 } 

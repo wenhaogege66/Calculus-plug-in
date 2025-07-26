@@ -82,6 +82,13 @@ async function registerPlugins() {
     root: path.join(__dirname, '../uploads'),
     prefix: '/uploads/',
   });
+
+  // 公共静态文件服务
+  await fastify.register(staticFiles, {
+    root: path.join(__dirname, '../public'),
+    prefix: '/',
+    decorateReply: false
+  });
 }
 
 // 注册路由
@@ -273,91 +280,7 @@ fastify.get('/auth/callback', async (request, reply) => {
         <div id="result" style="display: none;"></div>
       </div>
       
-      <script type="module">
-        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
-        
-        const supabase = createClient(
-          'https://gwvnlvhceylybrefugit.supabase.co',
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3dm5sdmhjZXlseWJyZWZ1Z2l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxNjQzMTYsImV4cCI6MjA2ODc0MDMxNn0.upzdvJvbRr2Wca6Lr6eVCx4FAjkI2dhdyyw044vzKmE'
-        );
-        
-        async function handleAuth() {
-          const statusDiv = document.getElementById('status');
-          const resultDiv = document.getElementById('result');
-          
-          try {
-            // 获取当前session
-            const { data: { session }, error } = await supabase.auth.getSession();
-            
-            if (error) {
-              throw new Error(\`获取session失败: \${error.message}\`);
-            }
-            
-            if (!session) {
-              throw new Error('未找到有效的登录session');
-            }
-            
-            // 发送session信息到后端，获取我们的JWT token
-            const response = await fetch('/api/auth/supabase/exchange', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                access_token: session.access_token,
-                refresh_token: session.refresh_token,
-                user: session.user
-              })
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-              statusDiv.style.display = 'none';
-              resultDiv.style.display = 'block';
-              resultDiv.innerHTML = \`
-                <div class="success">
-                  <h2>✅ 登录成功！</h2>
-                  <p>欢迎，\${result.data.user.username}！</p>
-                  <p>窗口将自动关闭...</p>
-                </div>
-              \`;
-              
-              // 向Chrome扩展发送登录成功消息
-              if (window.opener && window.opener.postMessage) {
-                window.opener.postMessage({
-                  type: 'GITHUB_AUTH_SUCCESS',
-                  token: result.data.token,
-                  user: result.data.user
-                }, '*');
-              }
-              
-              // 3秒后关闭窗口
-              setTimeout(() => {
-                window.close();
-              }, 3000);
-              
-            } else {
-              throw new Error(result.error || '登录处理失败');
-            }
-            
-          } catch (error) {
-            console.error('登录处理失败:', error);
-            statusDiv.style.display = 'none';
-            resultDiv.style.display = 'block';
-            resultDiv.innerHTML = \`
-              <div class="error">
-                <h2>❌ 登录失败</h2>
-                <p>\${error.message}</p>
-                <button onclick="window.close()" style="margin-top: 20px; padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">关闭窗口</button>
-              </div>
-            \`;
-          }
-        }
-        
-        // 页面加载时执行
-        handleAuth();
-      </script>
+      <script src="/auth-callback.js"></script>
     </body>
     </html>
   `;

@@ -346,6 +346,50 @@ export async function authRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // 处理Supabase authorization code exchange
+  fastify.post('/auth/github/exchange-code', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { code, state } = request.body as { code: string; state?: string };
+      
+      console.log('Exchange code请求:', { code: code ? 'exists' : 'missing', state });
+      
+      if (!code) {
+        return reply.code(400).send({
+          success: false,
+          error: 'Authorization code is required'
+        });
+      }
+
+      // 使用Supabase客户端交换code为session
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      
+      if (error) {
+        console.error('Code exchange错误:', error);
+        return reply.code(400).send({
+          success: false,
+          error: `Code exchange失败: ${error.message}`
+        });
+      }
+
+      console.log('Code exchange成功，获取session:', data.session ? 'exists' : 'missing');
+      
+      return {
+        success: true,
+        data: {
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+          user: data.user
+        }
+      };
+    } catch (error) {
+      console.error('Code exchange处理失败:', error);
+      return reply.code(500).send({
+        success: false,
+        error: 'Code exchange处理失败'
+      });
+    }
+  });
+
   // 验证token端点
   fastify.get('/auth/verify', {
     preHandler: async (request: FastifyRequest, reply: FastifyReply) => {
