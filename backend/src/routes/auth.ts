@@ -23,7 +23,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `http://localhost:3000/auth/callback`
+          redirectTo: 'https://egpkadooocnobgbklaclgimmkjmoghnl.chromiumapp.org/provider_cb'
         }
       });
       
@@ -265,9 +265,9 @@ export async function authRoutes(fastify: FastifyInstance) {
   });
 
   // 处理从前端重定向过来的OAuth结果
-  fastify.post('/auth/github/process-token', async (request, reply) => {
+  fastify.post('/auth/github/process-token', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const { access_token, refresh_token } = request.body as any;
+      const { access_token } = request.body as { access_token: string };
       
       if (!access_token) {
         return reply.code(400).send({
@@ -346,105 +346,27 @@ export async function authRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // 处理Supabase authorization code exchange
-  fastify.post('/auth/github/exchange-code', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const { code, state } = request.body as { code: string; state?: string };
-      
-      console.log('Exchange code请求:', { code: code ? 'exists' : 'missing', state });
-      
-      if (!code) {
-        return reply.code(400).send({
-          success: false,
-          error: 'Authorization code is required'
-        });
-      }
-
-      // 使用Supabase客户端交换code为session
-      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-      
-      if (error) {
-        console.error('Code exchange错误:', error);
-        return reply.code(400).send({
-          success: false,
-          error: `Code exchange失败: ${error.message}`
-        });
-      }
-
-      console.log('Code exchange成功，获取session:', data.session ? 'exists' : 'missing');
-      
-      return {
-        success: true,
-        data: {
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token,
-          user: data.user
-        }
-      };
-    } catch (error) {
-      console.error('Code exchange处理失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: 'Code exchange处理失败'
-      });
-    }
-  });
-
   // 验证token端点
-  fastify.get('/auth/verify', {
-    preHandler: async (request: FastifyRequest, reply: FastifyReply) => {
-      try {
-        const decoded = await request.jwtVerify() as JWTPayload;
-        const user = await prisma.user.findUnique({
-          where: { id: decoded.userId },
-          select: {
-            id: true,
-            username: true,
-            email: true,
-            role: true,
-            authType: true,
-            githubId: true,
-            githubUsername: true,
-            avatarUrl: true,
-          }
-        });
-
-        if (!user) {
-          return reply.code(404).send({
+  fastify.get(
+    '/auth/verify',
+    {
+      preHandler: async (request: FastifyRequest, reply: FastifyReply) => {
+        try {
+          await request.jwtVerify();
+        } catch (err) {
+          reply.code(401).send({
             success: false,
-            error: '用户不存在'
+            error: '无效的认证令牌'
           });
         }
-
-        // 转换类型以匹配接口定义
-        request.currentUser = {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          role: user.role as string,
-          authType: user.authType as string,
-          githubId: user.githubId || undefined,
-          githubUsername: user.githubUsername || undefined,
-          avatarUrl: user.avatarUrl || undefined,
-        };
-      } catch (err) {
-        reply.code(401).send({
-          success: false,
-          error: '无效的认证令牌'
-        });
       }
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      // 如果 preHandler 成功, 说明 token 有效
+      return { success: true, message: 'Token is valid' };
     }
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
-    return {
-      success: true,
-      data: {
-        user: request.currentUser,
-        tokenValid: true,
-        authProvider: 'Supabase'
-      }
-    };
-  });
-
+  );
+  
   // 登出端点
   fastify.post('/auth/logout', async (request: FastifyRequest, reply: FastifyReply) => {
     try {

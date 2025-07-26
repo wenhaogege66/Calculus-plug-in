@@ -1,214 +1,138 @@
 // AI微积分助教 - Plasmo Background Script
 
+// 直接定义API_BASE_URL，避免复杂的import路径问题  
+const API_BASE_URL = 'http://localhost:3000/api';
+
+console.log("✅ Background Service Worker 已启动");
+
 // 插件安装时初始化
 chrome.runtime.onInstalled.addListener(() => {
   console.log('AI微积分助教插件已安装 (Plasmo版本)');
+});
+
+// 监听来自Popup等内部组件的消息
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  console.log('Background脚本收到内部消息:', message);
   
-  // 初始化存储
-  chrome.storage.sync.set({
-    isLoggedIn: false,
-    userProfile: null,
-    settings: {
-      autoGrading: true,
-      showHints: true,
-      language: 'zh-CN'
-    }
-  });
-
-  // 创建上下文菜单
-  if (chrome.contextMenus) {
-    chrome.contextMenus.create({
-      id: 'uploadHomework',
-      title: '上传作业到AI助教',
-      contexts: ['page']
-    });
-  }
-});
-
-// 上下文菜单点击处理
-if (chrome.contextMenus && chrome.contextMenus.onClicked) {
-  chrome.contextMenus.onClicked.addListener((info: any, tab: any) => {
-    if (info.menuItemId === 'uploadHomework') {
-      // 打开侧边栏
-      if (tab?.id && chrome.sidePanel) {
-        chrome.sidePanel.open({ tabId: tab.id });
+  if (message.type === 'INITIATE_AUTH') {
+    console.log('收到启动认证的请求...');
+    // 使用一个立即执行的异步函数来包裹，以便使用try/catch
+    (async () => {
+      try {
+        await handleInitiateAuth();
+        console.log('认证流程成功启动。');
+        sendResponse({ success: true });
+      } catch (error) {
+        console.error('认证流程启动失败:', error);
+        sendResponse({ success: false, error: error.message });
       }
-    }
-  });
-}
-
-// 处理来自content script和popup的消息
-chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: any) => {
-  console.log('Background收到消息:', message);
-
-  switch (message.type) {
-    case 'GITHUB_AUTH_SUCCESS':
-      // 处理OAuth成功消息
-      handleOAuthSuccess(message.data)
-        .then((result: any) => sendResponse({ success: true, data: result }))
-        .catch((error: any) => sendResponse({ success: false, error: error.message }));
-      return true;
-
-    case 'UPLOAD_FILE':
-      handleFileUpload(message.data)
-        .then((result: any) => sendResponse({ success: true, data: result }))
-        .catch((error: any) => sendResponse({ success: false, error: error.message }));
-      return true;
-
-    case 'GET_USER_STATUS':
-      chrome.storage.sync.get(['isLoggedIn', 'userProfile'], (result: any) => {
-        sendResponse({ success: true, data: result });
-      });
-      return true;
-
-    case 'SAVE_SUBMISSION':
-      handleSaveSubmission(message.data)
-        .then((result: any) => sendResponse({ success: true, data: result }))
-        .catch((error: any) => sendResponse({ success: false, error: error.message }));
-      return true;
-
-    case 'PROCESS_MYSCRIPT':
-      callMyScriptAPI(message.data)
-        .then((result: any) => sendResponse({ success: true, data: result }))
-        .catch((error: any) => sendResponse({ success: false, error: error.message }));
-      return true;
-
-    case 'PROCESS_DEEPSEEK':
-      callDeepseekAPI(message.data)
-        .then((result: any) => sendResponse({ success: true, data: result }))
-        .catch((error: any) => sendResponse({ success: false, error: error.message }));
-      return true;
-
-    default:
-      sendResponse({ success: false, error: 'Unknown message type' });
+    })();
+    return true; // 保持消息通道开放以进行异步响应
   }
+  
+  // 这里可以添加其他内部消息的处理
+  // default:
+  //   console.warn('未知的内部消息类型:', message.type);
 });
 
-// 文件上传处理
-async function handleFileUpload(fileData: { file: File; type: string }) {
-  try {
-    const formData = new FormData();
-    formData.append('file', fileData.file);
+async function handleInitiateAuth() {
+  console.log('开始处理认证流程 (handleInitiateAuth)...');
+  
+  // 1. 从后端获取Supabase OAuth URL
+  console.log('步骤1: 从后端获取Supabase OAuth URL...');
+  const response = await fetch(`${API_BASE_URL}/auth/github`);
+  const result = await response.json();
 
-    const response = await fetch('http://localhost:3000/api/files', {
-      method: 'POST',
-      body: formData
-    });
-
-    if (!response.ok) {
-      throw new Error(`Upload failed: ${response.statusText}`);
-    }
-
-    const result = await response.json();
-    return result;
-  } catch (error) {
-    console.error('文件上传失败:', error);
-    throw error;
+  if (!result.success || !result.data?.authUrl) {
+    throw new Error(result.error || '无法获取GitHub OAuth URL');
   }
-}
 
-// 保存作业提交
-async function handleSaveSubmission(submissionData: any) {
-  try {
-    const response = await fetch('http://localhost:3000/api/submissions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
+  const authUrl = result.data.authUrl;
+  console.log('获取到的认证URL:', authUrl);
+
+  // 2. 使用chrome.identity.launchWebAuthFlow启动认证
+  console.log('步骤2: 调用 chrome.identity.launchWebAuthFlow...');
+  const redirectUrl = await new Promise<string>((resolve, reject) => {
+    chrome.identity.launchWebAuthFlow(
+      {
+        url: authUrl,
+        interactive: true
       },
-      body: JSON.stringify(submissionData)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Save failed: ${response.statusText}`);
-    }
-
-    const result = await response.json();
-    return result;
-  } catch (error) {
-    console.error('保存作业失败:', error);
-    throw error;
-  }
-}
-
-// MyScript识别处理
-async function callMyScriptAPI(imageData: string) {
-  try {
-    const response = await fetch('http://localhost:3000/api/ocr/myscript', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ imageData })
-    });
-
-    if (!response.ok) {
-      throw new Error(`MyScript API failed: ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('MyScript识别失败:', error);
-    throw error;
-  }
-}
-
-// Deepseek AI批改处理
-async function callDeepseekAPI(content: string) {
-  try {
-    const response = await fetch('http://localhost:3000/api/ai/deepseek/grade', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ recognizedContent: content })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Deepseek API failed: ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Deepseek批改失败:', error);
-    throw error;
-  }
-} 
-
-// OAuth成功处理
-async function handleOAuthSuccess(authData: { token: string; user: any }) {
-  try {
-    console.log('Background处理OAuth成功:', authData);
-    
-    // 保存认证信息到Chrome storage
-    await chrome.storage.local.set({
-      'oauth_success': authData,
-      'auth_token': authData.token,
-      'user_info': authData.user,
-      'isLoggedIn': true,
-      'userProfile': authData.user
-    });
-
-    console.log('OAuth数据已保存到storage');
-    
-    // 通知所有popup实例
-    try {
-      const views = chrome.extension.getViews({ type: 'popup' });
-      views.forEach(view => {
-        if (view.window && view.window.postMessage) {
-          view.window.postMessage({
-            type: 'GITHUB_AUTH_SUCCESS',
-            token: authData.token,
-            user: authData.user
-          }, '*');
+      (callbackUrl) => {
+        if (chrome.runtime.lastError) {
+          console.error('launchWebAuthFlow 错误:', chrome.runtime.lastError.message);
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (callbackUrl) {
+          console.log('launchWebAuthFlow 成功，返回URL:', callbackUrl);
+          resolve(callbackUrl);
+        } else {
+          // 用户可能手动关闭了认证窗口
+          console.warn('认证流程被取消或失败，未返回URL。');
+          reject(new Error('用户取消了登录。'));
         }
-      });
-    } catch (error) {
-      console.log('通知popup失败:', error);
-    }
+      }
+    );
+  });
+  
+  console.log('OAuth 成功，重定向URL:', redirectUrl);
 
-    return { success: true };
-  } catch (error) {
-    console.error('OAuth处理失败:', error);
-    throw error;
+  // 3. 从重定向URL中提取token
+  console.log('步骤3: 从重定向URL中提取token...');
+  const hash = new URL(redirectUrl).hash;
+  const params = new URLSearchParams(hash.substring(1));
+  const access_token = params.get('access_token');
+  const refresh_token = params.get('refresh_token');
+
+  if (!access_token) {
+    throw new Error('重定向URL中未找到access_token');
   }
-} 
+
+  // 4. 将token发送到后端以换取应用JWT
+  console.log('步骤4: 将token发送到后端以处理...');
+  const processResponse = await fetch(`${API_BASE_URL}/auth/github/process-token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ access_token, refresh_token })
+  });
+
+  const processResult = await processResponse.json();
+
+  if (!processResult.success) {
+    throw new Error(processResult.error || '后端处理token失败');
+  }
+
+  console.log('后端处理成功，获取到应用token和用户信息:', processResult.data);
+  
+  // 5. 调用handleOAuthSuccess将最终信息存入storage
+  console.log('步骤5: 将最终认证信息存入storage...');
+  await handleOAuthSuccess(processResult.data);
+}
+
+
+// OAuth成功处理 - 将最终信息存入storage
+async function handleOAuthSuccess(authData: { token: string; user: any }) {
+  if (!authData || !authData.token || !authData.user) {
+    throw new Error('无效的认证数据');
+  }
+  
+  console.log('Background正在保存最终的认证信息:', authData);
+  
+  // 这会触发popup中的onChanged监听器
+  await chrome.storage.local.set({
+    'oauth_success': authData,
+    'auth_token': authData.token,
+    'user_info': authData.user,
+  });
+  
+  await chrome.storage.sync.set({
+    'isLoggedIn': true,
+    'userProfile': authData.user
+  });
+
+  console.log('认证数据已成功保存到storage');
+}
+
+// 确保作为模块导出
+export {}; 

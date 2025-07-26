@@ -69,92 +69,22 @@ function Popup() {
   useEffect(() => {
     initializeAuth();
     
-    // 监听来自OAuth回调窗口的消息
-    window.addEventListener('message', handleAuthMessage);
-    
-    // 监听来自background script的消息
-    const handleRuntimeMessage = (message: any, sender: any, sendResponse: any) => {
-      console.log('Popup收到runtime消息:', message);
-      if (message.type === 'GITHUB_AUTH_SUCCESS') {
-        handleAuthMessage({ data: message } as MessageEvent);
-        sendResponse({ success: true });
-      }
-    };
-    
-    chrome.runtime.onMessage.addListener(handleRuntimeMessage);
-    
-    // 监听BroadcastChannel消息（额外的通信渠道）
-    let broadcastChannel: BroadcastChannel | null = null;
-    try {
-      broadcastChannel = new BroadcastChannel('oauth-success');
-      broadcastChannel.addEventListener('message', (event) => {
-        console.log('收到BroadcastChannel消息:', event.data);
-        if (event.data.type === 'GITHUB_AUTH_SUCCESS') {
-          handleAuthMessage({ data: event.data } as MessageEvent);
-        }
-      });
-    } catch (error) {
-      console.log('BroadcastChannel不可用:', error);
-    }
-    
-    // 定期检查LocalStorage（备用方案）
-    const checkLocalStorage = () => {
-      try {
-        const authData = localStorage.getItem('oauth_auth_data');
-        if (authData) {
-          const parsed = JSON.parse(authData);
-          // 检查数据是否是最近的（5分钟内）
-          if (Date.now() - parsed.timestamp < 5 * 60 * 1000) {
-            console.log('从LocalStorage检测到OAuth数据:', parsed);
-            handleAuthMessage({ 
-              data: {
-                type: 'GITHUB_AUTH_SUCCESS',
-                token: parsed.token,
-                user: parsed.user
-              }
-            } as MessageEvent);
-            localStorage.removeItem('oauth_auth_data'); // 清除已处理的数据
-          }
-        }
-      } catch (error) {
-        console.error('LocalStorage检查失败:', error);
-      }
-    };
-    
-    // 立即检查一次LocalStorage
-    checkLocalStorage();
-    
-    // 每秒检查LocalStorage
-    const localStorageInterval = setInterval(checkLocalStorage, 1000);
-    
-    // 监听storage变化，用于OAuth回调后的状态同步
+    // 只保留 storage.onChanged 监听器，这是最稳健的模式
     const handleStorageChange = async (changes: any) => {
       if (changes.oauth_success) {
         const authData = changes.oauth_success.newValue;
         if (authData) {
-          console.log('检测到OAuth成功，处理认证信息...');
+          console.log('检测到认证成功信号，更新UI...');
           
-          // 确保数据格式正确
-          let parsedData: any = authData;
-          if (typeof authData === 'string') {
-            try {
-              parsedData = JSON.parse(authData);
-            } catch (e) {
-              console.error('解析OAuth数据失败:', e);
-              return;
-            }
-          }
-          
-          // 验证数据结构
-          if (!parsedData || !parsedData.user || !parsedData.token) {
-            console.error('OAuth数据结构无效:', parsedData);
+          if (!authData.user || !authData.token) {
+            console.error('收到的认证数据结构无效:', authData);
             return;
           }
           
           setAuthState({
             isAuthenticated: true,
-            user: parsedData.user,
-            token: parsedData.token,
+            user: authData.user,
+            token: authData.token,
             loading: false
           });
 
@@ -164,77 +94,21 @@ function Popup() {
             message: '✅ 登录成功！'
           });
 
-          // 清除临时标志
-          await storage.remove('oauth_success');
-          
-          // 3秒后清除消息
           setTimeout(() => {
             setUploadStatus(prev => ({ ...prev, message: '' }));
+            // 清理旧的标记
+            storage.remove('oauth_success');
           }, 3000);
         }
       }
     };
 
-    // 监听storage变化
     chrome.storage.onChanged.addListener(handleStorageChange);
     
-    // 定期检查OAuth状态更新（为了处理popup关闭后重新打开的情况）
-    const oauthCheckInterval = setInterval(async () => {
-      const oauthSuccess = await storage.get('oauth_success');
-      if (oauthSuccess && !authState.isAuthenticated) {
-        console.log('检测到延迟的OAuth成功状态');
-        
-        // 确保数据格式正确
-        let parsedData: any = oauthSuccess;
-        if (typeof oauthSuccess === 'string') {
-          try {
-            parsedData = JSON.parse(oauthSuccess);
-          } catch (e) {
-            console.error('解析OAuth数据失败:', e);
-            return;
-          }
-        }
-        
-        // 验证数据结构
-        if (!parsedData || !parsedData.user || !parsedData.token) {
-          console.error('OAuth数据结构无效:', parsedData);
-          return;
-        }
-        
-        setAuthState({
-          isAuthenticated: true,
-          user: parsedData.user,
-          token: parsedData.token,
-          loading: false
-        });
-
-        setUploadStatus({
-          uploading: false,
-          progress: 100,
-          message: '✅ 登录成功！'
-        });
-
-        // 清除临时标志
-        await storage.remove('oauth_success');
-        
-        // 3秒后清除消息
-        setTimeout(() => {
-          setUploadStatus(prev => ({ ...prev, message: '' }));
-        }, 3000);
-      }
-    }, 1000); // 每秒检查一次
-    
     return () => {
-      window.removeEventListener('message', handleAuthMessage);
-      chrome.runtime.onMessage.removeListener(handleRuntimeMessage);
       chrome.storage.onChanged.removeListener(handleStorageChange);
-      clearInterval(oauthCheckInterval);
-      clearInterval(localStorageInterval);
-      if (broadcastChannel) {
-        broadcastChannel.close();
-      }
     };
-  }, [authState.isAuthenticated]);
+  }, []); // 依赖项为空，此 effect 只运行一次
 
   const initializeAuth = async () => {
     try {
@@ -335,77 +209,36 @@ function Popup() {
   };
 
   const handleGitHubLogin = async () => {
-    try {
+    console.log('Popup: 用户点击登录按钮，准备发送消息到background...');
+    setUploadStatus({
+      uploading: true,
+      progress: 50,
+      message: '🚀 正在启动GitHub登录...'
+    });
+
+    chrome.runtime.sendMessage({ type: 'INITIATE_AUTH' }, (response) => {
+      // 检查 sendMessage 是否成功发出。注意：这里的 response 是 background script 的同步响应
+      if (chrome.runtime.lastError) {
+        // 这种情况通常意味着 background script 没能成功建立消息通道
+        const errorMsg = chrome.runtime.lastError.message || '与后台脚本通信失败';
+        console.error('Popup: 发送认证请求失败:', errorMsg);
+        setUploadStatus({
+          uploading: false,
+          progress: 0,
+          message: `登录失败: ${errorMsg}`
+        });
+        setTimeout(() => setUploadStatus(prev => ({...prev, message: ''})), 3000);
+        return;
+      }
+      
+      // 消息已成功发出，等待用户在认证窗口中操作
+      console.log('Popup: 认证请求已成功发送到后台，等待用户操作...');
       setUploadStatus({
         uploading: true,
-        progress: 0,
-        message: '正在跳转到GitHub登录...'
+        progress: 75,
+        message: '⏳ 请在弹出的窗口中完成登录...'
       });
-
-      // 获取GitHub OAuth URL
-      const response = await fetch(`${API_BASE_URL}/auth/github`);
-      const result = await response.json();
-
-            if (result.success && result.data?.authUrl) {
-        setUploadStatus({
-          uploading: true,
-          progress: 50,
-          message: '🔗 正在打开GitHub登录页面...'
-        });
-
-        // 使用chrome.tabs API在新标签页中打开OAuth URL（如果可用）
-        if (chrome?.tabs) {
-          try {
-            // 在Chrome扩展中，使用tabs API打开新标签页
-            chrome.tabs.create({ 
-              url: result.data.authUrl,
-              active: true 
-            });
-          } catch (error) {
-            console.log('chrome.tabs不可用，降级使用window.open');
-            // 降级处理：使用window.open
-            const authWindow = window.open(
-              result.data.authUrl,
-              'github-auth',
-              'width=550,height=650,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=yes'
-            );
-            
-            if (!authWindow) {
-              throw new Error('无法打开OAuth窗口，请检查浏览器是否阻止了弹窗');
-            }
-          }
-        } else {
-          // 在普通网页环境中，使用window.open
-          const authWindow = window.open(
-            result.data.authUrl,
-            'github-auth',
-            'width=550,height=650,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=yes'
-          );
-          
-          if (!authWindow) {
-            throw new Error('无法打开OAuth窗口，请检查浏览器是否阻止了弹窗');
-          }
-        }
-
-        setUploadStatus({
-          uploading: true,
-          progress: 75,
-          message: '⏳ 正在处理GitHub登录...'
-        });
-
-        console.log('OAuth登录流程已启动，等待回调...');
-
-      } else {
-        throw new Error(result.error || 'GitHub OAuth初始化失败');
-      }
-    } catch (error) {
-      console.error('GitHub登录失败:', error);
-      setUploadStatus({
-        uploading: false,
-        progress: 0,
-        message: `登录失败: ${error instanceof Error ? error.message : '未知错误'}`
-      });
-    }
+    });
   };
 
   const handleLogout = async () => {
