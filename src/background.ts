@@ -1,7 +1,8 @@
 // AI微积分助教 - Plasmo Background Script
 
-// 直接定义API_BASE_URL，避免复杂的import路径问题  
+// 直接定义API_BASE_URL和Supabase配置，避免复杂的import路径问题  
 const API_BASE_URL = 'http://localhost:3000/api';
+const SUPABASE_URL = 'https://gwvnlvhceylybrefugit.supabase.co';
 
 console.log("✅ Background Service Worker 已启动");
 
@@ -24,7 +25,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ success: true });
       } catch (error) {
         console.error('认证流程启动失败:', error);
-        sendResponse({ success: false, error: error.message });
+        sendResponse({ success: false, error: (error as Error).message });
       }
     })();
     return true; // 保持消息通道开放以进行异步响应
@@ -38,40 +39,34 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 async function handleInitiateAuth() {
   console.log('开始处理认证流程 (handleInitiateAuth)...');
   
-  // 1. 从后端获取Supabase OAuth URL
-  console.log('步骤1: 从后端获取Supabase OAuth URL...');
-  const response = await fetch(`${API_BASE_URL}/auth/github`);
-  const result = await response.json();
-
-  if (!result.success || !result.data?.authUrl) {
-    throw new Error(result.error || '无法获取GitHub OAuth URL');
-  }
-
-  const authUrl = result.data.authUrl;
-  console.log('获取到的认证URL:', authUrl);
+  // 1. 构造Supabase OAuth URL，使用chromiumapp.org重定向
+  console.log('步骤1: 构造Supabase OAuth URL...');
+  const extensionId = chrome.runtime.id;
+  console.log('当前扩展ID:', extensionId);
+  
+  const redirectUri = `https://${extensionId}.chromiumapp.org/provider_cb`;
+  const authUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=github&redirect_to=${encodeURIComponent(redirectUri)}`;
+  console.log('构造的认证URL:', authUrl);
+  console.log('重定向URI:', redirectUri);
 
   // 2. 使用chrome.identity.launchWebAuthFlow启动认证
   console.log('步骤2: 调用 chrome.identity.launchWebAuthFlow...');
   const redirectUrl = await new Promise<string>((resolve, reject) => {
-    chrome.identity.launchWebAuthFlow(
-      {
-        url: authUrl,
-        interactive: true
-      },
-      (callbackUrl) => {
-        if (chrome.runtime.lastError) {
-          console.error('launchWebAuthFlow 错误:', chrome.runtime.lastError.message);
-          reject(new Error(chrome.runtime.lastError.message));
-        } else if (callbackUrl) {
-          console.log('launchWebAuthFlow 成功，返回URL:', callbackUrl);
-          resolve(callbackUrl);
-        } else {
-          // 用户可能手动关闭了认证窗口
-          console.warn('认证流程被取消或失败，未返回URL。');
-          reject(new Error('用户取消了登录。'));
-        }
+    chrome.identity.launchWebAuthFlow({
+      url: authUrl,
+      interactive: true
+    }, (responseUrl) => {
+      if (chrome.runtime.lastError) {
+        console.error('launchWebAuthFlow 错误:', chrome.runtime.lastError.message);
+        reject(new Error(chrome.runtime.lastError.message));
+      } else if (responseUrl) {
+        console.log('launchWebAuthFlow 成功，返回URL:', responseUrl);
+        resolve(responseUrl);
+      } else {
+        console.warn('认证流程被取消或失败，未返回URL。');
+        reject(new Error('用户取消了登录。'));
       }
-    );
+    });
   });
   
   console.log('OAuth 成功，重定向URL:', redirectUrl);
@@ -135,4 +130,4 @@ async function handleOAuthSuccess(authData: { token: string; user: any }) {
 }
 
 // 确保作为模块导出
-export {}; 
+export {};

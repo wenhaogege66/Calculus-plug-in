@@ -17,37 +17,7 @@ interface JWTPayload {
 }
 
 export async function authRoutes(fastify: FastifyInstance) {
-  // GitHub OAuth授权URL生成 (使用Supabase Auth)
-  fastify.get('/auth/github', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: 'https://egpkadooocnobgbklaclgimmkjmoghnl.chromiumapp.org/provider_cb'
-        }
-      });
-      
-      if (error) {
-        return reply.code(500).send({
-          success: false,
-          error: `GitHub OAuth初始化失败: ${error.message}`
-        });
-      }
-
-      return {
-        success: true,
-        data: {
-          authUrl: data.url
-        }
-      };
-    } catch (error) {
-      fastify.log.error('GitHub OAuth URL生成失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: 'OAuth URL生成失败'
-      });
-    }
-  });
+  // 注意：/auth/github 端点已删除，前端直接构造Supabase OAuth URL
 
   // GitHub OAuth回调处理 (Supabase Auth处理)
   fastify.get('/auth/github/callback', async (request, reply) => {
