@@ -14,6 +14,12 @@ function Popup() {
     loading: true
   });
 
+  // 添加模式选择状态
+  const [workMode, setWorkMode] = useState<'practice' | 'homework'>('practice');
+  
+  // 添加用户角色状态
+  const [userRole, setUserRole] = useState<'student' | 'teacher'>('student');
+
   const [uploadStatus, setUploadStatus] = useState<{
     uploading: boolean;
     progress: number;
@@ -115,42 +121,45 @@ function Popup() {
       // 从storage获取保存的token
       const savedToken = await storage.get('auth_token');
       const savedUser = await storage.get('user_info');
+      const savedWorkMode = await storage.get('work_mode') || 'practice';
 
       console.log('初始化认证状态 - Token:', savedToken ? '存在' : '不存在', 'User:', savedUser ? '存在' : '不存在');
 
+      // 恢复工作模式
+      setWorkMode(savedWorkMode === 'homework' ? 'homework' : 'practice');
+      
+      // 恢复用户角色
+      const savedRole = await storage.get('user_role') || 'student';
+      setUserRole(savedRole === 'teacher' ? 'teacher' : 'student');
+
       if (savedToken && savedUser) {
-        // 首先设置认证状态，然后在后台验证token
+        // 立即设置认证状态，提升用户体验
+        let user = typeof savedUser === 'string' ? JSON.parse(savedUser) : savedUser;
+        
+        // 确保用户角色默认为学生
+        if (!user.role) {
+          user.role = 'student';
+        }
+        
         setAuthState({
           isAuthenticated: true,
-          user: typeof savedUser === 'string' ? JSON.parse(savedUser) : savedUser,
+          user: user,
           token: savedToken,
           loading: false
         });
 
-        // 在后台验证token是否仍然有效
-        const isValid = await verifyToken(savedToken);
-        if (!isValid) {
-          console.log('Token已过期，需要重新登录');
-          // Token无效，清除storage并重置状态
-          await storage.remove('auth_token');
-          await storage.remove('user_info');
-          setAuthState({
-            isAuthenticated: false,
-            user: null,
-            token: null,
-            loading: false
-          });
-          setUploadStatus({
-            uploading: false,
-            progress: 0,
-            message: '⚠️ 登录已过期，请重新登录'
-          });
-          setTimeout(() => {
-            setUploadStatus(prev => ({ ...prev, message: '' }));
-          }, 3000);
-        } else {
-          console.log('Token验证成功，保持登录状态');
-        }
+        // 在后台静默验证token（不影响UI体验）
+        verifyToken(savedToken).then(isValid => {
+          if (!isValid) {
+            console.log('Token已过期，需要重新登录');
+            handleTokenExpired();
+          } else {
+            console.log('Token验证成功，保持登录状态');
+          }
+        }).catch(error => {
+          console.warn('Token验证出错，但保持当前登录状态:', error);
+        });
+        
         return;
       }
 
@@ -158,6 +167,43 @@ function Popup() {
     } catch (error) {
       console.error('初始化认证状态失败:', error);
       setAuthState(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const handleTokenExpired = async () => {
+    // Token无效，清除storage并重置状态
+    await storage.remove('auth_token');
+    await storage.remove('user_info');
+    setAuthState({
+      isAuthenticated: false,
+      user: null,
+      token: null,
+      loading: false
+    });
+    setUploadStatus({
+      uploading: false,
+      progress: 0,
+      message: '⚠️ 登录已过期，请重新登录'
+    });
+    setTimeout(() => {
+      setUploadStatus(prev => ({ ...prev, message: '' }));
+    }, 3000);
+  };
+
+  const handleModeChange = async (mode: 'practice' | 'homework') => {
+    setWorkMode(mode);
+    await storage.set('work_mode', mode);
+  };
+
+  const handleRoleSwitch = async (role: 'student' | 'teacher') => {
+    setUserRole(role);
+    await storage.set('user_role', role);
+    
+    // 更新用户信息中的角色
+    if (authState.user) {
+      const updatedUser = { ...authState.user, role };
+      setAuthState(prev => ({ ...prev, user: updatedUser }));
+      await storage.set('user_info', updatedUser);
     }
   };
 
@@ -181,6 +227,11 @@ function Popup() {
     if (event.data?.type === 'GITHUB_AUTH_SUCCESS') {
       console.log('GitHub登录成功，处理认证信息...');
       const { token, user } = event.data;
+      
+      // 确保用户角色默认为学生
+      if (!user.role) {
+        user.role = 'student';
+      }
       
       // 保存认证信息
       await storage.set('auth_token', token);
@@ -297,6 +348,7 @@ function Popup() {
 
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('workMode', workMode);
 
       setUploadStatus(prev => ({ ...prev, progress: 50 }));
 
@@ -497,17 +549,85 @@ function Popup() {
             <div className="user-details">
               <h3>{authState.user?.username}</h3>
               <p>{authState.user?.email}</p>
-              <span className="user-role">
-                {authState.user?.role === 'student' ? '🎓 学生' : '👨‍🏫 教师'}
-              </span>
+              <div className="role-switcher">
+                <button 
+                  className={`role-btn ${userRole === 'student' ? 'active' : ''}`}
+                  onClick={() => handleRoleSwitch('student')}
+                >
+                  🎓 学生
+                </button>
+                <button 
+                  className={`role-btn ${userRole === 'teacher' ? 'active' : ''}`}
+                  onClick={() => handleRoleSwitch('teacher')}
+                >
+                  👨‍🏫 教师
+                </button>
+              </div>
             </div>
             <button className="logout-btn" onClick={handleLogout}>
               退出
             </button>
           </div>
 
+          {userRole === 'student' && (
+            <div className="mode-selection">
+              <h3>📝 学习模式</h3>
+            <div className="mode-buttons">
+              <button 
+                className={`mode-btn ${workMode === 'practice' ? 'active' : ''}`}
+                onClick={() => handleModeChange('practice')}
+              >
+                <div className="mode-icon">📚</div>
+                <div className="mode-text">
+                  <strong>刷题模式</strong>
+                  <span>上传含题目的PDF/图片</span>
+                </div>
+              </button>
+              <button 
+                className={`mode-btn ${workMode === 'homework' ? 'active' : ''}`}
+                onClick={() => handleModeChange('homework')}
+              >
+                <div className="mode-icon">📝</div>
+                <div className="mode-text">
+                  <strong>作业模式</strong>
+                  <span>上传解题过程（已有题目）</span>
+                </div>
+              </button>
+            </div>
+            </div>
+          )}
+
+          {userRole === 'teacher' && (
+            <div className="teacher-section">
+              <h3>👨‍🏫 教师功能</h3>
+              <div className="teacher-actions">
+                <button className="teacher-btn">
+                  📋 创建班级
+                </button>
+                <button className="teacher-btn">
+                  📤 上传题目库
+                </button>
+                <button className="teacher-btn">
+                  📊 批改统计
+                </button>
+                <button className="teacher-btn">
+                  🔗 生成邀请码
+                </button>
+              </div>
+              <div className="teacher-info">
+                <p>💡 教师模式功能：</p>
+                <ul>
+                  <li>创建和管理班级</li>
+                  <li>上传题目库供学生练习</li>
+                  <li>查看学生作业批改统计</li>
+                  <li>生成班级邀请码</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
           <div className="upload-section">
-            <h3>📤 上传作业</h3>
+            <h3>📤 上传{userRole === 'teacher' ? '教学材料' : (workMode === 'practice' ? '练习材料' : '作业答案')}</h3>
             <div className="upload-area">
               <input
                 type="file"
@@ -536,6 +656,11 @@ function Popup() {
             <div className="file-info">
               <p>📋 支持格式: PDF, JPG, PNG, GIF, WebP</p>
               <p>📏 最大大小: 100MB</p>
+              {workMode === 'practice' ? (
+                <p>💡 刷题模式：请上传包含完整题目和您解答的文件</p>
+              ) : (
+                <p>💡 作业模式：请上传您的解题过程，系统将匹配对应题目</p>
+              )}
             </div>
 
             {uploadStatus.message && (
