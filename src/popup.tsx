@@ -19,6 +19,27 @@ function Popup() {
   
   // 添加用户角色状态
   const [userRole, setUserRole] = useState<'student' | 'teacher'>('student');
+  
+  // 添加班级管理状态
+  const [classrooms, setClassrooms] = useState<any[]>([]);
+  const [selectedClassroom, setSelectedClassroom] = useState<string>('');
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [selectedAssignment, setSelectedAssignment] = useState<string>('');
+  const [showCreateClass, setShowCreateClass] = useState(false);
+  const [showAssignWork, setShowAssignWork] = useState(false);
+  const [showJoinClass, setShowJoinClass] = useState(false);
+  
+  // 表单状态
+  const [className, setClassName] = useState('');
+  const [classDescription, setClassDescription] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  
+  // 作业表单状态
+  const [assignmentTitle, setAssignmentTitle] = useState('');
+  const [assignmentDescription, setAssignmentDescription] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [assignmentFile, setAssignmentFile] = useState<File | null>(null);
 
   const [uploadStatus, setUploadStatus] = useState<{
     uploading: boolean;
@@ -96,12 +117,12 @@ function Popup() {
 
           setUploadStatus({
             uploading: false,
-            progress: 100,
+            progress: 0,
             message: '✅ 登录成功！'
           });
 
           setTimeout(() => {
-            setUploadStatus(prev => ({ ...prev, message: '' }));
+            setUploadStatus(prev => ({ ...prev, message: '', progress: 0 }));
             // 清理旧的标记
             storage.remove('oauth_success');
           }, 3000);
@@ -118,9 +139,12 @@ function Popup() {
 
   const initializeAuth = async () => {
     try {
-      // 从storage获取保存的token
-      const savedToken = await storage.get('auth_token');
-      const savedUser = await storage.get('user_info');
+      // 从 chrome.storage.local 获取保存的token（与background保持一致）
+      const chromeStorage = await chrome.storage.local.get(['auth_token', 'user_info']);
+      const savedToken = chromeStorage.auth_token;
+      const savedUser = chromeStorage.user_info;
+      
+      // 从 plasmo storage 获取其他配置
       const savedWorkMode = await storage.get('work_mode') || 'practice';
 
       console.log('初始化认证状态 - Token:', savedToken ? '存在' : '不存在', 'User:', savedUser ? '存在' : '不存在');
@@ -155,6 +179,8 @@ function Popup() {
             handleTokenExpired();
           } else {
             console.log('Token验证成功，保持登录状态');
+            // 获取服务器端的用户信息（包括真实角色）
+            fetchUserInfo(savedToken);
           }
         }).catch(error => {
           console.warn('Token验证出错，但保持当前登录状态:', error);
@@ -172,8 +198,7 @@ function Popup() {
 
   const handleTokenExpired = async () => {
     // Token无效，清除storage并重置状态
-    await storage.remove('auth_token');
-    await storage.remove('user_info');
+    await chrome.storage.local.remove(['auth_token', 'user_info']);
     setAuthState({
       isAuthenticated: false,
       user: null,
@@ -196,14 +221,58 @@ function Popup() {
   };
 
   const handleRoleSwitch = async (role: 'student' | 'teacher') => {
+    // 首先验证用户是否有权限切换到教师角色
+    if (role === 'teacher' && authState.token) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${authState.token}`
+          }
+        });
+        
+        const result = await response.json();
+        if (result.success && result.data.role !== 'teacher') {
+          setUploadStatus({
+            uploading: false,
+            progress: 0,
+            message: '❌ 您没有教师权限，无法切换到教师模式'
+          });
+          
+          setTimeout(() => {
+            setUploadStatus(prev => ({ ...prev, message: '' }));
+          }, 3000);
+          return;
+        }
+      } catch (error) {
+        console.error('验证教师权限失败:', error);
+        setUploadStatus({
+          uploading: false,
+          progress: 0,
+          message: '❌ 权限验证失败，请重新登录'
+        });
+        
+        setTimeout(() => {
+          setUploadStatus(prev => ({ ...prev, message: '' }));
+        }, 3000);
+        return;
+      }
+    }
+    
     setUserRole(role);
     await storage.set('user_role', role);
     
-    // 更新用户信息中的角色
+    // 更新用户信息中的角色（仅用于UI显示）
     if (authState.user) {
       const updatedUser = { ...authState.user, role };
       setAuthState(prev => ({ ...prev, user: updatedUser }));
-      await storage.set('user_info', updatedUser);
+      await chrome.storage.local.set({ 'user_info': updatedUser });
+    }
+    
+    // 切换角色后加载对应数据
+    if (role === 'teacher') {
+      loadTeacherClassrooms();
+    } else {
+      loadStudentClassrooms();
     }
   };
 
@@ -221,6 +290,52 @@ function Popup() {
     }
   };
 
+  // 获取用户信息（包括真实角色）
+  const fetchUserInfo = async (token: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        const serverUser = result.data;
+        
+        // 更新用户状态，使用服务器端的角色信息
+        setUserRole(serverUser.role);
+        await storage.set('user_role', serverUser.role);
+        
+        // 更新authState中的用户信息
+        setAuthState(prev => ({
+          ...prev,
+          user: {
+            ...prev.user,
+            role: serverUser.role
+          }
+        }));
+        
+        // 更新本地存储
+        await chrome.storage.local.set({ 
+          'user_info': {
+            ...authState.user,
+            role: serverUser.role
+          }
+        });
+        
+        // 根据真实角色加载数据
+        if (serverUser.role === 'teacher') {
+          loadTeacherClassrooms();
+        } else {
+          loadStudentClassrooms();
+        }
+      }
+    } catch (error) {
+      console.error('获取用户信息失败:', error);
+    }
+  };
+
   const handleAuthMessage = async (event: MessageEvent) => {
     console.log('收到消息:', event.data);
     
@@ -233,9 +348,11 @@ function Popup() {
         user.role = 'student';
       }
       
-      // 保存认证信息
-      await storage.set('auth_token', token);
-      await storage.set('user_info', user);
+      // 保存认证信息到 chrome.storage.local（与background保持一致）
+      await chrome.storage.local.set({
+        'auth_token': token,
+        'user_info': user
+      });
       
       setAuthState({
         isAuthenticated: true,
@@ -246,13 +363,13 @@ function Popup() {
 
       setUploadStatus({
         uploading: false,
-        progress: 100,
+        progress: 0,
         message: '✅ 登录成功！'
       });
 
       // 3秒后清除消息
       setTimeout(() => {
-        setUploadStatus(prev => ({ ...prev, message: '' }));
+        setUploadStatus(prev => ({ ...prev, message: '', progress: 0 }));
       }, 3000);
     } else {
       console.log('收到其他类型消息:', event.data?.type);
@@ -284,19 +401,14 @@ function Popup() {
       
       // 消息已成功发出，等待用户在认证窗口中操作
       console.log('Popup: 认证请求已成功发送到后台，等待用户操作...');
-      setUploadStatus({
-        uploading: true,
-        progress: 75,
-        message: '⏳ 请在弹出的窗口中完成登录...'
-      });
+      // 不设置上传状态，避免与文件上传状态冲突
     });
   };
 
   const handleLogout = async () => {
     try {
       // 清除本地存储
-      await storage.remove('auth_token');
-      await storage.remove('user_info');
+      await chrome.storage.local.remove(['auth_token', 'user_info']);
       
       // 从Supabase登出
       await supabase.auth.signOut();
@@ -439,6 +551,288 @@ function Popup() {
     }
   };
 
+  // 加载教师班级列表
+  const loadTeacherClassrooms = async () => {
+    if (!authState.token) return;
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/classrooms/teacher`, {
+        headers: {
+          'Authorization': `Bearer ${authState.token}`
+        }
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        setClassrooms(result.data);
+      }
+    } catch (error) {
+      console.error('加载班级列表失败:', error);
+    }
+  };
+
+  // 加载学生班级列表
+  const loadStudentClassrooms = async () => {
+    if (!authState.token) return;
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/classrooms/student`, {
+        headers: {
+          'Authorization': `Bearer ${authState.token}`
+        }
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        setClassrooms(result.data);
+      }
+    } catch (error) {
+      console.error('加载班级列表失败:', error);
+    }
+  };
+
+  // 创建班级
+  const handleCreateClass = async () => {
+    if (!className.trim()) {
+      setUploadStatus({
+        uploading: false,
+        progress: 0,
+        message: '❌ 请输入班级名称'
+      });
+      return;
+    }
+
+    try {
+      setUploadStatus({
+        uploading: true,
+        progress: 50,
+        message: '正在创建班级...'
+      });
+
+      const response = await fetch(`${API_BASE_URL}/classrooms`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authState.token}`
+        },
+        body: JSON.stringify({
+          name: className,
+          description: classDescription
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setUploadStatus({
+          uploading: false,
+          progress: 100,
+          message: `✅ 班级创建成功！邀请码：${result.data.inviteCode}`
+        });
+        
+        // 清空表单
+        setClassName('');
+        setClassDescription('');
+        setShowCreateClass(false);
+        
+        // 重新加载班级列表
+        loadTeacherClassrooms();
+      } else {
+        throw new Error(result.error || '创建班级失败');
+      }
+    } catch (error) {
+      console.error('创建班级失败:', error);
+      setUploadStatus({
+        uploading: false,
+        progress: 0,
+        message: `❌ 创建失败: ${error instanceof Error ? error.message : '未知错误'}`
+      });
+    }
+
+    setTimeout(() => {
+      setUploadStatus(prev => ({ ...prev, message: '' }));
+    }, 5000);
+  };
+
+  // 学生加入班级
+  const handleJoinClass = async () => {
+    if (!inviteCode.trim()) {
+      setUploadStatus({
+        uploading: false,
+        progress: 0,
+        message: '❌ 请输入邀请码'
+      });
+      return;
+    }
+
+    try {
+      setUploadStatus({
+        uploading: true,
+        progress: 50,
+        message: '正在加入班级...'
+      });
+
+      const response = await fetch(`${API_BASE_URL}/classrooms/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authState.token}`
+        },
+        body: JSON.stringify({
+          inviteCode: inviteCode.trim()
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setUploadStatus({
+          uploading: false,
+          progress: 100,
+          message: `✅ 成功加入班级：${result.data.name}`
+        });
+        
+        // 清空表单
+        setInviteCode('');
+        setShowJoinClass(false);
+        
+        // 重新加载班级列表
+        loadStudentClassrooms();
+      } else {
+        throw new Error(result.error || '加入班级失败');
+      }
+    } catch (error) {
+      console.error('加入班级失败:', error);
+      setUploadStatus({
+        uploading: false,
+        progress: 0,
+        message: `❌ 加入失败: ${error instanceof Error ? error.message : '未知错误'}`
+      });
+    }
+
+    setTimeout(() => {
+      setUploadStatus(prev => ({ ...prev, message: '' }));
+    }, 5000);
+  };
+
+  // 布置作业
+  const handleAssignWork = async () => {
+    if (!assignmentTitle.trim()) {
+      setUploadStatus({
+        uploading: false,
+        progress: 0,
+        message: '❌ 请输入作业标题'
+      });
+      return;
+    }
+
+    if (!selectedClassroom) {
+      setUploadStatus({
+        uploading: false,
+        progress: 0,
+        message: '❌ 请选择班级'
+      });
+      return;
+    }
+
+    if (!startDate || !dueDate) {
+      setUploadStatus({
+        uploading: false,
+        progress: 0,
+        message: '❌ 请设置开始和截止时间'
+      });
+      return;
+    }
+
+    try {
+      setUploadStatus({
+        uploading: true,
+        progress: 30,
+        message: '正在处理作业文件...'
+      });
+
+      let fileUploadId = null;
+      
+      // 如果有文件，先上传文件
+      if (assignmentFile) {
+        const formData = new FormData();
+        formData.append('file', assignmentFile);
+        formData.append('workMode', 'practice'); // 题目文件使用practice模式
+
+        const fileResponse = await fetch(`${API_BASE_URL}/files`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authState.token}`
+          },
+          body: formData
+        });
+
+        const fileResult = await fileResponse.json();
+        if (!fileResult.success) {
+          throw new Error(fileResult.error || '文件上传失败');
+        }
+        
+        fileUploadId = fileResult.data.fileId;
+      }
+
+      setUploadStatus({
+        uploading: true,
+        progress: 70,
+        message: '正在创建作业...'
+      });
+
+      // 创建作业
+      const response = await fetch(`${API_BASE_URL}/assignments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authState.token}`
+        },
+        body: JSON.stringify({
+          title: assignmentTitle,
+          description: assignmentDescription || null,
+          classroomId: parseInt(selectedClassroom),
+          fileUploadId: fileUploadId,
+          startDate: startDate,
+          dueDate: dueDate
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setUploadStatus({
+          uploading: false,
+          progress: 100,
+          message: `✅ 作业布置成功！`
+        });
+        
+        // 清空表单
+        setAssignmentTitle('');
+        setAssignmentDescription('');
+        setStartDate('');
+        setDueDate('');
+        setAssignmentFile(null);
+        setShowAssignWork(false);
+        
+        // 可以在此处刷新作业列表（如果需要的话）
+      } else {
+        throw new Error(result.error || '创建作业失败');
+      }
+    } catch (error) {
+      console.error('布置作业失败:', error);
+      setUploadStatus({
+        uploading: false,
+        progress: 0,
+        message: `❌ 布置失败: ${error instanceof Error ? error.message : '未知错误'}`
+      });
+    }
+
+    setTimeout(() => {
+      setUploadStatus(prev => ({ ...prev, message: '' }));
+    }, 5000);
+  };
+
   if (authState.loading) {
     return (
       <div className="popup-container">
@@ -570,120 +964,296 @@ function Popup() {
           </div>
 
           {userRole === 'student' && (
-            <div className="mode-selection">
-              <h3>📝 学习模式</h3>
-            <div className="mode-buttons">
-              <button 
-                className={`mode-btn ${workMode === 'practice' ? 'active' : ''}`}
-                onClick={() => handleModeChange('practice')}
-              >
-                <div className="mode-icon">📚</div>
-                <div className="mode-text">
-                  <strong>刷题模式</strong>
-                  <span>上传含题目的PDF/图片</span>
+            <>
+              {!showJoinClass && (
+                <>
+                  <div className="student-class-info">
+                    {selectedClassroom ? (
+                      <div className="current-class">
+                        <p>🏢 当前班级：{classrooms.find(c => c.id === selectedClassroom)?.name || '未知班级'}</p>
+                        <button 
+                          className="btn-link"
+                          onClick={() => setShowJoinClass(true)}
+                        >
+                          加入其他班级
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="no-class">
+                        <p>💫 你还没有加入任何班级</p>
+                        <button 
+                          className="btn-primary"
+                          onClick={() => setShowJoinClass(true)}
+                        >
+                          加入班级
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="mode-selection">
+                    <h3>📝 学习模式</h3>
+                    <div className="mode-buttons">
+                      <button 
+                        className={`mode-btn ${workMode === 'practice' ? 'active' : ''}`}
+                        onClick={() => handleModeChange('practice')}
+                      >
+                        <div className="mode-icon">📚</div>
+                        <div className="mode-text">
+                          <strong>刷题模式</strong>
+                          <span>上传含题目的PDF/图片</span>
+                        </div>
+                      </button>
+                      <button 
+                        className={`mode-btn ${workMode === 'homework' ? 'active' : ''}`}
+                        onClick={() => handleModeChange('homework')}
+                        disabled={!selectedClassroom}
+                      >
+                        <div className="mode-icon">📝</div>
+                        <div className="mode-text">
+                          <strong>作业模式</strong>
+                          <span>上传解题过程（已有题目）</span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {workMode === 'homework' && selectedClassroom && (
+                    <div className="assignment-selector">
+                      <label>选择作业：</label>
+                      <select 
+                        value={selectedAssignment} 
+                        onChange={(e) => setSelectedAssignment(e.target.value)}
+                      >
+                        <option value="">请选择作业</option>
+                        {assignments.filter(a => a.classroomId === selectedClassroom).map(assignment => (
+                          <option key={assignment.id} value={assignment.id}>
+                            {assignment.title} (截止: {new Date(assignment.dueDate).toLocaleDateString()})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
+              
+              {showJoinClass && (
+                <div className="join-class-form">
+                  <h4>加入班级</h4>
+                  <input 
+                    type="text" 
+                    placeholder="输入邀请码" 
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value)}
+                  />
+                  <div className="form-buttons">
+                    <button 
+                      className="btn-primary"
+                      onClick={handleJoinClass}
+                      disabled={uploadStatus.uploading}
+                    >
+                      {uploadStatus.uploading ? '加入中...' : '加入'}
+                    </button>
+                    <button 
+                      className="btn-secondary"
+                      onClick={() => setShowJoinClass(false)}
+                    >
+                      取消
+                    </button>
+                  </div>
                 </div>
-              </button>
-              <button 
-                className={`mode-btn ${workMode === 'homework' ? 'active' : ''}`}
-                onClick={() => handleModeChange('homework')}
-              >
-                <div className="mode-icon">📝</div>
-                <div className="mode-text">
-                  <strong>作业模式</strong>
-                  <span>上传解题过程（已有题目）</span>
-                </div>
-              </button>
-            </div>
-            </div>
+              )}
+            </>
           )}
 
           {userRole === 'teacher' && (
             <div className="teacher-section">
               <h3>👨‍🏫 教师功能</h3>
-              <div className="teacher-actions">
-                <button className="teacher-btn">
-                  📋 创建班级
-                </button>
-                <button className="teacher-btn">
-                  📤 上传题目库
-                </button>
-                <button className="teacher-btn">
-                  📊 批改统计
-                </button>
-                <button className="teacher-btn">
-                  🔗 生成邀请码
-                </button>
-              </div>
-              <div className="teacher-info">
-                <p>💡 教师模式功能：</p>
-                <ul>
-                  <li>创建和管理班级</li>
-                  <li>上传题目库供学生练习</li>
-                  <li>查看学生作业批改统计</li>
-                  <li>生成班级邀请码</li>
-                </ul>
-              </div>
+              
+              {!showCreateClass && !showAssignWork && (
+                <>
+                  <div className="classroom-selector">
+                    <label>选择班级：</label>
+                    <select 
+                      value={selectedClassroom} 
+                      onChange={(e) => setSelectedClassroom(e.target.value)}
+                    >
+                      <option value="">请选择班级</option>
+                      {classrooms.map(cls => (
+                        <option key={cls.id} value={cls.id}>{cls.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="teacher-actions">
+                    <button 
+                      className="teacher-btn"
+                      onClick={() => setShowCreateClass(true)}
+                    >
+                      📋 创建班级
+                    </button>
+                    <button 
+                      className="teacher-btn"
+                      onClick={() => setShowAssignWork(true)}
+                      disabled={!selectedClassroom}
+                    >
+                      📤 布置作业
+                    </button>
+                    <button className="teacher-btn">
+                      📊 查看学生
+                    </button>
+                    <button className="teacher-btn">
+                      🔗 邀请码
+                    </button>
+                  </div>
+                </>
+              )}
+              
+              {showCreateClass && (
+                <div className="create-class-form">
+                  <h4>创建新班级</h4>
+                  <input 
+                    type="text" 
+                    placeholder="班级名称" 
+                    value={className}
+                    onChange={(e) => setClassName(e.target.value)}
+                  />
+                  <textarea 
+                    placeholder="班级描述（可选）"
+                    value={classDescription}
+                    onChange={(e) => setClassDescription(e.target.value)}
+                  ></textarea>
+                  <div className="form-buttons">
+                    <button 
+                      className="btn-primary"
+                      onClick={handleCreateClass}
+                      disabled={uploadStatus.uploading}
+                    >
+                      {uploadStatus.uploading ? '创建中...' : '创建'}
+                    </button>
+                    <button 
+                      className="btn-secondary"
+                      onClick={() => setShowCreateClass(false)}
+                    >
+                      取消
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {showAssignWork && (
+                <div className="assign-work-form">
+                  <h4>布置作业</h4>
+                  <input 
+                    type="text" 
+                    placeholder="作业标题" 
+                    value={assignmentTitle}
+                    onChange={(e) => setAssignmentTitle(e.target.value)}
+                  />
+                  <textarea 
+                    placeholder="作业描述（可选）"
+                    value={assignmentDescription}
+                    onChange={(e) => setAssignmentDescription(e.target.value)}
+                  ></textarea>
+                  <div className="date-inputs">
+                    <label>
+                      开始时间：
+                      <input 
+                        type="datetime-local" 
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      截止时间：
+                      <input 
+                        type="datetime-local" 
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <div className="upload-area">
+                    <input 
+                      type="file" 
+                      accept=".pdf,.jpg,.jpeg,.png" 
+                      onChange={(e) => setAssignmentFile(e.target.files?.[0] || null)}
+                    />
+                    <p>上传题目文件 (PDF/图片, 可选)</p>
+                  </div>
+                  <div className="form-buttons">
+                    <button 
+                      className="btn-primary"
+                      onClick={handleAssignWork}
+                      disabled={uploadStatus.uploading}
+                    >
+                      {uploadStatus.uploading ? '布置中...' : '布置作业'}
+                    </button>
+                    <button 
+                      className="btn-secondary"
+                      onClick={() => setShowAssignWork(false)}
+                    >
+                      取消
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          <div className="upload-section">
-            <h3>📤 上传{userRole === 'teacher' ? '教学材料' : (workMode === 'practice' ? '练习材料' : '作业答案')}</h3>
-            <div className="upload-area">
-              <input
-                type="file"
-                id="file-input"
-                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
-                onChange={handleFileUpload}
-                disabled={uploadStatus.uploading}
-              />
-              <label htmlFor="file-input" className="upload-label">
-                {uploadStatus.uploading ? (
-                  <>
-                    <div className="spinner"></div>
-                    上传中... {uploadStatus.progress}%
-                  </>
+          {userRole === 'student' && (
+            <div className="upload-section">
+              <h3>📤 上传{workMode === 'practice' ? '练习材料' : '作业答案'}</h3>
+              <div className="upload-area">
+                <input
+                  type="file"
+                  id="file-input"
+                  accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                  onChange={handleFileUpload}
+                  disabled={uploadStatus.uploading}
+                />
+                <label htmlFor="file-input" className="upload-label">
+                  {uploadStatus.uploading ? (
+                    <>
+                      <div className="spinner"></div>
+                      上传中... {uploadStatus.progress}%
+                    </>
+                  ) : (
+                    <>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                      </svg>
+                      点击上传PDF或图片文件
+                    </>
+                  )}
+                </label>
+              </div>
+              
+              <div className="file-info">
+                <p>📋 支持格式: PDF, JPG, PNG, GIF, WebP</p>
+                <p>📏 最大大小: 100MB</p>
+                {workMode === 'practice' ? (
+                  <p>💡 刷题模式：请上传包含完整题目和您解答的文件</p>
                 ) : (
-                  <>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-                    </svg>
-                    点击上传PDF或图片文件
-                  </>
+                  <p>💡 作业模式：请上传您的解题过程，系统将匹配对应题目</p>
                 )}
-              </label>
-            </div>
-            
-            <div className="file-info">
-              <p>📋 支持格式: PDF, JPG, PNG, GIF, WebP</p>
-              <p>📏 最大大小: 100MB</p>
-              {workMode === 'practice' ? (
-                <p>💡 刷题模式：请上传包含完整题目和您解答的文件</p>
-              ) : (
-                <p>💡 作业模式：请上传您的解题过程，系统将匹配对应题目</p>
+              </div>
+
+              {uploadStatus.message && (
+                <div className={`status-message ${uploadStatus.message.includes('失败') || uploadStatus.message.includes('❌') || uploadStatus.message.includes('超时') || uploadStatus.message.includes('⚠️') ? 'error' : 'success'}`}>
+                  {uploadStatus.message}
+                </div>
               )}
             </div>
+          )}
 
-            {uploadStatus.message && (
-              <div className={`status-message ${uploadStatus.message.includes('失败') || uploadStatus.message.includes('❌') || uploadStatus.message.includes('超时') || uploadStatus.message.includes('⚠️') ? 'error' : 'success'}`}>
-                {uploadStatus.message}
-              </div>
-            )}
-          </div>
+          {/* 全局状态消息，用于教师操作反馈 */}
+          {userRole === 'teacher' && uploadStatus.message && (
+            <div className={`status-message ${uploadStatus.message.includes('失败') || uploadStatus.message.includes('❌') || uploadStatus.message.includes('超时') || uploadStatus.message.includes('⚠️') ? 'error' : 'success'}`}>
+              {uploadStatus.message}
+            </div>
+          )}
 
-          <div className="actions-section">
-            <button 
-              className="action-btn primary"
-              onClick={openSidePanel}
-            >
-              📊 查看批改结果
-            </button>
-            <button 
-              className="action-btn secondary"
-              onClick={() => chrome.tabs.create({ url: `${API_BASE_URL.replace('/api', '')}` })}
-            >
-              🌐 打开后端管理
-            </button>
-          </div>
         </div>
       )}
     </div>

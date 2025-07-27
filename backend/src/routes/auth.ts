@@ -336,6 +336,62 @@ export async function authRoutes(fastify: FastifyInstance) {
       return { success: true, message: 'Token is valid' };
     }
   );
+
+  // 获取当前用户信息端点
+  fastify.get('/auth/me', {
+    preHandler: async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        await request.jwtVerify();
+      } catch (err) {
+        reply.code(401).send({
+          success: false,
+          error: '无效的认证令牌'
+        });
+      }
+    }
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const userId = (request.user as any).userId;
+      
+      // 从数据库获取最新的用户信息
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          role: true,
+          avatarUrl: true,
+          authType: true
+        }
+      });
+
+      if (!user) {
+        return reply.code(404).send({
+          success: false,
+          error: '用户不存在'
+        });
+      }
+
+      return {
+        success: true,
+        data: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          role: user.role.toLowerCase(), // 转换为小写
+          avatarUrl: user.avatarUrl,
+          authType: user.authType
+        }
+      };
+    } catch (error) {
+      fastify.log.error('获取用户信息失败:', error);
+      return reply.code(500).send({
+        success: false,
+        error: '获取用户信息失败'
+      });
+    }
+  });
   
   // 登出端点
   fastify.post('/auth/logout', async (request: FastifyRequest, reply: FastifyReply) => {

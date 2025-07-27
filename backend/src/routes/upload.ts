@@ -13,7 +13,23 @@ export async function uploadRoutes(fastify: FastifyInstance) {
   // 文件上传端点
   fastify.post('/files', { preHandler: requireAuth }, async (request, reply) => {
     try {
-      const data = await request.file();
+      // 获取文件和其他参数
+      const parts = request.parts();
+      let fileData: any = null;
+      let workMode = 'practice';
+      let assignmentId: number | null = null;
+      
+      for await (const part of parts) {
+        if (part.type === 'file') {
+          fileData = part;
+        } else if (part.fieldname === 'workMode') {
+          workMode = (part as any).value;
+        } else if (part.fieldname === 'assignmentId') {
+          assignmentId = parseInt((part as any).value) || null;
+        }
+      }
+      
+      const data = fileData;
       
       if (!data) {
         return reply.code(400).send({
@@ -120,10 +136,12 @@ export async function uploadRoutes(fastify: FastifyInstance) {
           filePath: filePath,
           mimeType: mimetype,
           fileSize: fileSize,
-          uploadType: 'assignment',
+          uploadType: workMode === 'homework' ? 'homework' : 'practice',
           metadata: {
             supabaseKey: uploadData?.path || filePath,
-            publicUrl: publicUrlData.publicUrl
+            publicUrl: publicUrlData.publicUrl,
+            workMode: workMode,
+            assignmentId: assignmentId
           }
         }
       });

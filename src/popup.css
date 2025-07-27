@@ -357,6 +357,168 @@ html, body {
   line-height: 1.3;
 }
 
+/* 学生班级信息部分 */
+.student-class-info {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #f0f8ff;
+  border: 1px solid #b3d9ff;
+  border-radius: 8px;
+}
+
+.current-class p {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.no-class {
+  text-align: center;
+}
+
+.no-class p {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #6c757d;
+}
+
+.btn-primary {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-primary:hover {
+  background: #5a6fd8;
+}
+
+.btn-primary:disabled {
+  background: #adb5bd;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #f8f9fa;
+  color: #495057;
+  border: 1px solid #dee2e6;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: #e9ecef;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: #667eea;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.btn-link:hover {
+  color: #5a6fd8;
+}
+
+/* 作业选择器 */
+.assignment-selector {
+  margin-bottom: 20px;
+}
+
+.assignment-selector label {
+  display: block;
+  font-size: 14px;
+  color: #2c3e50;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.assignment-selector select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+}
+
+/* 表单样式 */
+.join-class-form,
+.create-class-form,
+.assign-work-form {
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.join-class-form h4,
+.create-class-form h4,
+.assign-work-form h4 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  color: #2c3e50;
+}
+
+.join-class-form input,
+.create-class-form input,
+.assign-work-form input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.create-class-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 12px;
+  min-height: 60px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.date-inputs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.date-inputs label {
+  flex: 1;
+  font-size: 12px;
+  color: #495057;
+}
+
+.date-inputs input {
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
 /* 教师功能部分 */
 .teacher-section {
   margin-bottom: 24px;
@@ -366,6 +528,27 @@ html, body {
   margin: 0 0 16px 0;
   font-size: 18px;
   color: #2c3e50;
+}
+
+.classroom-selector {
+  margin-bottom: 16px;
+}
+
+.classroom-selector label {
+  display: block;
+  font-size: 14px;
+  color: #2c3e50;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.classroom-selector select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
 }
 
 .teacher-actions {
