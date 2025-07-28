@@ -3,8 +3,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // 环境变量
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://gwvnlvhceylybrefugit.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3dm5sdmhjZXlseWJyZWZ1Z2l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxNjQzMTYsImV4cCI6MjA2ODc0MDMxNn0.upzdvJvbRr2Wca6Lr6eVCx4FAjkI2dhdyyw044vzKmE';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {

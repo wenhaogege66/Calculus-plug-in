@@ -1,8 +1,8 @@
 // AI微积分助教 - Plasmo Background Script
 
 // 直接定义API_BASE_URL和Supabase配置，避免复杂的import路径问题  
-const API_BASE_URL = 'http://localhost:3000/api';
-const SUPABASE_URL = 'https://gwvnlvhceylybrefugit.supabase.co';
+const API_BASE_URL = process.env.PLASMO_PUBLIC_API_BASE_URL || 'http://localhost:3000/api';
+const SUPABASE_URL = process.env.PLASMO_PUBLIC_SUPABASE_URL;
 
 console.log("✅ Background Service Worker 已启动");
 
@@ -32,8 +32,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   
   // 这里可以添加其他内部消息的处理
-  // default:
-  //   console.warn('未知的内部消息类型:', message.type);
 });
 
 async function handleInitiateAuth() {

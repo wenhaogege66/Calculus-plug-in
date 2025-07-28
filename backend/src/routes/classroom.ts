@@ -15,8 +15,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/classrooms', {
     preHandler: async (request, reply) => {
       await requireAuth(request, reply);
-      console.log("kk",request.currentUser);
-      if (request.currentUser.role.toLowerCase() !== 'teacher') {
+      if (request.currentUser!.role.toLowerCase() !== 'teacher') {
         reply.code(403).send({ success: false, error: '只有教师可以创建班级' });
       }
     }
@@ -35,7 +34,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
           name: name.trim(),
           description: description?.trim() || null,
           inviteCode,
-          teacherId: request.currentUser.id
+          teacherId: request.currentUser!.id
         }
       });
 
@@ -59,7 +58,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/classrooms/teacher', {
     preHandler: async (request, reply) => {
       await requireAuth(request, reply);
-      if (request.currentUser.role.toLowerCase() !== 'teacher') {
+      if (request.currentUser!.role.toLowerCase() !== 'teacher') {
         reply.code(403).send({ success: false, error: '只有教师可以查看班级列表' });
       }
     }
@@ -67,7 +66,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       const classrooms = await prisma.classroom.findMany({
         where: {
-          teacherId: request.currentUser.id,
+          teacherId: request.currentUser!.id,
           isActive: true
         },
         include: {
@@ -103,7 +102,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/classrooms/student', {
     preHandler: async (request, reply) => {
       await requireAuth(request, reply);
-      if (request.currentUser.role.toLowerCase() !== 'student') {
+      if (request.currentUser!.role.toLowerCase() !== 'student') {
         reply.code(403).send({ success: false, error: '只有学生可以查看加入的班级' });
       }
     }
@@ -111,7 +110,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       const memberships = await prisma.classroomMember.findMany({
         where: {
-          studentId: request.currentUser.id,
+          studentId: request.currentUser!.id,
           isActive: true
         },
         include: {
@@ -150,7 +149,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/classrooms/join', {
     preHandler: async (request, reply) => {
       await requireAuth(request, reply);
-      if (request.currentUser.role.toLowerCase() !== 'student') {
+      if (request.currentUser!.role.toLowerCase() !== 'student') {
         reply.code(403).send({ success: false, error: '只有学生可以加入班级' });
       }
     }
@@ -179,7 +178,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
         where: {
           classroomId_studentId: {
             classroomId: classroom.id,
-            studentId: request.currentUser.id
+            studentId: request.currentUser!.id
           }
         }
       });
@@ -199,7 +198,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
         await prisma.classroomMember.create({
           data: {
             classroomId: classroom.id,
-            studentId: request.currentUser.id
+            studentId: request.currentUser!.id
           }
         });
       }
@@ -223,7 +222,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/classrooms/:classroomId/members', {
     preHandler: async (request, reply) => {
       await requireAuth(request, reply);
-      if (request.currentUser.role.toLowerCase() !== 'teacher') {
+      if (request.currentUser!.role.toLowerCase() !== 'teacher') {
         reply.code(403).send({ success: false, error: '只有教师可以查看班级成员' });
       }
     }
@@ -235,7 +234,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
       const classroom = await prisma.classroom.findFirst({
         where: {
           id: parseInt(classroomId),
-          teacherId: request.currentUser.id
+          teacherId: request.currentUser!.id
         }
       });
 
