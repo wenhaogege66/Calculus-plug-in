@@ -1040,11 +1040,103 @@ html, body {
   font-size: 13px;
 }
 
-.upload-area p {
-  margin: 8px 0 0 0;
-  font-size: 12px;
-  color: #6c757d;
-}
+  .upload-area p {
+    margin: 8px 0 0 0;
+    font-size: 12px;
+    color: #6c757d;
+  }
+
+  /* 文件上传区域样式 */
+  .file-upload-zone {
+    margin: 12px 0;
+    padding: 24px;
+    border: 2px dashed #dee2e6;
+    border-radius: 12px;
+    text-align: center;
+    background: #fafafa;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .file-upload-zone:hover {
+    border-color: #007bff;
+    background: rgba(0, 123, 255, 0.05);
+  }
+
+  .upload-area.drag-over .file-upload-zone {
+    border-color: #28a745;
+    background: rgba(40, 167, 69, 0.1);
+    transform: scale(1.02);
+  }
+
+  .file-upload-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .file-upload-prompt svg {
+    color: #6c757d;
+    opacity: 0.7;
+  }
+
+  .file-upload-prompt p {
+    margin: 0;
+    font-size: 16px;
+    color: #495057;
+  }
+
+  .file-upload-prompt small {
+    color: #6c757d;
+    font-size: 14px;
+  }
+
+  .file-selected {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #495057;
+  }
+
+  .file-selected svg {
+    color: #007bff;
+  }
+
+  .file-selected span {
+    flex: 1;
+    text-align: left;
+    font-weight: 500;
+  }
+
+  .remove-file {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.3s ease;
+  }
+
+  .remove-file:hover {
+    background: #c82333;
+    transform: scale(1.1);
+  }
 
 .form-buttons {
   display: flex;
@@ -1238,6 +1330,28 @@ html, body {
     outline: none;
     border-color: #007bff;
     box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+  }
+
+  /* 无作业提示样式 */
+  .no-assignments {
+    padding: 20px;
+    text-align: center;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    margin: 12px 0;
+  }
+
+  .no-assignments p {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    color: #6c757d;
+    font-weight: 500;
+  }
+
+  .no-assignments small {
+    color: #868e96;
+    font-size: 14px;
   }
 
   /* 作业详情样式 */
@@ -1494,5 +1608,155 @@ html, body {
   .student-avatar {
     margin-right: 0;
     margin-bottom: 8px;
+  }
+} 
+
+/* 新的加载状态组件样式 */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  gap: 8px;
+}
+
+.loading-container.small {
+  padding: 10px;
+  gap: 4px;
+}
+
+.loading-container.large {
+  padding: 40px;
+  gap: 12px;
+}
+
+.loading-spinner {
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top: 3px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-spinner.small {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+}
+
+.loading-spinner.medium {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
+.loading-spinner.large {
+  width: 48px;
+  height: 48px;
+  border-width: 4px;
+}
+
+.loading-text {
+  font-size: 14px;
+  color: #667eea;
+  font-weight: 500;
+}
+
+.loading-container.small .loading-text {
+  font-size: 12px;
+}
+
+.loading-container.large .loading-text {
+  font-size: 16px;
+}
+
+/* 骨架屏样式 */
+.skeleton-container {
+  width: 100%;
+  padding: 8px 0;
+}
+
+.skeleton-line {
+  background: linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.skeleton-line:last-child {
+  margin-bottom: 0;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* 加载区域样式 */
+.loading-section {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 8px 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 优化用户信息区域的加载状态 */
+.user-details {
+  position: relative;
+}
+
+.user-details.loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* 用户头像加载状态 */
+.avatar-placeholder.loading-pulse {
+  background: linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-placeholder.loading-pulse .loading-spinner {
+  border-color: rgba(102, 126, 234, 0.3);
+  border-top-color: #667eea;
+}
+
+/* 优化按钮的加载状态 */
+.teacher-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 增强现有的spinner动画 */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 响应式调整 */
+@media (max-width: 600px) {
+  .loading-container {
+    padding: 15px;
+  }
+  
+  .loading-container.small {
+    padding: 8px;
+  }
+  
+  .skeleton-line {
+    height: 16px !important;
   }
 } 

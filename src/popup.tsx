@@ -7,7 +7,52 @@ import "./popup.css"
 
 const storage = new Storage();
 
+// 加载状态类型
+interface LoadingStates {
+  classrooms: boolean;
+  assignments: boolean;
+  students: boolean;
+  submissions: boolean;
+  userInfo: boolean;
+}
+
+// 界面状态类型
+interface ViewStates {
+  showCreateClass: boolean;
+  showAssignWork: boolean;
+  showJoinClass: boolean;
+  showStudents: boolean;
+  showInviteCode: boolean;
+  showAssignmentManagement: boolean;
+  showAssignmentDetails: boolean;
+  showSubmissionHistory: boolean;
+}
+
 function Popup() {
+  // 加载状态组件
+  const LoadingSpinner = ({ size = 'medium', text = '加载中...' }: { size?: 'small' | 'medium' | 'large', text?: string }) => (
+    <div className={`loading-container ${size}`}>
+      <div className={`loading-spinner ${size}`}></div>
+      <span className="loading-text">{text}</span>
+    </div>
+  );
+
+  // 骨架屏组件
+  const SkeletonLoader = ({ lines = 3, height = '20px' }: { lines?: number, height?: string }) => (
+    <div className="skeleton-container">
+      {Array.from({ length: lines }).map((_, index) => (
+        <div 
+          key={index} 
+          className="skeleton-line" 
+          style={{ 
+            height, 
+            width: index === lines - 1 ? '70%' : '100%' 
+          }}
+        ></div>
+      ))}
+    </div>
+  );
+
   const [authState, setAuthState] = useState<AuthState>({
     isAuthenticated: false,
     user: null,
@@ -26,19 +71,10 @@ function Popup() {
   const [selectedClassroom, setSelectedClassroom] = useState<string>('');
   const [assignments, setAssignments] = useState<any[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<string>('');
-  const [showAssignmentDetails, setShowAssignmentDetails] = useState(false);
   const [assignmentSubmissions, setAssignmentSubmissions] = useState<any[]>([]);
-  const [showSubmissionHistory, setShowSubmissionHistory] = useState(false);
-  const [submissionFile, setSubmissionFile] = useState<File | null>(null);
   
   // 教师端作业管理状态
-  const [showAssignmentManagement, setShowAssignmentManagement] = useState(false);
   const [teacherAssignments, setTeacherAssignments] = useState<any[]>([]);
-  const [showCreateClass, setShowCreateClass] = useState(false);
-  const [showAssignWork, setShowAssignWork] = useState(false);
-  const [showJoinClass, setShowJoinClass] = useState(false);
-  const [showStudents, setShowStudents] = useState(false);
-  const [showInviteCode, setShowInviteCode] = useState(false);
   const [students, setStudents] = useState<any[]>([]);
   const [currentInviteCode, setCurrentInviteCode] = useState('');
   
@@ -54,6 +90,27 @@ function Popup() {
   const [dueDate, setDueDate] = useState('');
   const [assignmentFile, setAssignmentFile] = useState<File | null>(null);
 
+  // 统一的界面状态管理
+  const [viewStates, setViewStates] = useState<ViewStates>({
+    showCreateClass: false,
+    showAssignWork: false,
+    showJoinClass: false,
+    showStudents: false,
+    showInviteCode: false,
+    showAssignmentManagement: false,
+    showAssignmentDetails: false,
+    showSubmissionHistory: false,
+  });
+
+  // 统一的加载状态管理
+  const [loadingStates, setLoadingStates] = useState<LoadingStates>({
+    classrooms: false,
+    assignments: false,
+    students: false,
+    submissions: false,
+    userInfo: false,
+  });
+
   const [uploadStatus, setUploadStatus] = useState<{
     uploading: boolean;
     progress: number;
@@ -66,6 +123,39 @@ function Popup() {
 
   // 检测是否在全屏模式（新标签页）
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  // 统一重置所有界面状态的函数
+  const resetAllViews = () => {
+    setViewStates({
+      showCreateClass: false,
+      showAssignWork: false,
+      showJoinClass: false,
+      showStudents: false,
+      showInviteCode: false,
+      showAssignmentManagement: false,
+      showAssignmentDetails: false,
+      showSubmissionHistory: false,
+    });
+  };
+
+  // 设置单个界面状态并关闭其他界面
+  const setViewState = (viewKey: keyof ViewStates, value: boolean) => {
+    if (value) {
+      resetAllViews();
+    }
+    setViewStates(prev => ({
+      ...prev,
+      [viewKey]: value
+    }));
+  };
+
+  // 设置加载状态
+  const setLoadingState = (loadingKey: keyof LoadingStates, value: boolean) => {
+    setLoadingStates(prev => ({
+      ...prev,
+      [loadingKey]: value
+    }));
+  };
 
   useEffect(() => {
     // 检测是否在新标签页中打开（全屏模式）
@@ -152,6 +242,8 @@ function Popup() {
 
   const initializeAuth = async () => {
     try {
+      setLoadingState('userInfo', true);
+      
       // 从 chrome.storage.local 获取保存的token（与background保持一致）
       const chromeStorage = await chrome.storage.local.get(['auth_token', 'user_info']);
       const savedToken = chromeStorage.auth_token;
@@ -178,6 +270,7 @@ function Popup() {
           user.role = userRole;
         }
         
+        // 立即设置认证状态，确保用户信息不会消失
         setAuthState({
           isAuthenticated: true,
           user: user,
@@ -208,13 +301,16 @@ function Popup() {
           console.warn('Token验证出错，但保持当前登录状态:', error);
         });
         
+        setLoadingState('userInfo', false);
         return;
       }
 
       setAuthState(prev => ({ ...prev, loading: false }));
+      setLoadingState('userInfo', false);
     } catch (error) {
       console.error('初始化认证状态失败:', error);
       setAuthState(prev => ({ ...prev, loading: false }));
+      setLoadingState('userInfo', false);
     }
   };
 
@@ -238,6 +334,8 @@ function Popup() {
   };
 
   const handleModeChange = async (mode: 'practice' | 'homework') => {
+    console.log('切换模式:', mode, '当前班级数量:', classrooms.length);
+    
     // 如果切换到作业模式，检查是否已加入班级
     if (mode === 'homework') {
       if (classrooms.length === 0) {
@@ -254,6 +352,7 @@ function Popup() {
       }
     }
     
+    console.log('设置工作模式为:', mode);
     setWorkMode(mode);
     await storage.set('work_mode', mode);
   };
@@ -500,16 +599,44 @@ function Popup() {
       return;
     }
 
+    // 作业模式下检查是否选择了作业
+    if (workMode === 'homework') {
+      if (!selectedAssignment) {
+        setUploadStatus({
+          uploading: false,
+          progress: 0,
+          message: '⚠️ 请先选择要提交的作业'
+        });
+        event.target.value = '';
+        return;
+      }
+
+      // 检查作业是否过期
+      const assignment = assignments.find(a => a.id === parseInt(selectedAssignment));
+      if (assignment && new Date() > new Date(assignment.dueDate)) {
+        setUploadStatus({
+          uploading: false,
+          progress: 0,
+          message: '⚠️ 该作业已过期，无法提交'
+        });
+        event.target.value = '';
+        return;
+      }
+    }
+
     try {
       setUploadStatus({
         uploading: true,
         progress: 20,
-        message: '正在上传文件...'
+        message: workMode === 'homework' ? '📤 正在提交作业...' : '📤 正在上传文件...'
       });
 
       const formData = new FormData();
       formData.append('file', file);
       formData.append('workMode', workMode);
+      if (workMode === 'homework' && selectedAssignment) {
+        formData.append('assignmentId', selectedAssignment);
+      }
 
       setUploadStatus(prev => ({ ...prev, progress: 50 }));
 
@@ -526,20 +653,27 @@ function Popup() {
       if (result.success) {
         setUploadStatus({
           uploading: false,
-          progress: 100,
-          message: '✅ 文件上传成功！正在创建提交记录...'
+          progress: 80,
+          message: workMode === 'homework' ? '✅ 文件上传成功！正在创建作业提交记录...' : '✅ 文件上传成功！正在创建提交记录...'
         });
 
         // 创建提交记录
+        const submissionPayload: any = {
+          fileUploadId: result.data.fileId,
+        };
+        
+        if (workMode === 'homework' && selectedAssignment) {
+          submissionPayload.assignmentId = parseInt(selectedAssignment);
+          submissionPayload.workMode = 'homework';
+        }
+
         const submissionResponse = await fetch(`${API_BASE_URL}/submissions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authState.token}`
           },
-          body: JSON.stringify({
-            fileUploadId: result.data.fileId
-          })
+          body: JSON.stringify(submissionPayload)
         });
 
         const submissionResult = await submissionResponse.json();
@@ -548,8 +682,13 @@ function Popup() {
           setUploadStatus({
             uploading: false,
             progress: 100,
-            message: '🎉 提交成功！点击侧边栏查看处理进度'
+            message: workMode === 'homework' ? '🎉 作业提交成功！' : '🎉 提交成功！点击侧边栏查看处理进度'
           });
+
+          // 作业模式下重新加载数据
+          if (workMode === 'homework') {
+            loadStudentClassrooms();
+          }
         } else {
           setUploadStatus({
             uploading: false,
@@ -609,6 +748,7 @@ function Popup() {
     }
     
     try {
+      setLoadingState('classrooms', true);
       console.log('开始加载教师班级列表...', 'Token:', authToken ? '存在' : '不存在');
       const response = await fetch(`${API_BASE_URL}/classrooms/teacher`, {
         headers: {
@@ -625,6 +765,8 @@ function Popup() {
       }
     } catch (error) {
       console.error('加载教师班级列表失败:', error);
+    } finally {
+      setLoadingState('classrooms', false);
     }
   };
 
@@ -637,6 +779,7 @@ function Popup() {
     }
     
     try {
+      setLoadingState('classrooms', true);
       console.log('开始加载学生班级列表...', 'Token:', authToken ? '存在' : '不存在');
       const response = await fetch(`${API_BASE_URL}/classrooms/student`, {
         headers: {
@@ -650,6 +793,7 @@ function Popup() {
         setClassrooms(result.data);
         
         // 加载学生作业列表
+        setLoadingState('assignments', true);
         const assignmentResponse = await fetch(`${API_BASE_URL}/assignments/student`, {
           headers: {
             'Authorization': `Bearer ${authToken}`
@@ -659,10 +803,21 @@ function Popup() {
         const assignmentResult = await assignmentResponse.json();
         if (assignmentResult.success) {
           console.log('学生作业列表加载成功:', assignmentResult.data);
-          setAssignments(assignmentResult.data);
+          console.log('作业数据详情:', assignmentResult.data.map(a => ({
+            id: a.id, 
+            title: a.title, 
+            classroomId: a.classroomId, 
+            classroom: a.classroom?.name
+          })));
+          setAssignments(assignmentResult.data || []);
+        } else {
+          console.error('学生作业列表加载失败:', assignmentResult.error);
+          setAssignments([]);
         }
+        setLoadingState('assignments', false);
         
         // 加载学生提交历史
+        setLoadingState('submissions', true);
         const submissionResponse = await fetch(`${API_BASE_URL}/submissions`, {
           headers: {
             'Authorization': `Bearer ${authToken}`
@@ -675,11 +830,14 @@ function Popup() {
             setAssignmentSubmissions(submissionResult.data.submissions);
           }
         }
+        setLoadingState('submissions', false);
       } else {
         console.error('学生班级列表加载失败:', result.error);
       }
     } catch (error) {
       console.error('加载学生班级列表失败:', error);
+    } finally {
+      setLoadingState('classrooms', false);
     }
   };
 
@@ -725,7 +883,7 @@ function Popup() {
         // 清空表单
         setClassName('');
         setClassDescription('');
-        setShowCreateClass(false);
+        setViewState('showCreateClass', false);
         
         // 重新加载班级列表
         loadTeacherClassrooms();
@@ -789,7 +947,7 @@ function Popup() {
         
         // 清空表单
         setInviteCode('');
-        setShowJoinClass(false);
+        setViewState('showJoinClass', false);
         
         // 重新加载班级列表
         await loadStudentClassrooms();
@@ -908,7 +1066,7 @@ function Popup() {
         setStartDate('');
         setDueDate('');
         setAssignmentFile(null);
-        setShowAssignWork(false);
+        setViewState('showAssignWork', false);
         
         // 可以在此处刷新作业列表（如果需要的话）
       } else {
@@ -940,11 +1098,8 @@ function Popup() {
     }
 
     try {
-      setUploadStatus({
-        uploading: true,
-        progress: 50,
-        message: '正在加载学生列表...'
-      });
+      setLoadingState('students', true);
+      setViewState('showStudents', true);
 
       const response = await fetch(`${API_BASE_URL}/classrooms/${selectedClassroom}/members`, {
         headers: {
@@ -956,12 +1111,14 @@ function Popup() {
       
       if (result.success) {
         setStudents(result.data);
-        setShowStudents(true);
         setUploadStatus({
           uploading: false,
           progress: 100,
           message: `✅ 成功加载${result.data.length}名学生`
         });
+        setTimeout(() => {
+          setUploadStatus(prev => ({ ...prev, message: '' }));
+        }, 2000);
       } else {
         throw new Error(result.error || '加载学生列表失败');
       }
@@ -972,11 +1129,12 @@ function Popup() {
         progress: 0,
         message: `❌ 加载失败: ${error instanceof Error ? error.message : '未知错误'}`
       });
+      setTimeout(() => {
+        setUploadStatus(prev => ({ ...prev, message: '' }));
+      }, 3000);
+    } finally {
+      setLoadingState('students', false);
     }
-
-    setTimeout(() => {
-      setUploadStatus(prev => ({ ...prev, message: '' }));
-    }, 3000);
   };
 
   // 查看邀请码
@@ -993,7 +1151,7 @@ function Popup() {
     const classroom = classrooms.find(c => c.id === parseInt(selectedClassroom));
     if (classroom && classroom.inviteCode) {
       setCurrentInviteCode(classroom.inviteCode);
-      setShowInviteCode(true);
+      setViewState('showInviteCode', true);
       setUploadStatus({
         uploading: false,
         progress: 100,
@@ -1022,6 +1180,7 @@ function Popup() {
     if (!authToken || !selectedClassroom) return;
     
     try {
+      setLoadingState('assignments', true);
       const response = await fetch(`${API_BASE_URL}/assignments/teacher?classroomId=${selectedClassroom}`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
@@ -1034,6 +1193,8 @@ function Popup() {
       }
     } catch (error) {
       console.error('加载教师作业列表失败:', error);
+    } finally {
+      setLoadingState('assignments', false);
     }
   };
 
@@ -1041,9 +1202,9 @@ function Popup() {
   const handleSelectAssignment = (assignmentId: string) => {
     setSelectedAssignment(assignmentId);
     if (assignmentId) {
-      setShowAssignmentDetails(true);
+      setViewState('showAssignmentDetails', true);
     } else {
-      setShowAssignmentDetails(false);
+      setViewState('showAssignmentDetails', false);
     }
   };
 
@@ -1058,105 +1219,7 @@ function Popup() {
     return assignmentSubmissions.filter(s => s.assignmentId === assignmentId);
   };
 
-  // 提交作业
-  const handleSubmitAssignment = async () => {
-    if (!submissionFile || !selectedAssignment) {
-      setUploadStatus({
-        uploading: false,
-        progress: 0,
-        message: '⚠️ 请选择要提交的文件'
-      });
-      return;
-    }
 
-    try {
-      setUploadStatus({
-        uploading: true,
-        progress: 20,
-        message: '📤 上传文件中...'
-      });
-
-      // 1. 先上传文件
-      const formData = new FormData();
-      formData.append('file', submissionFile);
-      formData.append('workMode', 'homework');
-      formData.append('assignmentId', selectedAssignment);
-
-      const uploadResponse = await fetch(`${API_BASE_URL}/files`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authState.token}`
-        },
-        body: formData
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error('文件上传失败');
-      }
-
-      const uploadResult = await uploadResponse.json();
-      if (!uploadResult.success) {
-        throw new Error(uploadResult.error || '文件上传失败');
-      }
-
-      setUploadStatus({
-        uploading: true,
-        progress: 60,
-        message: '📝 创建提交记录...'
-      });
-
-      // 2. 创建提交记录
-      const submissionResponse = await fetch(`${API_BASE_URL}/submissions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authState.token}`
-        },
-        body: JSON.stringify({
-          fileUploadId: uploadResult.data.fileId,
-          assignmentId: parseInt(selectedAssignment),
-          workMode: 'homework'
-        })
-      });
-
-      if (!submissionResponse.ok) {
-        throw new Error('创建提交记录失败');
-      }
-
-      const submissionResult = await submissionResponse.json();
-      if (!submissionResult.success) {
-        throw new Error(submissionResult.error || '创建提交记录失败');
-      }
-
-      setUploadStatus({
-        uploading: false,
-        progress: 100,
-        message: '✅ 作业提交成功！'
-      });
-
-      // 清空文件选择
-      setSubmissionFile(null);
-      
-      // 重新加载提交历史
-      loadStudentClassrooms();
-
-      setTimeout(() => {
-        setUploadStatus(prev => ({ ...prev, message: '', progress: 0 }));
-      }, 3000);
-
-    } catch (error) {
-      console.error('提交作业失败:', error);
-      setUploadStatus({
-        uploading: false,
-        progress: 0,
-        message: '❌ 提交失败: ' + (error as Error).message
-      });
-      
-      setTimeout(() => {
-        setUploadStatus(prev => ({ ...prev, message: '', progress: 0 }));
-      }, 5000);
-    }
-  };
 
   // 查看作业文件
   const handleViewAssignmentFile = async (fileId: number) => {
@@ -1276,7 +1339,11 @@ function Popup() {
         <div className="main-section">
           <div className="user-info">
             <div className="user-avatar">
-              {authState.user?.avatarUrl ? (
+              {loadingStates.userInfo ? (
+                <div className="avatar-placeholder loading-pulse">
+                  <div className="loading-spinner small"></div>
+                </div>
+              ) : authState.user?.avatarUrl ? (
                 <img src={authState.user.avatarUrl} alt="头像" />
               ) : (
                 <div className="avatar-placeholder">
@@ -1284,24 +1351,35 @@ function Popup() {
                 </div>
               )}
             </div>
-            <div className="user-details">
-              <h3>{authState.user?.username}</h3>
-              <p>{authState.user?.email}</p>
-              <div className="role-switcher">
-                <button 
-                  className={`role-btn ${userRole === 'student' ? 'active' : ''}`}
-                  onClick={() => handleRoleSwitch('student')}
-                >
-                  🎓 学生
-                </button>
-                <button 
-                  className={`role-btn ${userRole === 'teacher' ? 'active' : ''}`}
-                  onClick={() => handleRoleSwitch('teacher')}
-                >
-                  👨‍🏫 教师
-                </button>
-              </div>
-
+            <div className={`user-details ${loadingStates.userInfo ? 'loading' : ''}`}>
+              {loadingStates.userInfo ? (
+                <>
+                  <SkeletonLoader lines={2} height="18px" />
+                  <div className="role-switcher">
+                    <div className="skeleton-line" style={{ height: '32px', width: '80px', display: 'inline-block', marginRight: '8px' }}></div>
+                    <div className="skeleton-line" style={{ height: '32px', width: '80px', display: 'inline-block' }}></div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3>{authState.user?.username}</h3>
+                  <p>{authState.user?.email}</p>
+                  <div className="role-switcher">
+                    <button 
+                      className={`role-btn ${userRole === 'student' ? 'active' : ''}`}
+                      onClick={() => handleRoleSwitch('student')}
+                    >
+                      🎓 学生
+                    </button>
+                    <button 
+                      className={`role-btn ${userRole === 'teacher' ? 'active' : ''}`}
+                      onClick={() => handleRoleSwitch('teacher')}
+                    >
+                      👨‍🏫 教师
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
             <button className="logout-btn" onClick={handleLogout}>
               退出
@@ -1312,10 +1390,15 @@ function Popup() {
 
           {userRole === 'student' && (
             <>
-              {!showJoinClass && (
+              {!viewStates.showJoinClass && (
                 <>
                   <div className="student-class-info">
-                    {classrooms.length > 0 ? (
+                    {loadingStates.classrooms ? (
+                      <div className="loading-section">
+                        <LoadingSpinner size="small" text="加载班级信息..." />
+                        <SkeletonLoader lines={2} height="16px" />
+                      </div>
+                    ) : classrooms.length > 0 ? (
                       <div className="current-class">
                         <p>🏢 已加入班级：</p>
                         <div className="classroom-list">
@@ -1328,7 +1411,7 @@ function Popup() {
                         </div>
                         <button 
                           className="btn-link"
-                          onClick={() => setShowJoinClass(true)}
+                          onClick={() => setViewState('showJoinClass', true)}
                         >
                           加入其他班级
                         </button>
@@ -1338,7 +1421,7 @@ function Popup() {
                         <p>💫 你还没有加入任何班级</p>
                         <button 
                           className="btn-primary"
-                          onClick={() => setShowJoinClass(true)}
+                          onClick={() => setViewState('showJoinClass', true)}
                         >
                           加入班级
                         </button>
@@ -1362,7 +1445,6 @@ function Popup() {
                       <button 
                         className={`mode-btn ${workMode === 'homework' ? 'active' : ''}`}
                         onClick={() => handleModeChange('homework')}
-                        disabled={!selectedClassroom}
                       >
                         <div className="mode-icon">📝</div>
                         <div className="mode-text">
@@ -1389,24 +1471,43 @@ function Popup() {
                       {selectedClassroom && (
                         <>
                           <label style={{marginTop: '12px'}}>选择作业：</label>
-                          <select 
-                            value={selectedAssignment} 
-                            onChange={(e) => handleSelectAssignment(e.target.value)}
-                          >
-                            <option value="">请选择作业</option>
-                            {assignments.filter(a => a.classroomId === parseInt(selectedClassroom)).map(assignment => (
-                              <option key={assignment.id} value={assignment.id}>
-                                {assignment.title} (截止: {new Date(assignment.dueDate).toLocaleDateString()})
-                              </option>
-                            ))}
-                          </select>
+                          {loadingStates.assignments ? (
+                            <LoadingSpinner size="small" text="加载作业列表..." />
+                          ) : (() => {
+                            const classroomAssignments = assignments.filter(a => a.classroomId === parseInt(selectedClassroom));
+                            
+                            if (classroomAssignments.length === 0) {
+                              return (
+                                <div className="no-assignments">
+                                  <p>📝 该班级暂无作业</p>
+                                  <small>请等待老师布置作业</small>
+                                </div>
+                              );
+                            }
+                            
+                            return (
+                              <select 
+                                value={selectedAssignment} 
+                                onChange={(e) => handleSelectAssignment(e.target.value)}
+                              >
+                                <option value="">请选择作业</option>
+                                {classroomAssignments.map(assignment => (
+                                  <option key={assignment.id} value={assignment.id}>
+                                    {assignment.title} (截止: {new Date(assignment.dueDate).toLocaleDateString()})
+                                  </option>
+                                ))}
+                              </select>
+                            );
+                          })()}
+                          
+
                         </>
                       )}
                     </div>
                   )}
 
                   {/* 作业详情显示 */}
-                  {showAssignmentDetails && getSelectedAssignmentDetails() && (
+                  {viewStates.showAssignmentDetails && getSelectedAssignmentDetails() && (
                     <div className="assignment-details">
                       <h4>📋 作业详情</h4>
                       {(() => {
@@ -1456,9 +1557,9 @@ function Popup() {
                                   ✅ 已提交 ({submissions.length} 次)
                                   <button 
                                     className="btn-link"
-                                    onClick={() => setShowSubmissionHistory(!showSubmissionHistory)}
+                                    onClick={() => setViewState('showSubmissionHistory', !viewStates.showSubmissionHistory)}
                                   >
-                                    {showSubmissionHistory ? '隐藏' : '查看'}历史记录
+                                    {viewStates.showSubmissionHistory ? '隐藏' : '查看'}历史记录
                                   </button>
                                 </span>
                               ) : (
@@ -1467,7 +1568,7 @@ function Popup() {
                             </div>
 
                             {/* 提交历史记录 */}
-                            {showSubmissionHistory && submissions.length > 0 && (
+                            {viewStates.showSubmissionHistory && submissions.length > 0 && (
                               <div className="submission-history">
                                 <h6>提交历史：</h6>
                                 {submissions.map((submission, index) => (
@@ -1485,43 +1586,14 @@ function Popup() {
                               </div>
                             )}
 
-                            {/* 提交表单 */}
-                            {!isOverdue && (
-                              <div className="submit-assignment">
-                                <h6>{submissions.length > 0 ? '重新提交：' : '提交作业：'}</h6>
-                                <div className="upload-area">
-                                  <input 
-                                    type="file" 
-                                    accept=".pdf,.jpg,.jpeg,.png"
-                                    onChange={(e) => setSubmissionFile(e.target.files?.[0] || null)}
-                                  />
-                                  <p>选择您的作业文件 (PDF/图片)</p>
-                                </div>
-                                
-                                <div className="form-buttons">
-                                  <button 
-                                    className="btn-primary"
-                                    onClick={handleSubmitAssignment}
-                                    disabled={!submissionFile || uploadStatus.uploading}
-                                  >
-                                    {uploadStatus.uploading ? (
-                                      <div className="upload-progress">
-                                        <ProgressBar progress={uploadStatus.progress} />
-                                        <span>提交中...</span>
-                                      </div>
-                                    ) : (
-                                      '📤 提交作业'
-                                    )}
-                                  </button>
-                                  <button 
-                                    className="btn-secondary"
-                                    onClick={() => setShowAssignmentDetails(false)}
-                                  >
-                                    返回
-                                  </button>
-                                </div>
-                              </div>
-                            )}
+                            <div className="form-buttons">
+                              <button 
+                                className="btn-secondary"
+                                onClick={() => setViewState('showAssignmentDetails', false)}
+                              >
+                                返回
+                              </button>
+                            </div>
                           </div>
                         );
                       })()}
@@ -1530,7 +1602,7 @@ function Popup() {
                 </>
               )}
               
-              {showJoinClass && (
+              {viewStates.showJoinClass && (
                 <div className="join-class-form">
                   <h4>加入班级</h4>
                   <input 
@@ -1549,7 +1621,7 @@ function Popup() {
                     </button>
                     <button 
                       className="btn-secondary"
-                      onClick={() => setShowJoinClass(false)}
+                      onClick={() => setViewState('showJoinClass', false)}
                     >
                       取消
                     </button>
@@ -1563,31 +1635,35 @@ function Popup() {
             <div className="teacher-section">
               <h3>👨‍🏫 教师功能</h3>
               
-              {!showCreateClass && !showAssignWork && (
+              {!viewStates.showCreateClass && !viewStates.showAssignWork && (
                 <>
                   <div className="classroom-selector">
                     <label>选择班级：</label>
-                    <select 
-                      value={selectedClassroom} 
-                      onChange={(e) => setSelectedClassroom(e.target.value)}
-                    >
-                      <option value="">请选择班级</option>
-                      {classrooms.map(cls => (
-                        <option key={cls.id} value={cls.id}>{cls.name}</option>
-                      ))}
-                    </select>
+                    {loadingStates.classrooms ? (
+                      <LoadingSpinner size="small" text="加载班级列表..." />
+                    ) : (
+                      <select 
+                        value={selectedClassroom} 
+                        onChange={(e) => setSelectedClassroom(e.target.value)}
+                      >
+                        <option value="">请选择班级</option>
+                        {classrooms.map(cls => (
+                          <option key={cls.id} value={cls.id}>{cls.name}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   
                   <div className="teacher-actions">
                     <button 
                       className="teacher-btn"
-                      onClick={() => setShowCreateClass(true)}
+                      onClick={() => setViewState('showCreateClass', true)}
                     >
                       📋 创建班级
                     </button>
                     <button 
                       className="teacher-btn"
-                      onClick={() => setShowAssignWork(true)}
+                      onClick={() => setViewState('showAssignWork', true)}
                       disabled={!selectedClassroom}
                     >
                       📤 布置作业
@@ -1595,7 +1671,7 @@ function Popup() {
                     <button 
                       className="teacher-btn"
                       onClick={() => {
-                        setShowAssignmentManagement(true);
+                        setViewState('showAssignmentManagement', true);
                         loadTeacherAssignments();
                       }}
                       disabled={!selectedClassroom}
@@ -1620,7 +1696,7 @@ function Popup() {
                 </>
               )}
               
-              {showCreateClass && (
+              {viewStates.showCreateClass && (
                 <div className="create-class-form">
                   <h4>创建新班级</h4>
                   <input 
@@ -1644,7 +1720,7 @@ function Popup() {
                     </button>
                     <button 
                       className="btn-secondary"
-                      onClick={() => setShowCreateClass(false)}
+                      onClick={() => setViewState('showCreateClass', false)}
                     >
                       取消
                     </button>
@@ -1652,7 +1728,7 @@ function Popup() {
                 </div>
               )}
               
-              {showAssignWork && (
+              {viewStates.showAssignWork && (
                 <div className="assign-work-form">
                   <h4>布置作业</h4>
                   <input 
@@ -1684,15 +1760,63 @@ function Popup() {
                       />
                     </label>
                   </div>
-                  <div className="upload-area">
+                  <div className="upload-area" 
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.add('drag-over');
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.remove('drag-over');
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.remove('drag-over');
+                      const files = e.dataTransfer.files;
+                      if (files.length > 0) {
+                        setAssignmentFile(files[0]);
+                      }
+                    }}
+                  >
                     <label>题目文件：</label>
                     <input 
+                      id="assignment-file-input"
                       type="file" 
                       accept=".pdf,.jpg,.jpeg,.png" 
                       onChange={(e) => setAssignmentFile(e.target.files?.[0] || null)}
-                      required
+                      style={{ display: 'none' }}
                     />
-                    <p>请上传题目的PDF文件或图片</p>
+                    <div 
+                      className="file-upload-zone"
+                      onClick={() => document.getElementById('assignment-file-input')?.click()}
+                    >
+                      {assignmentFile ? (
+                        <div className="file-selected">
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                          </svg>
+                          <span>{assignmentFile.name}</span>
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAssignmentFile(null);
+                            }}
+                            className="remove-file"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="file-upload-prompt">
+                          <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                          </svg>
+                          <p><strong>点击选择文件</strong> 或拖拽文件到此处</p>
+                          <small>支持 PDF、JPG、PNG 格式</small>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="form-buttons">
                     <button 
@@ -1704,7 +1828,7 @@ function Popup() {
                     </button>
                     <button 
                       className="btn-secondary"
-                      onClick={() => setShowAssignWork(false)}
+                      onClick={() => setViewState('showAssignWork', false)}
                     >
                       取消
                     </button>
@@ -1712,11 +1836,16 @@ function Popup() {
                 </div>
               )}
               
-              {showStudents && (
+              {viewStates.showStudents && (
                 <div className="students-list">
                   <h4>班级学生列表</h4>
                   <div className="students-container">
-                    {students.length > 0 ? (
+                    {loadingStates.students ? (
+                      <div className="loading-section">
+                        <LoadingSpinner text="加载学生信息..." />
+                        <SkeletonLoader lines={3} height="60px" />
+                      </div>
+                    ) : students.length > 0 ? (
                       students.map(member => (
                         <div key={member.id} className="student-item">
                           <div className="student-avatar">
@@ -1741,14 +1870,14 @@ function Popup() {
                   </div>
                   <button 
                     className="btn-secondary"
-                    onClick={() => setShowStudents(false)}
+                    onClick={() => setViewState('showStudents', false)}
                   >
                     关闭
                   </button>
                 </div>
               )}
               
-              {showInviteCode && (
+              {viewStates.showInviteCode && (
                 <div className="invite-code-display">
                   <h4>班级邀请码</h4>
                   <div className="invite-code-container">
@@ -1763,7 +1892,7 @@ function Popup() {
                   <p>学生可使用此邀请码加入班级</p>
                   <button 
                     className="btn-secondary"
-                    onClick={() => setShowInviteCode(false)}
+                    onClick={() => setViewState('showInviteCode', false)}
                   >
                     关闭
                   </button>
@@ -1771,11 +1900,16 @@ function Popup() {
               )}
 
               {/* 教师作业管理 */}
-              {showAssignmentManagement && (
+              {viewStates.showAssignmentManagement && (
                 <div className="assignment-management">
                   <h4>📊 作业管理</h4>
                   <div className="assignments-list">
-                    {teacherAssignments.length > 0 ? (
+                    {loadingStates.assignments ? (
+                      <div className="loading-section">
+                        <LoadingSpinner text="加载作业列表..." />
+                        <SkeletonLoader lines={3} height="80px" />
+                      </div>
+                    ) : teacherAssignments.length > 0 ? (
                       teacherAssignments.map(assignment => {
                         const isOverdue = new Date() > new Date(assignment.dueDate);
                         const isActive = new Date() >= new Date(assignment.startDate) && !isOverdue;
@@ -1808,7 +1942,7 @@ function Popup() {
                   </div>
                   <button 
                     className="btn-secondary"
-                    onClick={() => setShowAssignmentManagement(false)}
+                    onClick={() => setViewState('showAssignmentManagement', false)}
                   >
                     返回
                   </button>

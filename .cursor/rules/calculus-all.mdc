@@ -1,5 +1,14 @@
+---
+alwaysApply: true
+---
+- 项目介绍
+- 本项目是AI微积分助教项目，正在参加AI Agent For Education比赛；以AI插件的形式帮助老师在布置作业后，根据老师提供在"/Users/wenhao/XLab/Calculus/book"下课本与习题解答pdf的RAG(检索增强生成)，进行同学作业的批改，错误点、注意点标注，作业打分，学情分析等等
+
+- backend是后端文件夹，修改此文件夹内容时需确保插件端在对应的位置正确使用我们的接口
+- 插件当前使用的是supabase的云postgres数据库，也使用了supabase的OAuth，包含github作为provider
+
 - [Prisma文档](https://www.prisma.io/docs/)
 - [Fastify文档](https://www.fastify.io/docs/)
 - [Plasmo文档](https://docs.plasmo.com/)
 - [Supabase文档](https://supabase.com/docs)
-- [Chrome扩展文档](https://developer.chrome.com/docs/extensions/)
+- [Chrome扩展文档](https://developer.chrome.com/docs/extensions/)- [Prisma文档](https://www.prisma.io/docs/)

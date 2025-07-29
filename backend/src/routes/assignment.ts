@@ -44,7 +44,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
       const classroom = await prisma.classroom.findFirst({
         where: {
           id: classroomId,
-          teacherId: request.currentUser.id,
+          teacherId: request.currentUser!.id,
           isActive: true
         }
       });
@@ -163,7 +163,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
       // 获取学生加入的所有班级
       const memberships = await prisma.classroomMember.findMany({
         where: {
-          studentId: request.currentUser.id,
+          studentId: request.currentUser!.id,
           isActive: true
         },
         select: { classroomId: true }
@@ -200,7 +200,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
       const submissionCounts = await prisma.submission.groupBy({
         by: ['assignmentId'],
         where: {
-          userId: request.currentUser.id,
+          userId: request.currentUser!.id,
           assignmentId: { in: assignments.map(a => a.id) }
         },
         _count: { id: true }
@@ -216,6 +216,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
           id: assignment.id,
           title: assignment.title,
           description: assignment.description,
+          classroomId: assignment.classroomId, // 添加缺失的classroomId字段
           classroom: assignment.classroom,
           teacher: assignment.teacher,
           questionFile: assignment.questionFile,
