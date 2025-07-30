@@ -68,10 +68,25 @@ export async function uploadRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // 生成唯一文件名
+      // 改进文件路径生成逻辑
       const fileExt = path.extname(filename);
       const uniqueFilename = `${uuidv4()}${fileExt}`;
-      const filePath = `assignments/${request.currentUser!.id}/${uniqueFilename}`;
+      
+      // 根据文件类型和用户角色生成更有意义的路径
+      let filePath: string;
+      const userRole = request.currentUser!.role?.toLowerCase() || 'student';
+      const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      if (workMode === 'homework' && assignmentId) {
+        // 作业提交文件：homework-submissions/assignment-{id}/student-{userId}/filename
+        filePath = `homework-submissions/assignment-${assignmentId}/student-${request.currentUser!.id}/${uniqueFilename}`;
+      } else if (userRole === 'teacher') {
+        // 教师上传的文件（如题目）：teacher-files/user-{userId}/date/filename
+        filePath = `teacher-files/user-${request.currentUser!.id}/${timestamp}/${uniqueFilename}`;
+      } else {
+        // 学生练习文件：student-practice/user-{userId}/date/filename
+        filePath = `student-practice/user-${request.currentUser!.id}/${timestamp}/${uniqueFilename}`;
+      }
 
       // 使用admin客户端上传到Supabase Storage
       const storageClient = supabaseAdmin || supabase;
@@ -127,6 +142,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
         .from(STORAGE_BUCKETS.ASSIGNMENTS)
         .getPublicUrl(filePath);
 
+
       // 保存文件记录到数据库
       const fileUpload = await prisma.fileUpload.create({
         data: {
@@ -141,7 +157,8 @@ export async function uploadRoutes(fastify: FastifyInstance) {
             supabaseKey: uploadData?.path || filePath,
             publicUrl: publicUrlData.publicUrl,
             workMode: workMode,
-            assignmentId: assignmentId
+            assignmentId: assignmentId,
+            userRole: userRole
           }
         }
       });
@@ -197,15 +214,18 @@ export async function uploadRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // 下载文件
+  // 优化的文件下载接口 - 允许学生下载作业题目文件
   fastify.get('/files/:fileId/download', { preHandler: requireAuth }, async (request, reply) => {
     try {
       const fileId = parseInt((request.params as any).fileId);
       
-      const file = await prisma.fileUpload.findFirst({
-        where: {
-          id: fileId,
-          userId: request.currentUser!.id // 确保用户只能下载自己的文件
+      // 首先尝试找到文件
+      const file = await prisma.fileUpload.findUnique({
+        where: { id: fileId },
+        include: {
+          user: {
+            select: { id: true, role: true, username: true }
+          }
         }
       });
 
@@ -214,6 +234,47 @@ export async function uploadRoutes(fastify: FastifyInstance) {
           success: false,
           error: '文件不存在'
         });
+      }
+
+      // 权限检查逻辑
+      const currentUser = request.currentUser!;
+      const isOwner = file.userId === currentUser.id;
+
+      // 如果是文件所有者，直接允许下载
+      if (isOwner) {
+        // 继续下载流程
+      }
+      // 如果不是所有者，检查是否有权限访问
+      else {
+        // 检查该文件是否是作业题目文件
+        const assignment = await prisma.assignment.findFirst({
+          where: {
+            fileUploadId: fileId,
+            isActive: true
+          },
+          include: {
+            classroom: {
+              include: {
+                members: {
+                  where: {
+                    studentId: currentUser.id,
+                    isActive: true
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        // 如果是作业题目文件且用户是该班级成员，允许下载
+        if (assignment && assignment.classroom.members.length > 0) {
+          // 有权限，继续下载
+        } else {
+          return reply.code(403).send({
+            success: false,
+            error: '无权限下载此文件'
+          });
+        }
       }
 
       // 从Supabase Storage获取文件
@@ -225,7 +286,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
         fastify.log.error('从Supabase Storage下载文件失败:', error);
         return reply.code(404).send({
           success: false,
-          error: '文件下载失败'
+          error: '文件下载失败：文件可能已被删除或移动'
         });
       }
 
@@ -244,8 +305,8 @@ export async function uploadRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // 删除文件
-  fastify.delete('/files/:fileId', { preHandler: requireAuth }, async (request, reply) => {
+  // 获取文件信息接口（不下载文件内容）
+  fastify.get('/files/:fileId/info', { preHandler: requireAuth }, async (request, reply) => {
     try {
       const fileId = parseInt((request.params as any).fileId);
       
@@ -253,6 +314,16 @@ export async function uploadRoutes(fastify: FastifyInstance) {
         where: {
           id: fileId,
           userId: request.currentUser!.id
+        },
+        select: {
+          id: true,
+          filename: true,
+          originalName: true,
+          fileSize: true,
+          mimeType: true,
+          createdAt: true,
+          uploadType: true,
+          metadata: true
         }
       });
 
@@ -263,30 +334,16 @@ export async function uploadRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // 从Supabase Storage删除文件
-      const { error: deleteError } = await supabase.storage
-        .from(STORAGE_BUCKETS.ASSIGNMENTS)
-        .remove([file.filePath]);
-
-      if (deleteError) {
-        fastify.log.error('从Supabase Storage删除文件失败:', deleteError);
-      }
-
-      // 从数据库删除记录 (级联删除相关提交)
-      await prisma.fileUpload.delete({
-        where: { id: fileId }
-      });
-
       return {
         success: true,
-        message: '文件删除成功'
+        data: file
       };
 
     } catch (error) {
-      fastify.log.error('文件删除处理失败:', error);
+      fastify.log.error('获取文件信息失败:', error);
       return reply.code(500).send({
         success: false,
-        error: '文件删除处理失败'
+        error: '获取文件信息失败'
       });
     }
   });

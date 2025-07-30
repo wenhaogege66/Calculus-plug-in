@@ -121,6 +121,39 @@ function Popup() {
     message: ''
   });
 
+  // 新增：独立的下载状态管理
+  const [downloadStatus, setDownloadStatus] = useState<{
+    downloading: boolean;
+    message: string;
+  }>({
+    downloading: false,
+    message: ''
+  });
+
+  // 新增：批改进度状态管理
+  const [gradingStatus, setGradingStatus] = useState<{
+    processing: boolean;
+    stage: 'ocr' | 'grading' | 'completed' | '';
+    progress: number;
+    message: string;
+  }>({
+    processing: false,
+    stage: '',
+    progress: 0,
+    message: ''
+  });
+
+  // 新增：批改完成通知状态
+  const [gradingNotification, setGradingNotification] = useState<{
+    show: boolean;
+    submissionId: number | null;
+    message: string;
+  }>({
+    show: false,
+    submissionId: null,
+    message: ''
+  });
+
   // 检测是否在全屏模式（新标签页）
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
@@ -155,6 +188,130 @@ function Popup() {
       ...prev,
       [loadingKey]: value
     }));
+  };
+
+  // 开始批改进度监控
+  const startGradingMonitor = async (submissionId: number) => {
+    console.log('开始监控批改进度，提交ID:', submissionId);
+    
+    setGradingStatus({
+      processing: true,
+      stage: 'ocr',
+      progress: 10,
+      message: '🔍 正在进行文字识别...'
+    });
+
+    // 轮询检查批改状态
+    const monitorInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/submissions/${submissionId}/status`, {
+          headers: {
+            'Authorization': `Bearer ${authState.token}`
+          }
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            const submission = result.data;
+            
+            // 根据批改状态更新进度
+            if (submission.myscriptResults && submission.myscriptResults.length > 0) {
+              const myscriptResult = submission.myscriptResults[0];
+              
+              if (myscriptResult.status === 'processing') {
+                setGradingStatus({
+                  processing: true,
+                  stage: 'ocr',
+                  progress: 30,
+                  message: '🔍 文字识别处理中...'
+                });
+              } else if (myscriptResult.status === 'completed') {
+                setGradingStatus({
+                  processing: true,
+                  stage: 'grading',
+                  progress: 60,
+                  message: '🤖 AI智能批改中...'
+                });
+                
+                // 检查Deepseek批改状态
+                if (submission.deepseekResults && submission.deepseekResults.length > 0) {
+                  const deepseekResult = submission.deepseekResults[0];
+                  
+                  if (deepseekResult.status === 'completed') {
+                    setGradingStatus({
+                      processing: false,
+                      stage: 'completed',
+                      progress: 100,
+                      message: '✅ 批改完成！'
+                    });
+                    
+                    // 显示完成通知
+                    setGradingNotification({
+                      show: true,
+                      submissionId: submissionId,
+                      message: `🎉 您的${workMode === 'homework' ? '作业' : '练习'}批改完成！点击查看详细结果`
+                    });
+                    
+                    clearInterval(monitorInterval);
+                    
+                    // 5秒后隐藏批改状态
+                    setTimeout(() => {
+                      setGradingStatus({
+                        processing: false,
+                        stage: '',
+                        progress: 0,
+                        message: ''
+                      });
+                    }, 5000);
+                  }
+                }
+              } else if (myscriptResult.status === 'failed') {
+                setGradingStatus({
+                  processing: false,
+                  stage: '',
+                  progress: 0,
+                  message: '❌ 文字识别失败'
+                });
+                clearInterval(monitorInterval);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('监控批改进度失败:', error);
+      }
+    }, 3000); // 每3秒检查一次
+
+    // 5分钟后停止监控
+    setTimeout(() => {
+      clearInterval(monitorInterval);
+      if (gradingStatus.processing) {
+        setGradingStatus({
+          processing: false,
+          stage: '',
+          progress: 0,
+          message: '⏰ 批改超时，请稍后查看侧边栏'
+        });
+      }
+    }, 300000); // 5分钟
+  };
+
+  // 查看批改结果
+  const handleViewGradingResult = async (submissionId: number) => {
+    try {
+      // 隐藏通知
+      setGradingNotification({
+        show: false,
+        submissionId: null,
+        message: ''
+      });
+      
+      // 打开侧边栏显示详细结果
+      await openSidePanel();
+    } catch (error) {
+      console.error('打开批改结果失败:', error);
+    }
   };
 
   useEffect(() => {
@@ -640,13 +797,42 @@ function Popup() {
 
       setUploadStatus(prev => ({ ...prev, progress: 50 }));
 
-      const response = await fetch(`${API_BASE_URL}/files`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authState.token}`
-        },
-        body: formData
-      });
+      // 添加超时控制和更详细的错误处理
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2分钟超时
+
+      let response;
+      try {
+        response = await fetch(`${API_BASE_URL}/files`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authState.token}`
+          },
+          body: formData,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          throw new Error('上传超时，请检查网络连接或尝试上传较小的文件');
+        }
+        throw fetchError;
+      }
+
+      setUploadStatus(prev => ({ ...prev, progress: 70, message: '📤 处理服务器响应...' }));
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `服务器错误 (${response.status})`;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // 如果不是JSON，使用默认错误消息
+        }
+        throw new Error(errorMessage);
+      }
 
       const result = await response.json();
 
@@ -682,8 +868,13 @@ function Popup() {
           setUploadStatus({
             uploading: false,
             progress: 100,
-            message: workMode === 'homework' ? '🎉 作业提交成功！' : '🎉 提交成功！点击侧边栏查看处理进度'
+            message: workMode === 'homework' ? '🎉 作业提交成功！' : '🎉 提交成功！'
           });
+
+          // 开始监控批改进度
+          if (submissionResult.data?.submissionId) {
+            startGradingMonitor(submissionResult.data.submissionId);
+          }
 
           // 作业模式下重新加载数据
           if (workMode === 'homework') {
@@ -1221,9 +1412,14 @@ function Popup() {
 
 
 
-  // 查看作业文件
+  // 查看作业文件 - 使用独立的下载状态
   const handleViewAssignmentFile = async (fileId: number) => {
     try {
+      setDownloadStatus({
+        downloading: true,
+        message: '🔄 正在下载文件...'
+      });
+
       const response = await fetch(`${API_BASE_URL}/files/${fileId}/download`, {
         headers: {
           'Authorization': `Bearer ${authState.token}`
@@ -1234,9 +1430,39 @@ function Popup() {
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
         window.open(url, '_blank');
+        
+        setDownloadStatus({
+          downloading: false,
+          message: '✅ 文件下载成功！'
+        });
+        
+        setTimeout(() => {
+          setDownloadStatus({ downloading: false, message: '' });
+        }, 3000);
+      } else {
+        // 尝试解析错误信息
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || `下载失败 (状态码: ${response.status})`;
+        
+        setDownloadStatus({
+          downloading: false,
+          message: `❌ ${errorMessage}`
+        });
+        
+        setTimeout(() => {
+          setDownloadStatus({ downloading: false, message: '' });
+        }, 5000);
       }
     } catch (error) {
-      console.error('打开文件失败:', error);
+      console.error('文件下载失败:', error);
+      setDownloadStatus({
+        downloading: false,
+        message: `❌ 网络错误: ${error instanceof Error ? error.message : '未知错误'}`
+      });
+      
+      setTimeout(() => {
+        setDownloadStatus({ downloading: false, message: '' });
+      }, 5000);
     }
   };
 
@@ -1994,6 +2220,71 @@ function Popup() {
                   {uploadStatus.message}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* 下载状态显示 */}
+          {downloadStatus.message && (
+            <div className={`status-message ${downloadStatus.message.includes('失败') || downloadStatus.message.includes('❌') || downloadStatus.message.includes('网络错误') ? 'error' : 'success'}`}>
+              {downloadStatus.downloading && <div className="spinner small"></div>}
+              {downloadStatus.message}
+            </div>
+          )}
+
+          {/* 批改进度显示 */}
+          {gradingStatus.processing && (
+            <div className="grading-progress-card">
+              <div className="grading-header">
+                <h4>🤖 AI批改进度</h4>
+                <div className="progress-indicator">
+                  <div className="progress-bar">
+                    <div 
+                      className="progress-fill" 
+                      style={{ width: `${gradingStatus.progress}%` }}
+                    ></div>
+                  </div>
+                  <span className="progress-text">{gradingStatus.progress}%</span>
+                </div>
+              </div>
+              <div className="grading-stage">
+                <div className={`stage-item ${gradingStatus.stage === 'ocr' ? 'active' : gradingStatus.progress > 30 ? 'completed' : ''}`}>
+                  🔍 文字识别
+                </div>
+                <div className={`stage-item ${gradingStatus.stage === 'grading' ? 'active' : gradingStatus.progress === 100 ? 'completed' : ''}`}>
+                  🤖 智能批改
+                </div>
+                <div className={`stage-item ${gradingStatus.stage === 'completed' ? 'completed' : ''}`}>
+                  ✅ 完成
+                </div>
+              </div>
+              <p className="grading-message">{gradingStatus.message}</p>
+            </div>
+          )}
+
+          {/* 批改完成通知 */}
+          {gradingNotification.show && (
+            <div className="grading-notification">
+              <div className="notification-content">
+                <div className="notification-icon">🎉</div>
+                <div className="notification-text">
+                  <h4>批改完成！</h4>
+                  <p>{gradingNotification.message}</p>
+                </div>
+                <div className="notification-actions">
+                  <button 
+                    className="btn-primary btn-small"
+                    onClick={() => handleViewGradingResult(gradingNotification.submissionId!)}
+                  >
+                    查看结果
+                  </button>
+                  <button 
+                    className="btn-secondary btn-small"
+                    onClick={() => setGradingNotification({ show: false, submissionId: null, message: '' })}
+                  >
+                    稍后查看
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

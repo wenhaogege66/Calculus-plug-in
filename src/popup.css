@@ -1760,3 +1760,251 @@ html, body {
     height: 16px !important;
   }
 } 
+
+/* 批改进度卡片样式 */
+.grading-progress-card {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(33, 150, 243, 0.1));
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 20px;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.1);
+}
+
+.grading-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.grading-header h4 {
+  margin: 0;
+  color: #4CAF50;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.progress-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-bar {
+  width: 120px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4CAF50, #2196F3);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4CAF50;
+  min-width: 35px;
+}
+
+.grading-stage {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.stage-item {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  transition: all 0.3s ease;
+}
+
+.stage-item.active {
+  background: rgba(33, 150, 243, 0.3);
+  border-color: #2196F3;
+  color: #2196F3;
+  transform: scale(1.02);
+}
+
+.stage-item.completed {
+  background: rgba(76, 175, 80, 0.3);
+  border-color: #4CAF50;
+  color: #4CAF50;
+}
+
+.grading-message {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  text-align: center;
+  font-weight: 500;
+}
+
+/* 批改完成通知样式 */
+.grading-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(76, 175, 80, 0.3);
+  max-width: 350px;
+  animation: slideInRight 0.3s ease-out;
+}
+
+.notification-content {
+  padding: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: white;
+}
+
+.notification-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.notification-text {
+  flex: 1;
+}
+
+.notification-text h4 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.notification-text p {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.9;
+  line-height: 1.4;
+}
+
+.notification-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-primary.btn-small {
+  background: rgba(255, 255, 255, 0.9);
+  color: #4CAF50;
+}
+
+.btn-primary.btn-small:hover {
+  background: white;
+  transform: translateY(-1px);
+}
+
+.btn-secondary.btn-small {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary.btn-small:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* 下载状态样式优化 */
+.status-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  margin: 16px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.status-message .spinner.small {
+  margin-bottom: 0;
+}
+
+.status-message.success {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(56, 142, 60, 0.1));
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  color: #4CAF50;
+}
+
+.status-message.error {
+  background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(198, 40, 40, 0.1));
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  color: #f44336;
+}
+
+/* 全屏模式下的通知位置调整 */
+.popup-container.fullscreen .grading-notification {
+  top: 80px;
+  right: 40px;
+}
+
+/* 响应式调整 */
+@media (max-width: 600px) {
+  .grading-notification {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+  
+  .notification-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+  
+  .grading-progress-card {
+    margin: 12px 16px;
+    padding: 16px;
+  }
+  
+  .progress-bar {
+    width: 80px;
+  }
+  
+  .grading-stage {
+    flex-direction: column;
+    gap: 6px;
+  }
+} 
