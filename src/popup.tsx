@@ -1083,8 +1083,8 @@ function Popup() {
             setFileUploads(prev => prev.filter(item => item.id !== fileId));
           }, 2000);
 
-          // 开始监控批改进度
-          if (submissionResult.data?.submissionId) {
+          // 开始监控批改进度 - 仅在学生模式下显示
+          if (submissionResult.data?.submissionId && userRole === 'student') {
             console.log(`开始监控批改进度: ${submissionResult.data.submissionId}`);
             startGradingMonitor(submissionResult.data.submissionId);
           }
@@ -2585,8 +2585,8 @@ function Popup() {
             </div>
           )}
 
-          {/* 批改进度显示 */}
-          {gradingStatus.processing && (
+          {/* 批改进度显示 - 仅在学生模式下显示 */}
+          {gradingStatus.processing && userRole === 'student' && (
             <div className="grading-progress-card">
               <div className="grading-header">
                 <h4>🤖 AI批改进度</h4>

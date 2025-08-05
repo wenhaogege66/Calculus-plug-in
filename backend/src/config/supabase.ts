@@ -192,7 +192,8 @@ export interface Database {
 
 // Storage bucket名称
 export const STORAGE_BUCKETS = {
-  ASSIGNMENTS: 'calculus-hw',  // 作业文件 - 使用实际的bucket名称
+  ASSIGNMENTS: 'calculus-hw',  // 学生作业文件 - 使用实际的bucket名称
+  QUESTIONS: 'questions',      // 教师题目文件
   AVATARS: 'avatars',         // 用户头像
   ANNOTATED: 'annotated'      // 批改后的文件
 } as const; 

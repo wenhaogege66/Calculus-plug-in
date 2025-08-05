@@ -2,6 +2,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
+import axios from 'axios';
 
 const prisma = new PrismaClient();
 
@@ -83,6 +84,20 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
 
+      // 如果有题目文件，异步触发OCR识别
+      if (fileUploadId) {
+        fastify.log.info(`作业创建成功，开始OCR识别任务: assignmentId=${assignment.id}`);
+        
+        // 异步调用OCR识别，不阻塞响应
+        triggerAssignmentOCR(assignment.id, fastify)
+          .then(() => {
+            fastify.log.info(`作业OCR识别完成: assignmentId=${assignment.id}`);
+          })
+          .catch((error) => {
+            fastify.log.error(`作业OCR识别失败: assignmentId=${assignment.id}`, error);
+          });
+      }
+
       reply.send({
         success: true,
         data: {
@@ -93,6 +108,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
           questionFile: assignment.questionFile,
           startDate: assignment.startDate,
           dueDate: assignment.dueDate,
+          ocrStatus: assignment.ocrStatus,
           createdAt: assignment.createdAt
         }
       });
@@ -299,5 +315,28 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 };
+
+// 异步触发作业OCR识别的辅助函数
+async function triggerAssignmentOCR(assignmentId: number, fastify: any) {
+  try {
+    // 调用内部OCR接口
+    const response = await axios.post(`http://localhost:3000/api/internal/ocr/assignment`, {
+      assignmentId: assignmentId
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        // 这里需要添加内部服务认证，暂时跳过认证
+      },
+      timeout: 60000 // 60秒超时
+    });
+
+    fastify.log.info(`作业OCR识别结果:`, response.data);
+    return response.data;
+    
+  } catch (error) {
+    fastify.log.error(`触发作业OCR识别失败:`, error);
+    throw error;
+  }
+}
 
 export default assignmentRoutes;

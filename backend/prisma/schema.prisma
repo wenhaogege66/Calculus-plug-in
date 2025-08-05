@@ -148,6 +148,15 @@ enum SubmissionStatus {
   @@map("submission_status")
 }
 
+enum OcrStatus {
+  PENDING    @map("pending")
+  PROCESSING @map("processing")
+  COMPLETED  @map("completed")
+  FAILED     @map("failed")
+  
+  @@map("ocr_status")
+}
+
 // 班级表
 model Classroom {
   id          Int      @id @default(autoincrement())
@@ -194,6 +203,13 @@ model Assignment {
   startDate   DateTime  @map("start_date")
   dueDate     DateTime  @map("due_date")
   isActive    Boolean   @default(true) @map("is_active")
+  
+  // MyScript OCR识别结果
+  ocrText     String?   @map("ocr_text") @db.Text // 题目识别的文本
+  ocrLatex    String?   @map("ocr_latex") @db.Text // 题目识别的LaTeX
+  ocrStatus   OcrStatus @default(PENDING) @map("ocr_status") // OCR处理状态
+  ocrProcessedAt DateTime? @map("ocr_processed_at") // OCR处理时间
+  
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   

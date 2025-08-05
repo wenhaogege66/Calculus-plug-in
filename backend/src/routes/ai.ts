@@ -49,10 +49,45 @@ async function processAIGrading(request: FastifyRequest, reply: FastifyReply, fa
         });
       }
 
+      // 获取教师题目信息（如果是作业模式）
+      let teacherQuestionText = null;
+      let teacherQuestionLatex = null;
+      
+      if (submission.assignmentId) {
+        fastify.log.info(`获取作业题目信息: assignmentId=${submission.assignmentId}`);
+        
+        const assignment = await prisma.assignment.findUnique({
+          where: { id: submission.assignmentId },
+          select: {
+            id: true,
+            title: true,
+            ocrText: true,
+            ocrLatex: true,
+            ocrStatus: true
+          }
+        });
+
+        if (assignment) {
+          teacherQuestionText = assignment.ocrText;
+          teacherQuestionLatex = assignment.ocrLatex;
+          
+          fastify.log.info(`作业题目OCR状态: ${assignment.ocrStatus}`);
+          if (assignment.ocrText) {
+            fastify.log.info(`题目文本长度: ${assignment.ocrText.length}字符`);
+          }
+        }
+      }
+
       const startTime = Date.now();
 
-      // 调用Deepseek AI进行批改
-      const gradingResult = await callDeepseekAPI(recognizedText, subject, exerciseType);
+      // 调用Deepseek AI进行批改，传入教师题目信息
+      const gradingResult = await callDeepseekAPI(
+        recognizedText, 
+        subject, 
+        exerciseType,
+        teacherQuestionText,
+        teacherQuestionLatex
+      );
       
       const processingTime = Date.now() - startTime;
 
@@ -205,7 +240,13 @@ async function processAIGrading(request: FastifyRequest, reply: FastifyReply, fa
 }
 
 // 调用Deepseek API的辅助函数
-async function callDeepseekAPI(text: string, subject: string, exerciseType: string): Promise<{
+async function callDeepseekAPI(
+  text: string, 
+  subject: string, 
+  exerciseType: string,
+  teacherQuestionText?: string | null,
+  teacherQuestionLatex?: string | null
+): Promise<{
   score: number;
   maxScore: number;
   feedback: string;
@@ -221,11 +262,28 @@ async function callDeepseekAPI(text: string, subject: string, exerciseType: stri
       throw new Error('Deepseek API密钥未配置');
     }
 
+    // 构建包含题目信息的prompt
+    let questionSection = '';
+    if (teacherQuestionText) {
+      questionSection = `
+题目内容：
+${teacherQuestionText}
+${teacherQuestionLatex ? `
+LaTeX格式：
+${teacherQuestionLatex}
+` : ''}`;
+    }
+
     const prompt = `
 作为一位专业的${subject}教师，请对以下学生作业进行详细批改：
-
+${questionSection}
 学生答案：
 ${text}
+
+${teacherQuestionText ? 
+  '请根据题目要求和标准答案评分，重点检查：1) 学生是否理解题目要求；2) 解题步骤是否正确；3) 计算是否准确；4) 最终答案是否合理。' : 
+  '请根据微积分知识点评分，重点检查：1) 解题思路是否正确；2) 数学概念理解是否准确；3) 计算步骤是否合理。'
+}
 
 请按以下格式返回JSON：
 {
