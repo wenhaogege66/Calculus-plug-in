@@ -13,13 +13,13 @@
 
 ### 后端技术栈
 - **API服务**: Node.js + Fastify + TypeScript
-- **数据库**: Neon PostgreSQL (云数据库) + Prisma ORM
+- **数据库**: Supabase PostgreSQL (云数据库) + Prisma ORM
 - **认证**: JWT + GitHub OAuth
 - **AI服务**: MyScript (OCR) + Deepseek (批改)
 
 ### 数据流架构
 ```
-Chrome插件 (Plasmo) → GitHub OAuth → Fastify API → Prisma ORM → Neon PostgreSQL
+Chrome插件 (Plasmo) → GitHub OAuth → Fastify API → Prisma ORM → Supabase PostgreSQL
                                       ↓
                                   MyScript OCR
                                       ↓
@@ -277,7 +277,6 @@ npm run db:studio     # 打开Prisma Studio
 - [Plasmo框架文档](https://docs.plasmo.com/)
 - [Fastify文档](https://www.fastify.io/)
 - [Prisma文档](https://www.prisma.io/docs)
-- [Neon PostgreSQL](https://neon.tech/)
 - [GitHub OAuth Apps](https://docs.github.com/en/developers/apps/building-oauth-apps)
 - [MyScript API](https://developer.myscript.com/)
 - [Deepseek API](https://platform.deepseek.com/)
@@ -286,7 +285,7 @@ npm run db:studio     # 打开Prisma Studio
 
 - **前端**: 使用Plasmo框架，遵循React开发规范，支持热重载
 - **后端**: 使用Fastify+Prisma，类型安全的ORM操作
-- **数据库**: Neon PostgreSQL，使用Prisma进行迁移管理
+- **数据库**: Supabase PostgreSQL，使用Prisma进行迁移管理
 - **认证**: JWT + GitHub OAuth，支持无状态认证
 - **AI服务**: 集成MyScript和Deepseek，提供OCR和批改功能
 

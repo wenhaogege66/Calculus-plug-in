@@ -10,7 +10,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/assignments', {
     preHandler: async (request, reply) => {
       await requireAuth(request, reply);
-      if (request.currentUser.role.toLowerCase() !== 'teacher') {
+      if (!request.currentUser || request.currentUser!.role.toLowerCase() !== 'teacher') {
         reply.code(403).send({ success: false, error: '只有教师可以创建作业' });
       }
     }
@@ -66,7 +66,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
           title: title.trim(),
           description: description?.trim() || null,
           classroomId,
-          teacherId: request.currentUser.id,
+          teacherId: request.currentUser!.id,
           fileUploadId: fileUploadId || null,
           startDate: start,
           dueDate: due
@@ -106,7 +106,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/assignments/teacher', {
     preHandler: async (request, reply) => {
       await requireAuth(request, reply);
-      if (request.currentUser.role.toLowerCase() !== 'teacher') {
+      if (request.currentUser!.role.toLowerCase() !== 'teacher') {
         reply.code(403).send({ success: false, error: '只有教师可以查看作业列表' });
       }
     }
@@ -114,7 +114,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       const assignments = await prisma.assignment.findMany({
         where: {
-          teacherId: request.currentUser.id,
+          teacherId: request.currentUser!.id,
           isActive: true
         },
         include: {
@@ -154,7 +154,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/assignments/student', {
     preHandler: async (request, reply) => {
       await requireAuth(request, reply);
-      if (request.currentUser.role.toLowerCase() !== 'student') {
+      if (request.currentUser!.role.toLowerCase() !== 'student') {
         reply.code(403).send({ success: false, error: '只有学生可以查看作业列表' });
       }
     }
@@ -243,19 +243,19 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
       const classroomIdInt = parseInt(classroomId);
 
       // 验证用户是否有权限访问该班级
-      if (request.currentUser.role.toLowerCase() === 'teacher') {
+      if (request.currentUser!.role.toLowerCase() === 'teacher') {
         const classroom = await prisma.classroom.findFirst({
-          where: { id: classroomIdInt, teacherId: request.currentUser.id }
+          where: { id: classroomIdInt, teacherId: request.currentUser!.id }
         });
         if (!classroom) {
           return reply.code(404).send({ success: false, error: '班级不存在或无权限' });
         }
-      } else if (request.currentUser.role.toLowerCase() === 'student') {
+      } else if (request.currentUser!.role.toLowerCase() === 'student') {
         const membership = await prisma.classroomMember.findUnique({
           where: {
             classroomId_studentId: {
               classroomId: classroomIdInt,
-              studentId: request.currentUser.id
+              studentId: request.currentUser!.id
             }
           }
         });

@@ -2007,4 +2007,290 @@ html, body {
     flex-direction: column;
     gap: 6px;
   }
+}
+
+/* ==========================================
+   多文件上传组件样式
+   ========================================== */
+
+.multi-file-upload {
+  margin: 20px 0;
+}
+
+.multi-file-upload h4 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.file-upload-zone.multi {
+  border: 2px dashed #ddd;
+  border-radius: 12px;
+  padding: 32px 20px;
+  text-align: center;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.7);
+  margin-bottom: 20px;
+}
+
+.file-upload-zone.multi:hover {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.file-upload-zone.multi.uploading {
+  border-color: #2196F3;
+  background: rgba(33, 150, 243, 0.1);
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.file-upload-zone.multi.uploading:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.file-upload-zone.multi .upload-icon {
+  margin-bottom: 16px;
+  color: #667eea;
+  opacity: 0.7;
+}
+
+.file-upload-zone.multi .upload-text p {
+  margin: 8px 0;
+  color: #555;
+}
+
+.file-upload-zone.multi .upload-text .upload-hint {
+  font-size: 12px;
+  color: #999;
+}
+
+/* 上传进度列表 */
+.upload-progress-list {
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.upload-progress-list h5 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.upload-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  border-left: 4px solid #ddd;
+  transition: all 0.3s ease;
+}
+
+.upload-item.uploading {
+  border-left-color: #2196F3;
+  background: rgba(33, 150, 243, 0.05);
+}
+
+.upload-item.completed {
+  border-left-color: #4CAF50;
+  background: rgba(76, 175, 80, 0.05);
+}
+
+.upload-item.error {
+  border-left-color: #f44336;
+  background: rgba(244, 67, 54, 0.05);
+}
+
+.upload-item .file-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.upload-item .file-name {
+  display: block;
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.upload-item .file-size {
+  font-size: 12px;
+  color: #666;
+}
+
+.upload-item .upload-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 120px;
+}
+
+.progress-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.progress-container .progress-bar {
+  width: 80px;
+  height: 4px;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: #666;
+  min-width: 35px;
+  text-align: right;
+}
+
+.status-message.pending {
+  color: #ff9800;
+  font-size: 12px;
+}
+
+.status-message.uploading {
+  color: #2196F3;
+  font-size: 12px;
+}
+
+.status-message.completed {
+  color: #4CAF50;
+  font-size: 12px;
+}
+
+.status-message.error {
+  color: #f44336;
+  font-size: 12px;
+}
+
+.retry-btn {
+  background: #f44336;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.retry-btn:hover {
+  background: #d32f2f;
+}
+
+/* 已上传文件列表 */
+.uploaded-files-list {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.uploaded-files-list h5 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.uploaded-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  background: rgba(76, 175, 80, 0.1);
+  border-radius: 6px;
+  border-left: 3px solid #4CAF50;
+}
+
+.uploaded-item .file-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.uploaded-item .file-name {
+  display: block;
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.uploaded-item .file-size {
+  font-size: 11px;
+  color: #666;
+}
+
+.uploaded-item .file-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.uploaded-item .upload-time {
+  font-size: 11px;
+  color: #999;
+}
+
+.remove-btn {
+  background: #f44336;
+  color: white;
+  border: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.3s ease;
+  line-height: 1;
+}
+
+.remove-btn:hover {
+  background: #d32f2f;
+}
+
+/* 响应式调整 */
+@media (max-width: 600px) {
+  .upload-item,
+  .uploaded-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .upload-item .upload-status {
+    width: 100%;
+    align-items: flex-start;
+  }
+  
+  .progress-container {
+    justify-content: flex-start;
+  }
+  
+  .uploaded-item .file-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
 } 

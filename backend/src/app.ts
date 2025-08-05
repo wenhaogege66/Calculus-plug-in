@@ -65,12 +65,17 @@ async function registerPlugins() {
   await fastify.register(cors, {
     origin: [
       /^chrome-extension:\/\/.*/,
+      /^moz-extension:\/\/.*/,
       process.env.FRONTEND_URL || 'http://localhost:3000',
-      process.env.DEV_SERVER_URL || 'http://localhost:8080'
+      process.env.DEV_SERVER_URL || 'http://localhost:8080',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000'
     ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 200
   });
 
   // 文件上传支持 - 100MB限制

@@ -26,6 +26,8 @@ interface ViewStates {
   showAssignmentManagement: boolean;
   showAssignmentDetails: boolean;
   showSubmissionHistory: boolean;
+  teacherView: boolean;
+  studentView: boolean;
 }
 
 function Popup() {
@@ -100,6 +102,8 @@ function Popup() {
     showAssignmentManagement: false,
     showAssignmentDetails: false,
     showSubmissionHistory: false,
+    teacherView: false,
+    studentView: false,
   });
 
   // 统一的加载状态管理
@@ -111,6 +115,7 @@ function Popup() {
     userInfo: false,
   });
 
+  // 传统单文件上传状态（保留兼容性）
   const [uploadStatus, setUploadStatus] = useState<{
     uploading: boolean;
     progress: number;
@@ -119,6 +124,28 @@ function Popup() {
     uploading: false,
     progress: 0,
     message: ''
+  });
+
+  // 多文件上传状态管理
+  interface FileUploadItem {
+    id: string;
+    file: File;
+    progress: number;
+    status: 'pending' | 'uploading' | 'completed' | 'error';
+    message: string;
+    fileId?: number;
+    uploadType: 'assignment' | 'homework' | 'practice';
+  }
+
+  const [fileUploads, setFileUploads] = useState<FileUploadItem[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<{
+    assignments: FileUploadItem[];
+    homework: FileUploadItem[];
+    practice: FileUploadItem[];
+  }>({
+    assignments: [],
+    homework: [],
+    practice: []
   });
 
   // 新增：独立的下载状态管理
@@ -168,6 +195,8 @@ function Popup() {
       showAssignmentManagement: false,
       showAssignmentDetails: false,
       showSubmissionHistory: false,
+      teacherView: false,
+      studentView: false,
     });
   };
 
@@ -418,14 +447,20 @@ function Popup() {
         // 立即设置认证状态，提升用户体验
         let user = typeof savedUser === 'string' ? JSON.parse(savedUser) : savedUser;
         
-        // 恢复用户角色，优先使用用户对象中的角色
-        const userRole = user.role || await storage.get('user_role') || 'student';
-        setUserRole(userRole === 'teacher' ? 'teacher' : 'student');
-        
-        // 确保用户角色信息完整
-        if (!user.role) {
-          user.role = userRole;
+        // 标准化角色格式，优先使用用户对象中的角色
+        let normalizedRole = 'student'; // 默认为学生
+        const storedRole = user.role || await storage.get('user_role');
+        if (storedRole) {
+          normalizedRole = storedRole.toLowerCase() === 'teacher' ? 'teacher' : 'student';
         }
+        
+        console.log('初始化时恢复用户角色:', normalizedRole, '原始角色:', user.role);
+        
+        // 更新状态
+        setUserRole(normalizedRole as 'student' | 'teacher');
+        
+        // 确保用户角色信息完整且格式正确
+        user.role = normalizedRole;
         
         // 立即设置认证状态，确保用户信息不会消失
         setAuthState({
@@ -435,12 +470,17 @@ function Popup() {
           loading: false
         });
 
-        // 立即根据当前角色加载数据，不等待服务器验证
-        const currentRole = user.role || 'student';
-        console.log('初始化时加载数据，当前角色:', currentRole, 'Token:', savedToken ? '存在' : '不存在');
-        if (currentRole === 'teacher') {
+        // 根据角色初始化界面和加载数据
+        console.log('初始化时根据角色设置界面:', normalizedRole);
+        if (normalizedRole === 'teacher') {
+          // 重置所有视图，显示教师界面
+          resetAllViews();
+          setViewState('teacherView', true);
           loadTeacherClassrooms(savedToken);
         } else {
+          // 重置所有视图，显示学生界面
+          resetAllViews(); 
+          setViewState('studentView', true);
           loadStudentClassrooms(savedToken);
         }
 
@@ -587,6 +627,7 @@ function Popup() {
   // 获取用户信息（包括真实角色）
   const fetchUserInfo = async (token: string) => {
     try {
+      console.log('fetchUserInfo: 开始获取最新用户信息');
       const response = await fetch(`${API_BASE_URL}/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -597,37 +638,63 @@ function Popup() {
       if (result.success) {
         const serverUser = result.data;
         
-        // 更新用户状态，使用服务器端的角色信息
-        setUserRole(serverUser.role);
-        await storage.set('user_role', serverUser.role);
+        // 标准化角色格式
+        const normalizedRole = serverUser.role?.toLowerCase() === 'teacher' ? 'teacher' : 'student';
+        console.log('fetchUserInfo: 服务器返回角色:', serverUser.role, '标准化后:', normalizedRole);
         
-        // 更新authState中的用户信息
-        setAuthState(prev => ({
-          ...prev,
-          user: {
-            ...prev.user,
-            role: serverUser.role
+        // 构建完整的用户信息对象，避免覆盖现有信息
+        const updatedUser: User = {
+          id: serverUser.id || authState.user?.id,
+          username: serverUser.username || authState.user?.username,
+          email: serverUser.email || authState.user?.email,
+          role: normalizedRole as 'student' | 'teacher',
+          authType: authState.user?.authType || 'github',
+          githubId: authState.user?.githubId,
+          githubUsername: authState.user?.githubUsername,
+          avatarUrl: serverUser.avatarUrl || authState.user?.avatarUrl
+        };
+        
+        // 更新状态
+        setUserRole(normalizedRole as 'student' | 'teacher');
+        await storage.set('user_role', normalizedRole);
+        
+        // 原子性更新authState，避免竞态条件
+        setAuthState(prev => {
+          if (!prev.user) {
+            console.warn('fetchUserInfo: authState.user为null，跳过更新');
+            return prev;
           }
-        }));
+          return {
+            ...prev,
+            user: updatedUser
+          };
+        });
         
         // 更新本地存储
         await chrome.storage.local.set({ 
-          'user_info': {
-            ...authState.user,
-            role: serverUser.role
-          }
+          'user_info': updatedUser,
+          'user_role': normalizedRole
         });
         
-        // 根据真实角色加载数据
-        console.log('根据服务器角色加载数据:', serverUser.role);
-        if (serverUser.role === 'teacher') {
-          await loadTeacherClassrooms(token);
-        } else {
-          await loadStudentClassrooms(token);
+        console.log('fetchUserInfo: 用户信息更新完成，最终角色:', normalizedRole);
+        
+        // 仅在角色发生变化时才重新加载数据和界面
+        if (userRole !== normalizedRole) {
+          console.log('fetchUserInfo: 角色变化，重新初始化界面');
+          if (normalizedRole === 'teacher') {
+            resetAllViews();
+            setViewState('teacherView', true);
+            await loadTeacherClassrooms(token);
+          } else {
+            resetAllViews();
+            setViewState('studentView', true);
+            await loadStudentClassrooms(token);
+          }
         }
       }
     } catch (error) {
-      console.error('获取用户信息失败:', error);
+      console.error('fetchUserInfo: 获取用户信息失败:', error);
+      // 获取失败时不要清空现有状态，保持当前登录状态
     }
   };
 
@@ -638,18 +705,25 @@ function Popup() {
       console.log('GitHub登录成功，处理认证信息...');
       const { token, user } = event.data;
       
-      // 设置用户角色，如果服务器没有返回角色则默认为学生
-      if (!user.role) {
-        user.role = 'student';
+      // 标准化角色格式：TEACHER -> teacher, STUDENT -> student
+      let normalizedRole = 'student'; // 默认为学生
+      if (user.role) {
+        normalizedRole = user.role.toLowerCase() === 'teacher' ? 'teacher' : 'student';
       }
       
+      // 更新用户对象的角色为标准化格式
+      user.role = normalizedRole;
+      
+      console.log('登录用户角色:', normalizedRole);
+      
       // 根据服务器返回的角色设置前端状态
-      setUserRole(user.role);
+      setUserRole(normalizedRole as 'student' | 'teacher');
       
       // 保存认证信息到 chrome.storage.local（与background保持一致）
       await chrome.storage.local.set({
         'auth_token': token,
-        'user_info': user
+        'user_info': user,
+        'user_role': normalizedRole
       });
       
       setAuthState({
@@ -665,10 +739,17 @@ function Popup() {
         message: '✅ 登录成功！'
       });
 
-      // 根据用户角色加载对应数据
-      if (user.role === 'teacher') {
+      // 根据用户角色加载对应数据和切换界面
+      console.log('根据角色初始化界面:', normalizedRole);
+      if (normalizedRole === 'teacher') {
+        // 重置所有视图状态，显示教师界面
+        resetAllViews();
+        setViewState('teacherView', true);
         loadTeacherClassrooms();
       } else {
+        // 重置所有视图状态，显示学生界面  
+        resetAllViews();
+        setViewState('studentView', true);
         loadStudentClassrooms();
       }
 
@@ -739,68 +820,94 @@ function Popup() {
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // 强制检查认证状态
-    if (!authState.isAuthenticated || !authState.token) {
+  // 新的多文件上传函数
+  const handleMultiFileUpload = async (files: FileList, uploadType: 'assignment' | 'homework' | 'practice') => {
+    if (!authState.token) {
       setUploadStatus({
         uploading: false,
         progress: 0,
-        message: '⚠️ 请先登录后再上传文件'
+        message: '❌ 请先登录'
       });
-      
-      // 清空文件选择
-      event.target.value = '';
       return;
     }
 
-    // 作业模式下检查是否选择了作业
-    if (workMode === 'homework') {
-      if (!selectedAssignment) {
-        setUploadStatus({
-          uploading: false,
-          progress: 0,
-          message: '⚠️ 请先选择要提交的作业'
-        });
-        event.target.value = '';
-        return;
-      }
+    const fileArray = Array.from(files);
+    console.log(`开始处理${fileArray.length}个文件，类型: ${uploadType}`);
+    
+    // 使用更安全的ID生成方式，避免重复
+    const newUploads: FileUploadItem[] = fileArray.map((file, index) => ({
+      id: `${uploadType}-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+      file,
+      progress: 0,
+      status: 'pending' as const,
+      message: '等待上传...',
+      uploadType
+    }));
 
-      // 检查作业是否过期
-      const assignment = assignments.find(a => a.id === parseInt(selectedAssignment));
-      if (assignment && new Date() > new Date(assignment.dueDate)) {
-        setUploadStatus({
-          uploading: false,
-          progress: 0,
-          message: '⚠️ 该作业已过期，无法提交'
-        });
-        event.target.value = '';
-        return;
-      }
-    }
+    // 添加到上传队列
+    setFileUploads(prev => {
+      console.log('添加到上传队列:', newUploads.map(u => u.id));
+      return [...prev, ...newUploads];
+    });
 
+    // 并发上传所有文件，而不是串行
+    const uploadPromises = newUploads.map(uploadItem => uploadSingleFile(uploadItem));
+    
     try {
-      setUploadStatus({
-        uploading: true,
-        progress: 20,
-        message: workMode === 'homework' ? '📤 正在提交作业...' : '📤 正在上传文件...'
-      });
+      await Promise.all(uploadPromises);
+      console.log(`所有文件上传完成，类型: ${uploadType}`);
+    } catch (error) {
+      console.error('批量上传出现错误:', error);
+    }
+  };
+
+  const uploadSingleFile = async (uploadItem: FileUploadItem) => {
+    const fileId = uploadItem.id;
+    console.log(`开始上传文件: ${uploadItem.file.name} (ID: ${fileId})`);
+    
+    try {
+      // 更新状态为上传中
+      setFileUploads(prev => 
+        prev.map(item => 
+          item.id === fileId 
+            ? { ...item, status: 'uploading', progress: 10, message: '准备上传...' }
+            : item
+        )
+      );
 
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', uploadItem.file);
+      
+      // 根据上传类型设置workMode
+      const workMode = uploadItem.uploadType === 'assignment' ? 'practice' : 
+                      uploadItem.uploadType === 'homework' ? 'homework' : 'practice';
       formData.append('workMode', workMode);
+      
       if (workMode === 'homework' && selectedAssignment) {
         formData.append('assignmentId', selectedAssignment);
       }
 
-      setUploadStatus(prev => ({ ...prev, progress: 50 }));
-
-      // 添加超时控制和更详细的错误处理
+      // 设置合理的超时时间 - 为小文件增加更多时间，因为Supabase上传可能需要时间
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2分钟超时
+      const fileSizeMB = uploadItem.file.size / 1024 / 1024;
+      const timeoutMs = Math.max(60000, fileSizeMB * 30000); // 最少60秒，每MB增加30秒
+      
+      console.log(`设置上传超时: ${uploadItem.file.name} - 文件大小: ${fileSizeMB.toFixed(2)}MB, 超时: ${timeoutMs/1000}秒`);
+      
+      const timeoutId = setTimeout(() => {
+        console.log(`❌ 文件上传超时: ${uploadItem.file.name} (${timeoutMs/1000}秒)`);
+        controller.abort();
+      }, timeoutMs);
 
+      setFileUploads(prev => 
+        prev.map(item => 
+          item.id === fileId 
+            ? { ...item, progress: 30, message: '正在上传文件...' }
+            : item
+        )
+      );
+
+      console.log(`发送文件上传请求: ${uploadItem.file.name}`);
       let response;
       try {
         response = await fetch(`${API_BASE_URL}/files`, {
@@ -812,15 +919,24 @@ function Popup() {
           signal: controller.signal
         });
         clearTimeout(timeoutId);
+        console.log(`文件上传HTTP响应: ${response.status} ${response.statusText}`);
       } catch (fetchError) {
         clearTimeout(timeoutId);
+        console.error(`文件上传网络错误: ${uploadItem.file.name}`, fetchError);
         if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-          throw new Error('上传超时，请检查网络连接或尝试上传较小的文件');
+          console.log(`💡 上传超时建议: 检查网络连接，或尝试上传更小的文件`);
+          throw new Error(`上传超时 (${Math.round(timeoutMs/1000)}秒)，可能是网络慢或Supabase响应慢`);
         }
-        throw fetchError;
+        throw new Error(`网络错误: ${fetchError instanceof Error ? fetchError.message : '未知错误'}`);
       }
 
-      setUploadStatus(prev => ({ ...prev, progress: 70, message: '📤 处理服务器响应...' }));
+      setFileUploads(prev => 
+        prev.map(item => 
+          item.id === fileId 
+            ? { ...item, progress: 60, message: '处理服务器响应...' }
+            : item
+        )
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -831,17 +947,21 @@ function Popup() {
         } catch {
           // 如果不是JSON，使用默认错误消息
         }
+        console.error(`服务器错误响应: ${uploadItem.file.name}`, { status: response.status, error: errorMessage });
         throw new Error(errorMessage);
       }
 
       const result = await response.json();
+      console.log(`文件上传成功，服务器返回:`, result);
 
       if (result.success) {
-        setUploadStatus({
-          uploading: false,
-          progress: 80,
-          message: workMode === 'homework' ? '✅ 文件上传成功！正在创建作业提交记录...' : '✅ 文件上传成功！正在创建提交记录...'
-        });
+        setFileUploads(prev => 
+          prev.map(item => 
+            item.id === fileId 
+              ? { ...item, progress: 80, message: '创建提交记录...' }
+              : item
+          )
+        );
 
         // 创建提交记录
         const submissionPayload: any = {
@@ -865,47 +985,272 @@ function Popup() {
         const submissionResult = await submissionResponse.json();
         
         if (submissionResult.success) {
-          setUploadStatus({
-            uploading: false,
+          console.log(`提交记录创建成功: ${uploadItem.file.name}`, submissionResult.data);
+          
+          // 上传成功，更新状态
+          const completedItem = {
+            ...uploadItem,
             progress: 100,
-            message: workMode === 'homework' ? '🎉 作业提交成功！' : '🎉 提交成功！'
-          });
+            status: 'completed' as const,
+            message: '✅ 上传成功！',
+            fileId: result.data.fileId
+          };
+
+          setFileUploads(prev => 
+            prev.map(item => 
+              item.id === fileId ? completedItem : item
+            )
+          );
+
+          // 移动到已上传文件列表
+          setTimeout(() => {
+            setUploadedFiles(prev => ({
+              ...prev,
+              [uploadItem.uploadType]: [...prev[uploadItem.uploadType], completedItem]
+            }));
+            
+            // 从上传队列中移除
+            setFileUploads(prev => prev.filter(item => item.id !== fileId));
+          }, 2000);
 
           // 开始监控批改进度
           if (submissionResult.data?.submissionId) {
+            console.log(`开始监控批改进度: ${submissionResult.data.submissionId}`);
             startGradingMonitor(submissionResult.data.submissionId);
           }
 
-          // 作业模式下重新加载数据
+          // 重新加载数据
           if (workMode === 'homework') {
             loadStudentClassrooms();
           }
         } else {
-          setUploadStatus({
-            uploading: false,
-            progress: 100,
-            message: '⚠️ 文件上传成功，但创建提交记录失败'
-          });
+          console.error(`提交记录创建失败: ${uploadItem.file.name}`, submissionResult);
+          throw new Error('创建提交记录失败');
         }
       } else {
+        console.error(`文件上传结果失败: ${uploadItem.file.name}`, result);
         throw new Error(result.error || '文件上传失败');
       }
     } catch (error) {
-      console.error('文件上传失败:', error);
-      setUploadStatus({
-        uploading: false,
-        progress: 0,
-        message: `❌ 上传失败: ${error instanceof Error ? error.message : '未知错误'}`
-      });
+      console.error(`文件上传完整流程失败: ${uploadItem.file.name}`, error);
+      setFileUploads(prev => 
+        prev.map(item => 
+          item.id === fileId 
+            ? { 
+                ...item, 
+                status: 'error', 
+                progress: 0, 
+                message: `❌ ${error instanceof Error ? error.message : '上传失败'}` 
+              }
+            : item
+        )
+      );
     }
+  };
 
-    // 清空文件输入
-    event.target.value = '';
+  // 删除已上传的文件
+  const removeUploadedFile = (uploadType: 'assignment' | 'homework' | 'practice', fileId: string) => {
+    setUploadedFiles(prev => ({
+      ...prev,
+      [uploadType]: prev[uploadType].filter(item => item.id !== fileId)
+    }));
+  };
 
-    // 5秒后清除消息
-    setTimeout(() => {
-      setUploadStatus(prev => ({ ...prev, message: '' }));
-    }, 5000);
+  // 重试失败的上传
+  const retryUpload = async (uploadId: string) => {
+    const uploadItem = fileUploads.find(item => item.id === uploadId);
+    if (uploadItem && uploadItem.status === 'error') {
+      await uploadSingleFile(uploadItem);
+    }
+  };
+
+  // 多文件上传组件
+  const MultiFileUpload = ({ uploadType, title, accept }: { 
+    uploadType: 'assignment' | 'homework' | 'practice',
+    title: string,
+    accept: string 
+  }) => {
+    const [isUploading, setIsUploading] = React.useState(false);
+    const [uploadStartTime, setUploadStartTime] = React.useState<number | null>(null);
+    
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0 || isUploading) {
+        return;
+      }
+      
+      // 防重复上传：检查最近是否有上传操作
+      const now = Date.now();
+      if (uploadStartTime && (now - uploadStartTime) < 3000) {
+        console.log('防重复上传：操作太频繁，跳过');
+        return;
+      }
+      
+      setIsUploading(true);
+      setUploadStartTime(now);
+      
+      try {
+        await handleMultiFileUpload(files, uploadType);
+      } finally {
+        setIsUploading(false);
+        // 3秒后才允许下次上传
+        setTimeout(() => setUploadStartTime(null), 3000);
+      }
+      
+      // 清空input，允许重复选择同一文件
+      e.target.value = '';
+    };
+
+    const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const files = e.dataTransfer.files;
+      
+      if (!files || files.length === 0 || isUploading) {
+        return;
+      }
+      
+      // 防重复上传：检查最近是否有上传操作
+      const now = Date.now();
+      if (uploadStartTime && (now - uploadStartTime) < 3000) {
+        console.log('防重复上传：拖拽操作太频繁，跳过');
+        return;
+      }
+      
+      setIsUploading(true);
+      setUploadStartTime(now);
+      
+      try {
+        await handleMultiFileUpload(files, uploadType);
+      } finally {
+        setIsUploading(false);
+        // 3秒后才允许下次上传
+        setTimeout(() => setUploadStartTime(null), 1000);
+      }
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const uploadingFiles = fileUploads.filter(item => item.uploadType === uploadType);
+    const completedFiles = uploadedFiles[uploadType] || [];
+
+    return (
+      <div className="multi-file-upload">
+        <h4>{title}</h4>
+        
+        {/* 文件拖拽上传区域 */}
+        <div 
+          className={`file-upload-zone multi ${isUploading ? 'uploading' : ''}`}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onClick={() => !isUploading && document.getElementById(`file-input-${uploadType}`)?.click()}
+        >
+          <input
+            id={`file-input-${uploadType}`}
+            type="file"
+            accept={accept}
+            multiple
+            onChange={handleFileSelect}
+            style={{ display: 'none' }}
+            disabled={isUploading}
+          />
+          
+          <div className="upload-icon">
+            {isUploading ? (
+              <div className="loading-spinner medium">
+                <div className="spinner"></div>
+              </div>
+            ) : (
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+              </svg>
+            )}
+          </div>
+          
+          <div className="upload-text">
+            {isUploading ? (
+              <>
+                <p><strong>正在上传文件...</strong></p>
+                <p className="upload-hint">请稍候，文件正在处理中</p>
+              </>
+            ) : (
+              <>
+                <p><strong>点击选择文件</strong> 或拖拽文件到此处</p>
+                <p className="upload-hint">支持 PDF, JPG, PNG 等格式，可选择多个文件</p>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* 上传进度列表 */}
+        {uploadingFiles.length > 0 && (
+          <div className="upload-progress-list">
+            <h5>上传中的文件：</h5>
+            {uploadingFiles.map(item => (
+              <div key={item.id} className={`upload-item ${item.status}`}>
+                <div className="file-info">
+                  <span className="file-name">{item.file.name}</span>
+                  <span className="file-size">({(item.file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                </div>
+                
+                <div className="upload-status">
+                  {item.status === 'uploading' && (
+                    <div className="progress-container">
+                      <ProgressBar progress={item.progress} />
+                      <span className="progress-text">{item.progress}%</span>
+                    </div>
+                  )}
+                  
+                  <span className={`status-message ${item.status}`}>
+                    {item.message}
+                  </span>
+                  
+                  {item.status === 'error' && (
+                    <button 
+                      className="retry-btn"
+                      onClick={() => retryUpload(item.id)}
+                    >
+                      重试
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 已上传文件列表 */}
+        {completedFiles.length > 0 && (
+          <div className="uploaded-files-list">
+            <h5>已上传文件：</h5>
+            {completedFiles.map(item => (
+              <div key={item.id} className="uploaded-item">
+                <div className="file-info">
+                  <span className="file-name">{item.file.name}</span>
+                  <span className="file-size">({(item.file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                </div>
+                
+                <div className="file-actions">
+                  <span className="upload-time">
+                    {new Date().toLocaleString()}
+                  </span>
+                  <button 
+                    className="remove-btn"
+                    onClick={() => removeUploadedFile(uploadType, item.id)}
+                    title="移除文件"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const openSidePanel = async () => {
@@ -1191,39 +1536,18 @@ function Popup() {
     try {
       setUploadStatus({
         uploading: true,
-        progress: 30,
-        message: '正在处理作业文件...'
-      });
-
-      let fileUploadId = null;
-      
-      // 如果有文件，先上传文件
-      if (assignmentFile) {
-        const formData = new FormData();
-        formData.append('file', assignmentFile);
-        formData.append('workMode', 'practice'); // 题目文件使用practice模式
-
-        const fileResponse = await fetch(`${API_BASE_URL}/files`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${authState.token}`
-          },
-          body: formData
-        });
-
-        const fileResult = await fileResponse.json();
-        if (!fileResult.success) {
-          throw new Error(fileResult.error || '文件上传失败');
-        }
-        
-        fileUploadId = fileResult.data.fileId;
-      }
-
-      setUploadStatus({
-        uploading: true,
-        progress: 70,
+        progress: 50,
         message: '正在创建作业...'
       });
+
+      // 获取最新上传的作业文件ID（可选）
+      let fileUploadId = null;
+      const assignmentFiles = uploadedFiles.assignments;
+      if (assignmentFiles.length > 0) {
+        // 使用最新上传的文件
+        fileUploadId = assignmentFiles[assignmentFiles.length - 1].fileId;
+        console.log('使用已上传的题目文件:', fileUploadId);
+      }
 
       // 创建作业
       const response = await fetch(`${API_BASE_URL}/assignments`, {
@@ -1256,10 +1580,17 @@ function Popup() {
         setAssignmentDescription('');
         setStartDate('');
         setDueDate('');
-        setAssignmentFile(null);
         setViewState('showAssignWork', false);
         
-        // 可以在此处刷新作业列表（如果需要的话）
+        // 清空已上传的题目文件（因为已经用于创建作业了）
+        setUploadedFiles(prev => ({
+          ...prev,
+          assignments: []
+        }));
+        
+        // 重新加载教师班级和作业数据
+        loadTeacherClassrooms();
+        loadTeacherAssignments();
       } else {
         throw new Error(result.error || '创建作业失败');
       }
@@ -1986,64 +2317,12 @@ function Popup() {
                       />
                     </label>
                   </div>
-                  <div className="upload-area" 
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.currentTarget.classList.add('drag-over');
-                    }}
-                    onDragLeave={(e) => {
-                      e.preventDefault();
-                      e.currentTarget.classList.remove('drag-over');
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      e.currentTarget.classList.remove('drag-over');
-                      const files = e.dataTransfer.files;
-                      if (files.length > 0) {
-                        setAssignmentFile(files[0]);
-                      }
-                    }}
-                  >
-                    <label>题目文件：</label>
-                    <input 
-                      id="assignment-file-input"
-                      type="file" 
-                      accept=".pdf,.jpg,.jpeg,.png" 
-                      onChange={(e) => setAssignmentFile(e.target.files?.[0] || null)}
-                      style={{ display: 'none' }}
-                    />
-                    <div 
-                      className="file-upload-zone"
-                      onClick={() => document.getElementById('assignment-file-input')?.click()}
-                    >
-                      {assignmentFile ? (
-                        <div className="file-selected">
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-                          </svg>
-                          <span>{assignmentFile.name}</span>
-                          <button 
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAssignmentFile(null);
-                            }}
-                            className="remove-file"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="file-upload-prompt">
-                          <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-                          </svg>
-                          <p><strong>点击选择文件</strong> 或拖拽文件到此处</p>
-                          <small>支持 PDF、JPG、PNG 格式</small>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  
+                  <MultiFileUpload 
+                    uploadType="assignment"
+                    title="📋 题目文件"
+                    accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                  />
                   <div className="form-buttons">
                     <button 
                       className="btn-primary"
@@ -2179,31 +2458,11 @@ function Popup() {
 
           {userRole === 'student' && (
             <div className="upload-section">
-              <h3>📤 上传{workMode === 'practice' ? '练习材料' : '作业答案'}</h3>
-              <div className="upload-area">
-                <input
-                  type="file"
-                  id="file-input"
-                  accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
-                  onChange={handleFileUpload}
-                  disabled={uploadStatus.uploading}
-                />
-                <label htmlFor="file-input" className="upload-label">
-                  {uploadStatus.uploading ? (
-                    <div className="upload-progress">
-                      <ProgressBar progress={uploadStatus.progress} />
-                      <span>上传中...</span>
-                    </div>
-                  ) : (
-                    <>
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-                      </svg>
-                      点击上传PDF或图片文件
-                    </>
-                  )}
-                </label>
-              </div>
+              <MultiFileUpload 
+                uploadType={workMode === 'practice' ? 'practice' : 'homework'}
+                title={`📤 上传${workMode === 'practice' ? '练习材料' : '作业答案'}`}
+                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+              />
               
               <div className="file-info">
                 <p>📋 支持格式: PDF, JPG, PNG, GIF, WebP</p>
@@ -2211,8 +2470,9 @@ function Popup() {
                 {workMode === 'practice' ? (
                   <p>💡 刷题模式：请上传包含完整题目和您解答的文件</p>
                 ) : (
-                  <p>💡 作业模式：请上传您的解题过程，系统将匹配对应题目</p>
+                  <p>💡 作业模式：请上传您的解题过程，系统将自动批改</p>
                 )}
+                <p>🚀 <strong>选择文件后会立即上传并开始AI批改</strong></p>
               </div>
 
               {uploadStatus.message && (

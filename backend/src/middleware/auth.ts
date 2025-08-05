@@ -49,8 +49,17 @@ export function createAuthMiddleware(required: boolean = true) {
       // 提取token
       const token = authHeader.substring(7);
       
-      // 验证JWT token
-      const decoded = await request.jwtVerify() as JWTPayload;
+      // 验证JWT token - 使用手动验证而不是request.jwtVerify()以避免multipart问题
+      let decoded: JWTPayload;
+      try {
+        decoded = await request.server.jwt.verify(token) as JWTPayload;
+      } catch (jwtError) {
+        console.error('JWT验证失败:', jwtError);
+        return reply.code(401).send({
+          success: false,
+          error: '认证令牌无效'
+        });
+      }
       
       // 从数据库获取最新用户信息
       const user = await prisma.user.findUnique({

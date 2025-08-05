@@ -14,7 +14,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // 公共客户端 - 用于前端和基本操作
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// 管理员客户端 - 用于后端操作，绕过RLS
+// 管理员客户端 - 用于后端操作（RLS已禁用）
 export const supabaseAdmin = supabaseServiceKey 
   ? createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
@@ -192,7 +192,7 @@ export interface Database {
 
 // Storage bucket名称
 export const STORAGE_BUCKETS = {
-  ASSIGNMENTS: 'assignments',  // 作业文件
+  ASSIGNMENTS: 'calculus-hw',  // 作业文件 - 使用实际的bucket名称
   AVATARS: 'avatars',         // 用户头像
   ANNOTATED: 'annotated'      // 批改后的文件
 } as const; 
