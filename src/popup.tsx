@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Storage } from '@plasmohq/storage';
 import { supabase, API_BASE_URL, type User, type AuthState } from './common/config/supabase';
 import { ProgressBar } from './components/ProgressBar';
@@ -31,6 +31,25 @@ interface ViewStates {
 }
 
 function Popup() {
+  // 错误状态管理
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // 错误边界处理
+  const handleError = (error: Error, errorInfo?: any) => {
+    console.error('组件渲染错误:', error, errorInfo);
+    setHasError(true);
+    setErrorMessage(error.message || '未知错误');
+    // 清理可能导致问题的状态
+    clearGradingMonitor();
+  };
+
+  // 重置错误状态
+  const resetError = () => {
+    setHasError(false);
+    setErrorMessage('');
+  };
+
   // 加载状态组件
   const LoadingSpinner = ({ size = 'medium', text = '加载中...' }: { size?: 'small' | 'medium' | 'large', text?: string }) => (
     <div className={`loading-container ${size}`}>
@@ -134,7 +153,7 @@ function Popup() {
     status: 'pending' | 'uploading' | 'completed' | 'error';
     message: string;
     fileId?: number;
-    uploadType: 'assignment' | 'homework' | 'practice';
+    uploadType: 'assignments' | 'homework' | 'practice';
   }
 
   const [fileUploads, setFileUploads] = useState<FileUploadItem[]>([]);
@@ -181,6 +200,9 @@ function Popup() {
     message: ''
   });
 
+  // 添加ref来追踪活跃的监控interval
+  const monitorIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // 检测是否在全屏模式（新标签页）
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
@@ -219,9 +241,24 @@ function Popup() {
     }));
   };
 
+  // 清理监控interval
+  const clearGradingMonitor = () => {
+    if (monitorIntervalRef.current) {
+      clearInterval(monitorIntervalRef.current);
+      monitorIntervalRef.current = null;
+      console.log('已清理批改监控interval');
+    }
+  };
+
   // 开始批改进度监控
   const startGradingMonitor = async (submissionId: number) => {
     console.log('开始监控批改进度，提交ID:', submissionId);
+    
+    // 先清理可能存在的旧监控
+    clearGradingMonitor();
+    
+    // 清理上传进度状态，避免与批改进度重复显示
+    setFileUploads([]);
     
     setGradingStatus({
       processing: true,
@@ -231,8 +268,14 @@ function Popup() {
     });
 
     // 轮询检查批改状态
-    const monitorInterval = setInterval(async () => {
+    monitorIntervalRef.current = setInterval(async () => {
       try {
+        // 检查组件是否还在活跃状态
+        if (!monitorIntervalRef.current) {
+          console.log('监控已停止，跳过请求');
+          return;
+        }
+
         const response = await fetch(`${API_BASE_URL}/submissions/${submissionId}/status`, {
           headers: {
             'Authorization': `Bearer ${authState.token}`
@@ -282,7 +325,7 @@ function Popup() {
                       message: `🎉 您的${workMode === 'homework' ? '作业' : '练习'}批改完成！点击查看详细结果`
                     });
                     
-                    clearInterval(monitorInterval);
+                    clearGradingMonitor();
                     
                     // 5秒后隐藏批改状态
                     setTimeout(() => {
@@ -302,7 +345,7 @@ function Popup() {
                   progress: 0,
                   message: '❌ 文字识别失败'
                 });
-                clearInterval(monitorInterval);
+                clearGradingMonitor();
               }
             }
           }
@@ -314,7 +357,7 @@ function Popup() {
 
     // 5分钟后停止监控
     setTimeout(() => {
-      clearInterval(monitorInterval);
+      clearGradingMonitor();
       if (gradingStatus.processing) {
         setGradingStatus({
           processing: false,
@@ -376,8 +419,33 @@ function Popup() {
     checkFullscreenMode();
     window.addEventListener('resize', checkFullscreenMode);
     
+    // 全局错误处理
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('未处理的Promise rejection:', event.reason);
+      if (event.reason instanceof Error) {
+        handleError(event.reason);
+      } else {
+        handleError(new Error('未处理的Promise rejection: ' + String(event.reason)));
+      }
+      event.preventDefault(); // 阻止默认错误显示
+    };
+
+    const handleWindowError = (event: ErrorEvent) => {
+      console.error('全局JavaScript错误:', event.error);
+      if (event.error instanceof Error) {
+        handleError(event.error);
+      } else {
+        handleError(new Error(event.message || '未知JavaScript错误'));
+      }
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    window.addEventListener('error', handleWindowError);
+
     return () => {
       window.removeEventListener('resize', checkFullscreenMode);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      window.removeEventListener('error', handleWindowError);
     };
   }, []);
 
@@ -423,6 +491,8 @@ function Popup() {
     
     return () => {
       chrome.storage.onChanged.removeListener(handleStorageChange);
+      // 清理批改监控
+      clearGradingMonitor();
     };
   }, []); // 依赖项为空，此 effect 只运行一次
 
@@ -821,7 +891,7 @@ function Popup() {
   };
 
   // 新的多文件上传函数
-  const handleMultiFileUpload = async (files: FileList, uploadType: 'assignment' | 'homework' | 'practice') => {
+  const handleMultiFileUpload = async (files: FileList, uploadType: 'assignments' | 'homework' | 'practice') => {
     if (!authState.token) {
       setUploadStatus({
         uploading: false,
@@ -879,7 +949,7 @@ function Popup() {
       formData.append('file', uploadItem.file);
       
       // 根据上传类型设置workMode
-      const workMode = uploadItem.uploadType === 'assignment' ? 'practice' : 
+      const workMode = uploadItem.uploadType === 'assignments' ? 'practice' : 
                       uploadItem.uploadType === 'homework' ? 'homework' : 'practice';
       formData.append('workMode', workMode);
       
@@ -1049,7 +1119,7 @@ function Popup() {
   };
 
   // 删除已上传的文件
-  const removeUploadedFile = (uploadType: 'assignment' | 'homework' | 'practice', fileId: string) => {
+  const removeUploadedFile = (uploadType: 'assignments' | 'homework' | 'practice', fileId: string) => {
     setUploadedFiles(prev => ({
       ...prev,
       [uploadType]: prev[uploadType].filter(item => item.id !== fileId)
@@ -1066,7 +1136,7 @@ function Popup() {
 
   // 多文件上传组件
   const MultiFileUpload = ({ uploadType, title, accept }: { 
-    uploadType: 'assignment' | 'homework' | 'practice',
+    uploadType: 'assignments' | 'homework' | 'practice',
     title: string,
     accept: string 
   }) => {
@@ -1797,6 +1867,30 @@ function Popup() {
     }
   };
 
+  // 错误边界渲染
+  if (hasError) {
+    return (
+      <div className="popup-container">
+        <div className="popup-header">
+          <h2>AI微积分助教</h2>
+        </div>
+        <div className="error-container">
+          <div className="error-icon">⚠️</div>
+          <h3>出现了一些问题</h3>
+          <p>错误信息: {errorMessage}</p>
+          <div className="error-actions">
+            <button className="btn btn-primary" onClick={resetError}>
+              重新加载
+            </button>
+            <button className="btn btn-secondary" onClick={() => window.location.reload()}>
+              刷新页面
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (authState.loading) {
     return (
       <div className="popup-container">
@@ -2319,7 +2413,7 @@ function Popup() {
                   </div>
                   
                   <MultiFileUpload 
-                    uploadType="assignment"
+                    uploadType="assignments"
                     title="📋 题目文件"
                     accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
                   />

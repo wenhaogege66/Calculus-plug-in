@@ -8,8 +8,18 @@ import axios from 'axios';
 const prisma = new PrismaClient();
 
 export async function aiRoutes(fastify: FastifyInstance) {
-  // Deepseek AI批改作业
+  // Deepseek AI批改作业 - 内部调用版本（无需认证）
+  fastify.post('/internal/ai/grade', async (request, reply) => {
+    return await processAIGrading(request, reply, fastify);
+  });
+
+  // Deepseek AI批改作业 - 外部调用版本（需要认证）
   fastify.post('/ai/grade', { preHandler: requireAuth }, async (request, reply) => {
+    return await processAIGrading(request, reply, fastify);
+  });
+
+// AI批改的核心逻辑
+async function processAIGrading(request: FastifyRequest, reply: FastifyReply, fastify: FastifyInstance) {
     try {
       const { submissionId, recognizedText, subject = '微积分', exerciseType = '练习题' } = request.body as any;
       
@@ -20,11 +30,11 @@ export async function aiRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // 验证提交记录是否属于当前用户
+      // 获取提交记录（对于内部调用，不验证用户）
       const submission = await prisma.submission.findFirst({
         where: {
           id: submissionId,
-          userId: request.currentUser!.id
+          ...(request.currentUser && { userId: request.currentUser.id }) // 只有在有用户上下文时才验证
         },
         include: {
           fileUpload: true,
@@ -100,7 +110,7 @@ export async function aiRoutes(fastify: FastifyInstance) {
         error: 'AI批改处理失败'
       });
     }
-  });
+}
 
   // 获取批改结果
   fastify.get('/ai/results/:submissionId', { preHandler: requireAuth }, async (request, reply) => {

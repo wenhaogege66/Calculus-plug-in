@@ -142,17 +142,131 @@ Use backend's built-in endpoints or Prisma Studio (`npm run db:studio`) for data
 
 ### AI Service Usage
 **MyScript OCR:**
-- Teachers: Upload and recognize handwritten questions from images
+- Teachers: Upload and recognize handwritten questions from images → Build structured question bank
 - Students: Convert handwritten homework solutions to text for AI processing
+- Future: Question-answer matching and automated assignment detection
 
 **DeepSeek AI:**
 - Currently: Basic scoring of student submissions (0-100 points)
 - Planned: Detailed grading, error annotation, learning suggestions, mistake analysis
+- Future: RAG-enhanced grading with textbook reference and standard answers
+
+### Future Enhancements (Roadmap)
+
+**Question Bank & OCR Enhancement:**
+- Automatic question recognition and structured storage
+- Question-answer intelligent matching system
+- Multi-format question parsing (handwritten, printed, LaTeX)
+- Question difficulty assessment and tagging system
+
+**RAG (Retrieval-Augmented Generation) Integration:**
+- Vector database integration for textbook content and standard answers
+- Semantic search for relevant reference materials during grading
+- Context-aware feedback generation based on curriculum standards
+- Personalized learning path recommendations
+- Error pattern analysis with corrective suggestions
+
+**Advanced AI Features:**
+- Multi-modal understanding (text + mathematical expressions + diagrams)
+- Step-by-step solution validation
+- Partial credit assignment for incomplete solutions
+- Plagiarism detection and similarity analysis
+- Learning analytics and progress tracking
 
 ### Working with Submissions
 The system supports two modes:
 - **Practice Mode** (`workMode: "practice"`) - Student uploads complete problems with solutions
 - **Homework Mode** (`workMode: "homework"`) - Student uploads solutions, matched against assignment questions
+
+## Technical Implementation Notes
+
+### Question Bank Implementation
+```sql
+-- Extend database schema for question bank
+CREATE TABLE question_bank (
+  id SERIAL PRIMARY KEY,
+  assignment_id INTEGER REFERENCES assignments(id),
+  teacher_id INTEGER REFERENCES users(id),
+  original_image_path TEXT NOT NULL,
+  recognized_text TEXT,
+  structured_content JSONB,
+  confidence_score DECIMAL(3,2),
+  tags TEXT[],
+  difficulty_level INTEGER DEFAULT 1,
+  subject_chapter TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Vector embeddings for questions (separate table for performance)
+CREATE TABLE question_embeddings (
+  id SERIAL PRIMARY KEY,
+  question_id INTEGER REFERENCES question_bank(id) ON DELETE CASCADE,
+  embedding_vector VECTOR(1536), -- For OpenAI Ada-002 embeddings
+  embedding_model TEXT DEFAULT 'text-embedding-ada-002',
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Textbook content and embeddings
+CREATE TABLE textbook_content (
+  id SERIAL PRIMARY KEY,
+  book_title TEXT NOT NULL,
+  chapter_title TEXT,
+  section_title TEXT,
+  page_number INTEGER,
+  content_text TEXT NOT NULL,
+  content_type TEXT DEFAULT 'text', -- 'text', 'formula', 'example', 'theorem'
+  metadata JSONB,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE textbook_embeddings (
+  id SERIAL PRIMARY KEY,
+  content_id INTEGER REFERENCES textbook_content(id) ON DELETE CASCADE,
+  embedding_vector VECTOR(1536),
+  embedding_model TEXT DEFAULT 'text-embedding-ada-002',
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Add vector similarity search indexes
+CREATE INDEX ON question_embeddings USING ivfflat (embedding_vector vector_cosine_ops);
+CREATE INDEX ON textbook_embeddings USING ivfflat (embedding_vector vector_cosine_ops);
+```
+
+### RAG Integration Architecture
+
+**Option 1: PostgreSQL + pgvector (Recommended)**
+- ✅ **Pros**: Native integration with existing Supabase database, cost-effective, ACID compliance
+- ⚠️ **Cons**: May need performance tuning for large datasets (>100k vectors)
+- **Use Case**: Perfect for educational content where data integrity and cost-effectiveness matter
+
+**Option 2: Dedicated Vector Database (Pinecone/Qdrant)**
+- ✅ **Pros**: Optimized for vector operations, better performance at scale, advanced filtering
+- ⚠️ **Cons**: Additional infrastructure cost, data synchronization complexity
+- **Use Case**: When scaling to multiple institutions or processing millions of documents
+
+**Implementation Workflow:**
+```
+1. Teacher uploads question → OCR recognition → Text extraction
+2. Question text → OpenAI Embedding API → Vector generation
+3. Vector + metadata → PostgreSQL/pgvector → Persistent storage
+4. Student submits answer → Question matching → Similar content retrieval
+5. Retrieved context + student answer → Enhanced AI grading
+```
+
+**Embedding Strategy:**
+- **Questions**: Focus on mathematical concepts, keywords, difficulty markers
+- **Textbook Content**: Chunk by logical sections (theorems, examples, exercises)
+- **Hybrid Search**: Combine semantic similarity with keyword matching for precision
+
+### File Storage Organization
+```
+supabase-storage/
+├── assignments/          # Student homework submissions
+├── questions/           # Teacher uploaded question images  
+├── annotated/          # AI-processed files with grading
+├── textbooks/          # Course material PDFs for RAG
+└── embeddings/         # Vector representations (if stored)
+```
 
 ## Key Constraints
 
@@ -162,3 +276,4 @@ The system supports two modes:
 - No test files should be committed - delete after testing
 - Follow existing TypeScript and React patterns
 - Maintain Prisma migration history
+- Consider network connectivity issues for Supabase (timeout handling, retry mechanisms)

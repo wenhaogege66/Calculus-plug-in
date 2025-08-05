@@ -19,7 +19,7 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
 const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
 // ✅ 本地文件路径
-const localFilePath = '/Users/wenhao/XLab/Calculus/homework/题目.png';
+const localFilePath = '/Users/wenhao/XLab/Calculus/homework/Title.png';
 
 // ✅ 检查文件是否存在
 if (!fs.existsSync(localFilePath)) {

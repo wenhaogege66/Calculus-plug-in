@@ -104,6 +104,21 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
 
+      // 根据用户角色和工作模式决定处理流程
+      const userRole = request.currentUser!.role?.toLowerCase();
+      
+      if (userRole === 'teacher') {
+        // 教师上传：只进行OCR识别，存储到题库
+        startQuestionProcessing(submission.id).catch(error => {
+          fastify.log.error(`题目处理流程启动失败 - 提交ID: ${submission.id}`, error);
+        });
+      } else {
+        // 学生提交：完整的批改流程
+        startGradingProcess(submission.id).catch(error => {
+          fastify.log.error(`自动批改流程启动失败 - 提交ID: ${submission.id}`, error);
+        });
+      }
+
       return {
         success: true,
         data: { 
@@ -250,5 +265,159 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 };
+
+// 自动化批改流程
+async function startGradingProcess(submissionId: number) {
+  try {
+    console.log(`🚀 开始自动批改流程 - 提交ID: ${submissionId}`);
+    
+    // 1. 首先进行OCR识别
+    console.log(`📝 步骤1: 启动OCR识别`);
+    const ocrResponse = await fetch(`http://localhost:3000/api/internal/ocr/myscript`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // 注意：这里需要系统级认证，暂时跳过auth
+      },
+      body: JSON.stringify({
+        submissionId: submissionId
+      })
+    });
+
+    if (!ocrResponse.ok) {
+      const errorText = await ocrResponse.text();
+      throw new Error(`OCR识别失败: ${ocrResponse.status} - ${errorText}`);
+    }
+
+    const ocrResult = await ocrResponse.json() as any;
+    console.log(`✅ OCR识别完成:`, {
+      submissionId,
+      hasText: !!ocrResult.data?.recognizedText,
+      textLength: ocrResult.data?.recognizedText?.length || 0,
+      confidence: ocrResult.data?.confidence
+    });
+
+    // 2. 如果OCR识别成功，进行AI批改
+    if (ocrResult.success && ocrResult.data?.recognizedText) {
+      console.log(`🤖 步骤2: 启动AI批改`);
+      
+      const aiResponse = await fetch(`http://localhost:3000/api/internal/ai/grade`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // 注意：这里需要系统级认证，暂时跳过auth
+        },
+        body: JSON.stringify({
+          submissionId: submissionId,
+          recognizedText: ocrResult.data.recognizedText,
+          subject: '微积分',
+          exerciseType: '练习题'
+        })
+      });
+
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        throw new Error(`AI批改失败: ${aiResponse.status} - ${errorText}`);
+      }
+
+      const aiResult = await aiResponse.json() as any;
+      console.log(`✅ AI批改完成:`, {
+        submissionId,
+        score: aiResult.data?.score,
+        maxScore: aiResult.data?.maxScore,
+        hasFeedback: !!aiResult.data?.feedback
+      });
+
+    } else {
+      console.warn(`⚠️ OCR识别未获得文本，跳过AI批改`, {
+        submissionId,
+        ocrSuccess: ocrResult.success,
+        hasText: !!ocrResult.data?.recognizedText
+      });
+    }
+
+    console.log(`🎉 自动批改流程完成 - 提交ID: ${submissionId}`);
+
+  } catch (error) {
+    console.error(`❌ 自动批改流程失败 - 提交ID: ${submissionId}`, error);
+    
+    // 更新提交状态为失败
+    try {
+      await prisma.submission.update({
+        where: { id: submissionId },
+        data: { status: 'FAILED' }
+      });
+    } catch (updateError) {
+      console.error(`❌ 更新提交状态失败 - 提交ID: ${submissionId}`, updateError);
+    }
+  }
+}
+
+// 教师端题目处理流程（仅OCR识别，存储到题库）
+async function startQuestionProcessing(submissionId: number) {
+  try {
+    console.log(`📚 开始题目处理流程 - 提交ID: ${submissionId}`);
+    
+    // 进行OCR识别
+    console.log(`📝 步骤1: 启动题目OCR识别`);
+    const ocrResponse = await fetch(`http://localhost:3000/api/internal/ocr/myscript`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        submissionId: submissionId
+      })
+    });
+
+    if (!ocrResponse.ok) {
+      const errorText = await ocrResponse.text();
+      throw new Error(`题目OCR识别失败: ${ocrResponse.status} - ${errorText}`);
+    }
+
+    const ocrResult = await ocrResponse.json() as any;
+    console.log(`✅ 题目OCR识别完成:`, {
+      submissionId,
+      hasText: !!ocrResult.data?.recognizedText,
+      textLength: ocrResult.data?.recognizedText?.length || 0,
+      confidence: ocrResult.data?.confidence
+    });
+
+    // TODO: 如果识别成功，将题目存储到题库
+    if (ocrResult.success && ocrResult.data?.recognizedText) {
+      console.log(`📝 题目识别成功，可以存储到题库`);
+      
+      // 更新提交状态为已完成（教师端不需要AI批改）
+      await prisma.submission.update({
+        where: { id: submissionId },
+        data: { 
+          status: 'COMPLETED',
+          completedAt: new Date()
+        }
+      });
+    } else {
+      console.warn(`⚠️ 题目OCR识别未获得文本`, {
+        submissionId,
+        ocrSuccess: ocrResult.success,
+        hasText: !!ocrResult.data?.recognizedText
+      });
+    }
+
+    console.log(`🎉 题目处理流程完成 - 提交ID: ${submissionId}`);
+
+  } catch (error) {
+    console.error(`❌ 题目处理流程失败 - 提交ID: ${submissionId}`, error);
+    
+    // 更新提交状态为失败
+    try {
+      await prisma.submission.update({
+        where: { id: submissionId },
+        data: { status: 'FAILED' }
+      });
+    } catch (updateError) {
+      console.error(`❌ 更新提交状态失败 - 提交ID: ${submissionId}`, updateError);
+    }
+  }
+}
 
 export default submissionRoutes; 
