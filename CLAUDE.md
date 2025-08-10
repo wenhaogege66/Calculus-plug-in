@@ -1,6 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Every time you complete the modification of the code, you should determine whether the corresponding parts in Claude.md and Readme.md need to be modified
 
 ## Project Overview
 
