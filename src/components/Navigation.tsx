@@ -48,6 +48,7 @@ export const Navigation: React.FC<NavigationProps> = ({
       return [
         { id: 'home', label: '首页', icon: '🏠' },
         { id: 'assignments', label: '作业', icon: '📝' },
+        { id: 'classrooms', label: '班级', icon: '🏫' },
         { id: 'practice', label: '自主练习', icon: '💪' },
         { id: 'mistakes', label: '错题本', icon: '📚' },
         { id: 'knowledge', label: '知识图谱', icon: '🧠' },

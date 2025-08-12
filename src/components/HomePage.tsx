@@ -377,6 +377,13 @@ export const HomePage: React.FC<HomePageProps> = ({ authState, isDarkMode, onPag
                 <span className="card-icon">👥</span>
                 我的班级
               </div>
+              <button 
+                className="card-action-btn"
+                onClick={() => onPageChange?.('classrooms')}
+              >
+                <span>🏫</span>
+                班级管理
+              </button>
             </div>
             <div className="classroom-content">
               {classrooms.length > 0 ? (
