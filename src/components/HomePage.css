@@ -31,6 +31,40 @@
   100% { transform: rotate(360deg); }
 }
 
+/* 炫彩字效果 */
+.rainbow-text {
+  background: linear-gradient(
+    45deg,
+    #ff6b6b,
+    #4ecdc4,
+    #45b7d1,
+    #96ceb4,
+    #feca57,
+    #ff9ff3,
+    #54a0ff
+  );
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: rainbow-animation 3s ease-in-out infinite;
+  font-weight: 700;
+  display: inline-block;
+}
+
+@keyframes rainbow-animation {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
 .loading-container p {
   color: #6b7280;
   font-size: 16px;

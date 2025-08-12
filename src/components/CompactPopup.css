@@ -669,6 +669,156 @@ html {
   padding: 0;
 }
 
+/* 认证弹窗暗背景样式 */
+.auth-popup {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #f1f5f9;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-background {
+  display: flex;
+  flex-direction: column;
+  min-height: 500px;
+  position: relative;
+}
+
+.auth-background::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 25% 25%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.auth-background::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4);
+  animation: tech-glow 3s ease-in-out infinite alternate;
+  z-index: 1;
+}
+
+@keyframes tech-glow {
+  0% { opacity: 0.5; transform: scaleX(0.8); }
+  100% { opacity: 1; transform: scaleX(1); }
+}
+
+.auth-content {
+  flex: 1;
+  padding: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.auth-footer {
+  padding: 12px 20px;
+  border-top: 1px solid rgba(71, 85, 105, 0.3);
+  background: rgba(15, 23, 42, 0.8);
+  text-align: center;
+  position: relative;
+  z-index: 2;
+}
+
+.auth-popup .version-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 10px;
+  color: #94a3b8;
+  opacity: 0.8;
+}
+
+/* 深色模式下的认证元素优化 */
+.auth-popup .project-intro {
+  background: rgba(30, 41, 59, 0.8);
+  border-color: rgba(71, 85, 105, 0.3);
+  backdrop-filter: blur(10px);
+}
+
+.auth-popup .intro-subtitle {
+  color: #94a3b8;
+}
+
+.auth-popup .intro-description p {
+  color: #cbd5e1;
+}
+
+.auth-popup .highlight-item {
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(71, 85, 105, 0.3);
+  backdrop-filter: blur(5px);
+}
+
+.auth-popup .highlight-item:hover {
+  background: rgba(15, 23, 42, 0.8);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.auth-popup .highlight-text strong {
+  color: #f1f5f9;
+}
+
+.auth-popup .highlight-text span {
+  color: #94a3b8;
+}
+
+.auth-popup .auth-title {
+  color: #f1f5f9;
+}
+
+.auth-popup .auth-subtitle {
+  color: #cbd5e1;
+}
+
+.auth-popup .auth-features {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+  backdrop-filter: blur(5px);
+}
+
+.auth-popup .feature-item {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(5px);
+}
+
+.auth-popup .feature-item:hover {
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.auth-popup .feature-text {
+  color: #cbd5e1;
+}
+
+.auth-popup .feature-title {
+  color: #60a5fa;
+}
+
+/* 状态消息深色模式适配 */
+.auth-popup .status-message.success {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.auth-popup .status-message.error {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
 /* 认证区域样式 */
 .auth-section {
   padding: 0;

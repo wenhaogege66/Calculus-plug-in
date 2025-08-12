@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
+import { PracticeDetailPage } from './PracticeDetailPage';
 import './PracticePage.css';
 
 interface PracticeSession {
@@ -12,6 +13,14 @@ interface PracticeSession {
   suggestions?: string;
   ocrText?: string;
   difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
+  // 新增的结构化信息
+  questionCount?: number;
+  incorrectCount?: number;
+  correctCount?: number;
+  knowledgePoints?: string[];
+  detailedErrors?: any[];
+  improvementAreas?: string[];
+  nextStepRecommendations?: string[];
 }
 
 interface PracticePageProps {
@@ -25,6 +34,8 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [message, setMessage] = useState({ text: '', type: '' as 'success' | 'error' | 'info' });
   const [dragOver, setDragOver] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -223,8 +234,59 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
     return Math.round(total / completedSessions.length);
   };
 
+  const handleSessionClick = (sessionId: string) => {
+    setSelectedSessionId(sessionId);
+  };
+
+  const handleBackToList = () => {
+    setSelectedSessionId(null);
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!authState.token) {
+      showMessage('请先登录', 'error');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/practice/${sessionId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${authState.token}` }
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showMessage('练习记录已删除', 'success');
+        // 重新加载练习记录
+        await loadPracticeHistory();
+        setShowDeleteDialog(null);
+      } else {
+        showMessage(`删除失败: ${result.error}`, 'error');
+      }
+    } catch (error) {
+      console.error('删除练习记录失败:', error);
+      showMessage('删除练习记录失败', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confirmDelete = (sessionId: string) => {
+    setShowDeleteDialog(sessionId);
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteDialog(null);
+  };
+
   const renderPracticeSession = (session: PracticeSession) => (
-    <div key={session.id} className="practice-session-card">
+    <div 
+      key={session.id} 
+      className="practice-session-card clickable"
+      onClick={() => handleSessionClick(session.id)}
+    >
       <div className="session-header">
         <div className="session-title">
           <span className="status-icon">{getStatusIcon(session.status)}</span>
@@ -242,6 +304,16 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
               {getDifficultyLabel(session.difficulty)}
             </span>
           )}
+          <button
+            className="delete-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              confirmDelete(session.id);
+            }}
+            title="删除练习记录"
+          >
+            🗑️
+          </button>
         </div>
       </div>
 
@@ -265,19 +337,35 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
             </div>
           </div>
 
-          {session.feedback && (
-            <div className="feedback-section">
-              <h5>📝 AI批改反馈</h5>
-              <p className="feedback-text">{session.feedback}</p>
+          {/* 统计信息 - 紧凑格式 */}
+          <div className="stats-summary compact">
+            <div className="stat-item">
+              <span className="stat-label">题目数:</span>
+              <span className="stat-value">{session.questionCount || 0}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">正确:</span>
+              <span className="stat-value correct">{session.correctCount || 0}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">错误:</span>
+              <span className="stat-value incorrect">{session.incorrectCount || 0}</span>
+            </div>
+          </div>
+
+          {/* 知识点标签 */}
+          {session.knowledgePoints && session.knowledgePoints.length > 0 && (
+            <div className="knowledge-points">
+              <div className="knowledge-tags">
+                {session.knowledgePoints.map((point, index) => (
+                  <span key={index} className="knowledge-tag">
+                    {point}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
 
-          {session.suggestions && (
-            <div className="suggestions-section">
-              <h5>💡 改进建议</h5>
-              <p className="suggestions-text">{session.suggestions}</p>
-            </div>
-          )}
         </div>
       )}
 
@@ -289,6 +377,17 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
       )}
     </div>
   );
+
+  // If a session is selected, show the detail page
+  if (selectedSessionId) {
+    return (
+      <PracticeDetailPage
+        sessionId={selectedSessionId}
+        authState={authState}
+        onBack={handleBackToList}
+      />
+    );
+  }
 
   return (
     <div className="practice-page">
@@ -444,6 +543,36 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
               <div className="chart-placeholder">
                 <p>学习数据分析图表</p>
                 <p className="chart-note">完成更多练习后将显示详细的进步趋势</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 删除确认对话框 */}
+        {showDeleteDialog && (
+          <div className="delete-dialog-overlay">
+            <div className="delete-dialog">
+              <div className="delete-dialog-header">
+                <h3>确认删除</h3>
+              </div>
+              <div className="delete-dialog-body">
+                <p>确定要删除这条练习记录吗？此操作不可撤销。</p>
+              </div>
+              <div className="delete-dialog-footer">
+                <button 
+                  className="cancel-btn"
+                  onClick={cancelDelete}
+                  disabled={loading}
+                >
+                  取消
+                </button>
+                <button 
+                  className="confirm-delete-btn"
+                  onClick={() => handleDeleteSession(showDeleteDialog)}
+                  disabled={loading}
+                >
+                  {loading ? '删除中...' : '确认删除'}
+                </button>
               </div>
             </div>
           </div>

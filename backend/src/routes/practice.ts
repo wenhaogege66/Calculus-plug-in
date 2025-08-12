@@ -86,6 +86,9 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
             : suggestions.toString()
         ) : undefined;
 
+        // 从rawResult中提取增强数据
+        const enhancedData = (latestGrading?.rawResult as any)?.enhancedData || {};
+        
         return {
           id: submission.id.toString(),
           originalName: submission.fileUpload.originalName,
@@ -95,7 +98,15 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
           feedback: latestGrading?.feedback || undefined,
           suggestions: suggestionsText,
           ocrText: latestOCR?.recognizedText || undefined,
-          difficulty: difficulty
+          difficulty: difficulty,
+          // 新增的结构化信息
+          questionCount: enhancedData.questionCount || 0,
+          incorrectCount: enhancedData.incorrectCount || 0,
+          correctCount: enhancedData.correctCount || 0,
+          knowledgePoints: enhancedData.knowledgePoints || [],
+          detailedErrors: enhancedData.detailedErrors || [],
+          improvementAreas: enhancedData.improvementAreas || [],
+          nextStepRecommendations: enhancedData.nextStepRecommendations || []
         };
       });
 
@@ -270,7 +281,17 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
             maxScore: latestGrading.maxScore,
             feedback: latestGrading.feedback,
             suggestions: latestGrading.suggestions,
-            strengths: latestGrading.strengths
+            strengths: latestGrading.strengths,
+            // 新增的结构化信息
+            ...(((latestGrading.rawResult as any)?.enhancedData) && {
+              questionCount: (latestGrading.rawResult as any).enhancedData.questionCount,
+              incorrectCount: (latestGrading.rawResult as any).enhancedData.incorrectCount,
+              correctCount: (latestGrading.rawResult as any).enhancedData.correctCount,
+              knowledgePoints: (latestGrading.rawResult as any).enhancedData.knowledgePoints,
+              detailedErrors: (latestGrading.rawResult as any).enhancedData.detailedErrors,
+              improvementAreas: (latestGrading.rawResult as any).enhancedData.improvementAreas,
+              nextStepRecommendations: (latestGrading.rawResult as any).enhancedData.nextStepRecommendations
+            })
           } : null,
           submittedAt: practiceSession.submittedAt,
           completedAt: practiceSession.completedAt
@@ -284,6 +305,64 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
   });
+
+  // 删除练习记录
+  fastify.delete('/practice/:sessionId', { 
+    preHandler: requireAuth 
+  }, async (request, reply) => {
+    try {
+      const userId = request.currentUser!.id;
+      const sessionId = parseInt((request.params as any).sessionId);
+
+      if (!sessionId) {
+        return reply.code(400).send({
+          success: false,
+          error: '无效的会话ID'
+        });
+      }
+
+      // 验证练习记录是否属于当前用户
+      const practiceSession = await prisma.submission.findFirst({
+        where: {
+          id: sessionId,
+          userId: userId,
+          workMode: 'practice'
+        },
+        include: {
+          fileUpload: true
+        }
+      });
+
+      if (!practiceSession) {
+        return reply.code(404).send({
+          success: false,
+          error: '练习记录不存在或无权限删除'
+        });
+      }
+
+      // 删除关联的数据（级联删除应该自动处理 MathPixResult 和 DeepseekResult）
+      await prisma.submission.delete({
+        where: { id: sessionId }
+      });
+
+      // 如果需要，也可以删除文件上传记录（但要小心，因为可能被其他地方引用）
+      // 这里我们暂时保留文件上传记录，只删除提交记录
+
+      fastify.log.info(`练习记录已删除: sessionId=${sessionId}, userId=${userId}`);
+
+      return {
+        success: true,
+        message: '练习记录已删除'
+      };
+
+    } catch (error) {
+      fastify.log.error('删除练习记录失败:', error);
+      return reply.code(500).send({
+        success: false,
+        error: '删除练习记录失败'
+      });
+    }
+  });
 };
 
 // 练习处理流程（OCR + AI批改）
@@ -291,59 +370,80 @@ async function startPracticeProcessing(submissionId: number, fastify: any) {
   try {
     fastify.log.info(`🎯 开始练习处理流程 - submissionId: ${submissionId}`);
 
-    // 1. OCR识别
-    const ocrResponse = await fetch(`http://localhost:3000/api/internal/ocr/mathpix`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        submissionId: submissionId
-      })
-    });
-
-    if (!ocrResponse.ok) {
-      const errorText = await ocrResponse.text();
-      throw new Error(`OCR识别失败: ${ocrResponse.status} - ${errorText}`);
-    }
-
-    const ocrResult = await ocrResponse.json() as any;
-    fastify.log.info(`✅ OCR识别完成:`, {
-      submissionId,
-      hasText: !!ocrResult.data?.recognizedText,
-      confidence: ocrResult.data?.confidence
-    });
-
-    // 2. AI批改
-    if (ocrResult.success && ocrResult.data?.recognizedText) {
-      const aiResponse = await fetch(`http://localhost:3000/api/internal/ai/grade`, {
+    // 1. OCR识别 - 使用内部调用header
+    let ocrResult: any = null;
+    try {
+      const ocrResponse = await fetch(`http://localhost:3000/api/ocr/mathpix`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-internal-call': 'true' // 标识内部调用，跳过认证
         },
         body: JSON.stringify({
-          submissionId: submissionId,
-          recognizedText: ocrResult.data.recognizedText,
-          subject: '微积分',
-          exerciseType: '自主练习',
-          context: {
-            mode: 'practice',
-            maxScore: 100,
-            rubric: '根据解题步骤、方法正确性和计算准确性进行评分'
-          }
+          submissionId: submissionId
         })
       });
 
-      if (!aiResponse.ok) {
-        const errorText = await aiResponse.text();
-        throw new Error(`AI批改失败: ${aiResponse.status} - ${errorText}`);
+      if (!ocrResponse.ok) {
+        const errorText = await ocrResponse.text();
+        fastify.log.error(`OCR API调用失败: ${ocrResponse.status} - ${errorText}`);
+        ocrResult = { success: false, error: errorText };
+      } else {
+        ocrResult = await ocrResponse.json();
       }
 
-      const aiResult = await aiResponse.json() as any;
-      fastify.log.info(`✅ AI批改完成:`, {
+      fastify.log.info(`✅ OCR识别完成:`, {
         submissionId,
-        score: aiResult.data?.score,
-        maxScore: aiResult.data?.maxScore
+        success: ocrResult?.success,
+        hasText: !!ocrResult?.data?.recognizedText,
+        confidence: ocrResult?.data?.confidence
+      });
+    } catch (error) {
+      fastify.log.error(`OCR识别过程异常:`, error);
+      ocrResult = { success: false, error: '网络连接失败' };
+    }
+
+    // 2. AI批改
+    if (ocrResult?.success && ocrResult.data?.recognizedText) {
+      try {
+        const aiResponse = await fetch(`http://localhost:3000/api/ai/grade`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-call': 'true' // 标识内部调用，跳过认证
+          },
+          body: JSON.stringify({
+            submissionId: submissionId,
+            recognizedText: ocrResult.data.recognizedText,
+            subject: '微积分',
+            exerciseType: '自主练习',
+            context: {
+              mode: 'practice',
+              maxScore: 100,
+              rubric: '根据解题步骤、方法正确性和计算准确性进行评分'
+            }
+          })
+        });
+
+        if (!aiResponse.ok) {
+          const errorText = await aiResponse.text();
+          fastify.log.error(`AI批改失败: ${aiResponse.status} - ${errorText}`);
+        } else {
+          const aiResult = await aiResponse.json() as any;
+          fastify.log.info(`✅ AI批改完成:`, {
+            submissionId,
+            score: aiResult.data?.score,
+            maxScore: aiResult.data?.maxScore
+          });
+        }
+      } catch (error) {
+        fastify.log.error(`AI批改过程异常:`, error);
+      }
+    } else {
+      fastify.log.warn(`跳过AI批改: OCR识别未成功或无文本内容`, {
+        submissionId,
+        ocrSuccess: ocrResult?.success,
+        hasText: !!ocrResult?.data?.recognizedText
       });
     }
 

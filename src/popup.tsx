@@ -216,36 +216,26 @@ function Popup() {
     );
   }
 
-  // 未认证状态 - 显示简洁登录界面
+  // 未认证状态 - 显示暗背景登录界面
   if (!authState.isAuthenticated) {
     return (
-      <div className="compact-popup auth-mode">
-        <div style={{ padding: '16px' }}>
-          <AuthSection
-            authState={authState}
-            uploadStatus={uploadStatus}
-            onGitHubLogin={handleGitHubLogin}
-            onLogout={handleLogout}
-          />
-        </div>
-
-        <div style={{ 
-          padding: '12px 16px',
-          borderTop: '1px solid #e5e7eb',
-          background: '#f8fafc',
-          textAlign: 'center'
-        }}>
-          <div style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            fontSize: '10px',
-            color: '#9ca3af'
-          }}>
-            <span>版本 2.0.0</span>
-            <span>•</span>
-            <span>Powered by MathPix & Deepseek</span>
+      <div className="compact-popup auth-popup">
+        <div className="auth-background">
+          <div className="auth-content">
+            <AuthSection
+              authState={authState}
+              uploadStatus={uploadStatus}
+              onGitHubLogin={handleGitHubLogin}
+              onLogout={handleLogout}
+            />
+          </div>
+          
+          <div className="auth-footer">
+            <div className="version-info">
+              <span>版本 2.0.0</span>
+              <span>•</span>
+              <span>Powered by MathPix & Deepseek</span>
+            </div>
           </div>
         </div>
       </div>

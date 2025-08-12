@@ -8,160 +8,8 @@ import axios from 'axios';
 
 const prisma = new PrismaClient();
 
-export async function ocrRoutes(fastify: FastifyInstance) {
-  // 教师作业题目OCR识别 - 内部调用版本（无需认证）
-  fastify.post('/internal/ocr/assignment', async (request, reply) => {
-    return await processAssignmentOCR(request, reply, fastify);
-  });
-
-  // 教师作业题目OCR识别 - 外部调用版本（需要认证）
-  fastify.post('/ocr/assignment', { preHandler: requireAuth }, async (request, reply) => {
-    return await processAssignmentOCR(request, reply, fastify);
-  });
-
-  // MathPix手写识别 - 内部调用版本（无需认证）
-  fastify.post('/internal/ocr/mathpix', async (request, reply) => {
-    return await processOCR(request, reply, fastify);
-  });
-
-  // MathPix手写识别 - 外部调用版本（需要认证）
-  fastify.post('/ocr/mathpix', { preHandler: requireAuth }, async (request, reply) => {
-    return await processOCR(request, reply, fastify);
-  });
-
-// 教师作业OCR处理的专用函数
-async function processAssignmentOCR(request: FastifyRequest, reply: FastifyReply, fastify: FastifyInstance) {
-  try {
-    const { assignmentId } = request.body as any;
-    
-    if (!assignmentId) {
-      return reply.code(400).send({
-        success: false,
-        error: '缺少作业ID'
-      });
-    }
-
-    // 获取作业记录（内部调用时不验证用户权限）
-    const assignment = await prisma.assignment.findFirst({
-      where: {
-        id: assignmentId,
-        ...(request.currentUser && { teacherId: request.currentUser.id }) // 只有在有用户上下文时才验证
-      },
-      include: {
-        questionFile: true
-      }
-    });
-
-    if (!assignment) {
-      return reply.code(404).send({
-        success: false,
-        error: '作业不存在或无权限'
-      });
-    }
-
-    if (!assignment.questionFile) {
-      return reply.code(400).send({
-        success: false,
-        error: '作业没有题目文件'
-      });
-    }
-
-    // 更新OCR状态为处理中
-    await prisma.assignment.update({
-      where: { id: assignmentId },
-      data: { ocrStatus: 'PROCESSING' }
-    });
-
-    let imageToProcess;
-    
-    try {
-      // 从Supabase Storage获取题目文件
-      const fileUpload = assignment.questionFile;
-      fastify.log.info(`获取作业题目文件: ${fileUpload.filePath}`);
-      
-      const storageClient = supabaseAdmin || supabase;
-      const { data: fileData, error: downloadError } = await storageClient.storage
-        .from(STORAGE_BUCKETS.QUESTIONS)
-        .download(fileUpload.filePath);
-
-      if (downloadError || !fileData) {
-        throw new Error(`下载文件失败: ${downloadError?.message}`);
-      }
-
-      // 将文件转换为base64
-      const fileBuffer = await fileData.arrayBuffer();
-      imageToProcess = Buffer.from(fileBuffer).toString('base64');
-      
-      fastify.log.info(`题目文件转换完成，大小: ${Math.round(fileBuffer.byteLength / 1024)}KB`);
-      
-    } catch (error) {
-      fastify.log.error('获取题目文件失败:', error);
-      
-      await prisma.assignment.update({
-        where: { id: assignmentId },
-        data: { ocrStatus: 'FAILED' }
-      });
-
-      return reply.code(500).send({
-        success: false,
-        error: '获取题目文件失败'
-      });
-    }
-
-    const startTime = Date.now();
-
-    // 获取文件类型信息进行优化识别
-    const fileType = assignment.questionFile.mimeType;
-    
-    // 调用MathPix API进行识别
-    const mathpixResult = await callMathPixAPI(imageToProcess, fileType);
-    
-    const processingTime = Date.now() - startTime;
-
-    // 保存OCR结果到作业表
-    await prisma.assignment.update({
-      where: { id: assignmentId },
-      data: {
-        ocrText: mathpixResult.text,
-        ocrLatex: mathpixResult.latex || null,
-        ocrStatus: 'COMPLETED',
-        ocrProcessedAt: new Date()
-      }
-    });
-
-    fastify.log.info(`作业OCR识别完成，处理时间: ${processingTime}ms`);
-
-    return {
-      success: true,
-      data: {
-        assignmentId: assignmentId,
-        ocrText: mathpixResult.text,
-        ocrLatex: mathpixResult.latex,
-        confidence: mathpixResult.confidence,
-        processingTime: processingTime
-      }
-    };
-
-  } catch (error) {
-    fastify.log.error('作业OCR处理失败:', error);
-    
-    // 更新OCR状态为失败
-    if ((request.body as any)?.assignmentId) {
-      await prisma.assignment.update({
-        where: { id: (request.body as any).assignmentId },
-        data: { ocrStatus: 'FAILED' }
-      }).catch(() => {});
-    }
-
-    return reply.code(500).send({
-      success: false,
-      error: '作业OCR识别处理失败'
-    });
-  }
-}
-
-// OCR处理的核心逻辑
-async function processOCR(request: FastifyRequest, reply: FastifyReply, fastify: FastifyInstance) {
+// OCR处理的核心逻辑 - 导出供其他模块使用
+export async function processOCR(request: FastifyRequest, reply: FastifyReply, fastify: FastifyInstance) {
     try {
       const { submissionId, imageData, fileId } = request.body as any;
       
@@ -258,7 +106,7 @@ async function processOCR(request: FastifyRequest, reply: FastifyReply, fastify:
       
       const processingTime = Date.now() - startTime;
 
-      // 保存识别结果
+      // 保存识别结果 - 包括fallback结果
       const ocrResult = await prisma.mathPixResult.create({
         data: {
           submissionId: submissionId,
@@ -268,6 +116,13 @@ async function processOCR(request: FastifyRequest, reply: FastifyReply, fastify:
           processingTime: processingTime,
           rawResult: mathpixResult.raw
         }
+      });
+
+      fastify.log.info(`OCR结果已保存到数据库:`, {
+        submissionId,
+        resultId: ocrResult.id,
+        textLength: mathpixResult.text?.length || 0,
+        isFallback: mathpixResult.raw?.fallback || false
       });
 
       return {
@@ -284,20 +139,36 @@ async function processOCR(request: FastifyRequest, reply: FastifyReply, fastify:
     } catch (error) {
       fastify.log.error('MathPix OCR处理失败:', error);
       
-      // 更新提交状态为失败
-      if ((request.body as any)?.submissionId) {
+      // 不返回fallback数据，直接抛出错误
+      const submissionId = (request.body as any)?.submissionId;
+      if (submissionId) {
         await prisma.submission.update({
-          where: { id: (request.body as any).submissionId },
+          where: { id: submissionId },
           data: { status: 'FAILED' }
-        }).catch(() => {}); // 忽略更新失败
+        }).catch(() => {});
       }
 
       return reply.code(500).send({
         success: false,
-        error: 'OCR识别处理失败'
+        error: `OCR识别失败: ${error instanceof Error ? error.message : '未知错误'}`
       });
     }
 }
+
+export async function ocrRoutes(fastify: FastifyInstance) {
+  // MathPix手写识别 - 统一端点（条件认证）
+  fastify.post('/ocr/mathpix', { 
+    preHandler: async (request, reply) => {
+      // 对于内部调用，跳过认证检查
+      if (request.headers['x-internal-call'] === 'true') {
+        return;
+      }
+      // 对于外部调用，需要认证
+      await requireAuth(request, reply);
+    }
+  }, async (request, reply) => {
+    return await processOCR(request, reply, fastify);
+  });
 
   // 获取OCR结果
   fastify.get('/ocr/results/:submissionId', { preHandler: requireAuth }, async (request, reply) => {
@@ -379,52 +250,91 @@ async function callMathPixAPI(imageData: string, fileType?: string): Promise<{
     const appKey = process.env.MATHPIX_APP_KEY;
 
     if (!appId || !appKey) {
-      throw new Error('MathPix配置缺失');
+      throw new Error('MathPix配置缺失: MATHPIX_APP_ID或MATHPIX_APP_KEY未设置');
     }
 
-    // 根据文件类型调整MathPix参数
+    // 根据文件类型确定正确的MIME类型
+    let mimeType = 'image/png'; // 默认
+    if (fileType) {
+      if (fileType === 'application/pdf') {
+        mimeType = 'application/pdf';
+      } else if (fileType.includes('jpeg') || fileType.includes('jpg')) {
+        mimeType = 'image/jpeg';
+      } else if (fileType.includes('png')) {
+        mimeType = 'image/png';
+      } else if (fileType.includes('gif')) {
+        mimeType = 'image/gif';
+      } else if (fileType.includes('webp')) {
+        mimeType = 'image/webp';
+      }
+    }
+
+    // 构建MathPix API请求参数 - 根据官方文档优化
+    // 基础配置，适用于数学内容识别
     const mathpixOptions: any = {
-      src: `data:image/png;base64,${imageData}`,
-      formats: ["text", "latex_normal", "latex_simplified", "mathml"],
+      src: `data:${mimeType};base64,${imageData}`,
+      formats: ["text", "latex_normal"],
       data_options: {
-        include_line_data: true,
-        include_word_data: true,
-        include_smiles: true,
-        include_geometry_data: true,
-        include_table_data: true
+        include_asciimath: true,
+        include_latex: true,
+        include_table_html: false, // 对于数学作业，通常不需要表格HTML
+        include_tsv: false
       }
     };
 
-    // 针对不同文件类型优化处理选项
-    if (fileType === 'application/pdf') {
-      mathpixOptions.data_options.include_asciimath = true;
-      mathpixOptions.data_options.include_tsv = true;
-    } else if (fileType?.startsWith('image/')) {
-      mathpixOptions.data_options.include_confidence = true;
-      mathpixOptions.data_options.include_diagram = true;
-    }
+    console.log('🔧 使用标准数学识别配置');
 
     // 调用MathPix OCR API
-    console.log('🔍 调用MathPix OCR API进行识别，文件类型:', fileType);
+    console.log('🔍 调用MathPix OCR API进行识别');
+    console.log('📋 请求参数:', {
+      fileType,
+      mimeType,
+      formats: mathpixOptions.formats,
+      imageSize: Math.round(imageData.length / 1024) + 'KB'
+    });
     
     const response = await axios.post('https://api.mathpix.com/v3/text', mathpixOptions, {
       headers: {
         'app_id': appId,
         'app_key': appKey,
-        'Content-type': 'application/json'
+        'Content-Type': 'application/json'
       },
-      timeout: 45000 // 增加超时时间到45秒，因为复杂文档可能需要更长时间
+      timeout: 60000, // 增加超时时间到60秒
+      validateStatus: function (status) {
+        return status < 500; // 接受400-499的错误响应，以便更好地处理错误
+      }
     });
 
-    console.log('✅ MathPix API调用成功');
+    console.log('📡 MathPix API响应状态:', response.status);
+
+    if (response.status !== 200) {
+      console.error('❌ MathPix API返回错误:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: response.data
+      });
+      throw new Error(`MathPix API返回错误 ${response.status}: ${JSON.stringify(response.data)}`);
+    }
 
     const result = response.data;
-    const text = result.text || '';
-    const latex = result.latex_normal || result.latex_simplified || '';
-    const confidence = result.confidence || result.confidence_rate || 0.95;
+    console.log('📊 MathPix原始响应:', JSON.stringify(result, null, 2));
 
-    // 记录详细的识别结果
-    console.log(`📊 MathPix识别结果 - 文本长度: ${text.length}, LaTeX长度: ${latex?.length || 0}, 置信度: ${confidence}`);
+    // 提取识别结果 - 根据MathPix API v3响应格式
+    const text = result.text || '';
+    const latex = result.latex_normal || result.latex || '';
+    const confidence = parseFloat(result.confidence) || 0.0;
+
+    // 验证结果有效性
+    if (!text || text.trim().length === 0) {
+      console.warn('⚠️ MathPix返回空文本结果');
+      throw new Error('MathPix OCR未能识别出任何文本内容');
+    }
+
+    console.log('✅ MathPix识别成功:', {
+      textLength: text.length,
+      latexLength: latex?.length || 0,
+      confidence: confidence
+    });
 
     return {
       text: text,
@@ -434,40 +344,33 @@ async function callMathPixAPI(imageData: string, fileType?: string): Promise<{
     };
 
   } catch (error) {
-    console.error('MathPix API调用失败:', error);
+    console.error('❌ MathPix API调用失败:', error);
     
-    // 如果API调用失败，提供fallback模拟结果
-    console.log('🔄 API调用失败，使用fallback模拟结果');
-    
-    // 模拟识别延时
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // 根据图片大小生成模拟的OCR结果
-    const imageSize = Math.round(imageData.length / 1024);
-    let mockText = '';
-    let mockLatex = '';
-    
-    if (imageSize > 200) {
-      // 大图片，可能是复杂题目
-      mockText = '计算下列极限：\n lim(x→0) (sin x) / x = ?\n\n解：\n根据洛必达法则，\nlim(x→0) (sin x) / x = lim(x→0) (cos x) / 1 = cos(0) = 1';
-      mockLatex = '\\lim_{x \\to 0} \\frac{\\sin x}{x} = \\lim_{x \\to 0} \\frac{\\cos x}{1} = \\cos(0) = 1';
-    } else {
-      // 小图片，可能是简单表达式
-      mockText = 'f(x) = x² + 2x + 1\nf\'(x) = 2x + 2';
-      mockLatex = 'f(x) = x^2 + 2x + 1\nf\'(x) = 2x + 2';
+    // 输出详细的错误信息以便调试
+    if (error instanceof Error) {
+      console.error('错误详情:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
     }
-
-    return {
-      text: mockText,
-      latex: mockLatex,
-      confidence: 0.85, // fallback结果置信度稍低
-      raw: { 
-        fallback: true,
-        originalError: error instanceof Error ? error.message : '未知错误',
-        originalImageSize: imageSize + 'KB',
-        processingTime: '1.0s',
-        provider: 'MathPix_Fallback'
-      }
-    };
+    
+    // 检查是否是axios错误
+    if ((error as any).response) {
+      console.error('HTTP错误响应:', {
+        status: (error as any).response.status,
+        statusText: (error as any).response.statusText,
+        data: (error as any).response.data,
+        headers: (error as any).response.headers
+      });
+    }
+    
+    // 检查是否是请求配置问题
+    if ((error as any).request) {
+      console.error('请求配置问题:', (error as any).request);
+    }
+    
+    // 不要返回mock数据，直接抛出真实的错误
+    throw new Error(`MathPix OCR识别失败: ${error instanceof Error ? error.message : '未知网络错误'}`);
   }
 }

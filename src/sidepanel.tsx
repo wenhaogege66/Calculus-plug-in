@@ -445,86 +445,41 @@ const SidePanel: React.FC = () => {
   if (!authState.isAuthenticated) {
     return (
       <div className="sidepanel-container unauthenticated">
-        <div className="login-page">
-          {/* 背景装饰 */}
-          <div className="bg-decoration">
-            <div className="decoration-circle circle-1"></div>
-            <div className="decoration-circle circle-2"></div>
-            <div className="decoration-circle circle-3"></div>
+        <div className="simple-login-page">
+          {/* 简化的Logo区域 */}
+          <div className="simple-header">
+            <div className="simple-logo">🔬</div>
+            <h1>AI微积分助教</h1>
+            <p>智能学习助手</p>
           </div>
-          
-          {/* 主要内容 */}
-          <div className="login-content">
-            {/* Logo区域 */}
-            <div className="logo-section">
-              <div className="logo-icon-large">
-                <span className="logo-emoji">🔬</span>
-                <div className="logo-glow"></div>
-              </div>
-              <h1 className="app-title">AI微积分助教</h1>
-              <p className="app-subtitle">智能学习助手 · 专业数学批改</p>
-            </div>
 
-            {/* 功能特色 */}
-            <div className="features-preview">
-              <div className="feature-item">
-                <span className="feature-icon">🤖</span>
-                <div className="feature-text">
-                  <h4>智能批改</h4>
-                  <p>AI精准识别数学公式，提供详细批改反馈</p>
-                </div>
+          {/* 简化的登录提示 */}
+          <div className="simple-login-content">
+            <div className="login-message">
+              <h3>需要登录才能使用</h3>
+              <p>请点击扩展图标完成GitHub登录</p>
+            </div>
+            
+            <div className="simple-features">
+              <div className="simple-feature">
+                <span>🤖</span>
+                <span>AI智能批改</span>
               </div>
-              <div className="feature-item">
-                <span className="feature-icon">📊</span>
-                <div className="feature-text">
-                  <h4>学习分析</h4>
-                  <p>错题统计分析，个性化学习建议</p>
-                </div>
+              <div className="simple-feature">
+                <span>📊</span>
+                <span>学习数据分析</span>
               </div>
-              <div className="feature-item">
-                <span className="feature-icon">⚡</span>
-                <div className="feature-text">
-                  <h4>高效便捷</h4>
-                  <p>支持多种文件格式，快速处理批改</p>
-                </div>
+              <div className="simple-feature">
+                <span>⚡</span>
+                <span>快速处理</span>
               </div>
             </div>
+          </div>
 
-            {/* 登录提示 */}
-            <div className="login-prompt">
-              <div className="login-icon-wrapper">
-                <div className="login-icon">🚀</div>
-              </div>
-              <h3 className="login-title">开始您的智能学习之旅</h3>
-              <p className="login-description">
-                请点击浏览器扩展图标，通过GitHub账户登录后即可使用全部功能
-              </p>
-              <div className="login-steps">
-                <div className="step-item">
-                  <span className="step-number">1</span>
-                  <span className="step-text">点击扩展图标</span>
-                </div>
-                <div className="step-arrow">→</div>
-                <div className="step-item">
-                  <span className="step-number">2</span>
-                  <span className="step-text">GitHub登录</span>
-                </div>
-                <div className="step-arrow">→</div>
-                <div className="step-item">
-                  <span className="step-number">3</span>
-                  <span className="step-text">开始使用</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 底部信息 */}
-            <div className="login-footer">
-              <div className="tech-info">
-                <span className="tech-badge">Powered by MathPix OCR</span>
-                <span className="tech-badge">DeepSeek AI</span>
-              </div>
-              <p className="version-info">Version 2.0.0 | 智能数学助教系统</p>
-            </div>
+          {/* 简化的底部 */}
+          <div className="simple-footer">
+            <div className="version">版本 2.0.0</div>
+            <div className="powered-by">Powered by MathPix & DeepSeek</div>
           </div>
         </div>
       </div>

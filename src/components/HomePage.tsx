@@ -271,7 +271,7 @@ export const HomePage: React.FC<HomePageProps> = ({ authState, isDarkMode, onPag
             </div>
             <div className="user-info">
               <h1 className="welcome-title">
-                {getGreeting()}，{authState.user?.username || '用户'}
+                {getGreeting()}，<span className="rainbow-text">{authState.user?.username || '用户'}</span>
               </h1>
               <div className="user-info-display">
                 <div className="user-role-badge">

@@ -37,7 +37,7 @@ AI微积分助教 (AI Calculus Assistant) - A Chrome extension built with Plasmo
 - **Database**: Supabase PostgreSQL with Prisma ORM
 - **Authentication**: Supabase built-in OAuth with GitHub Provider
 - **File Storage**: Supabase Storage (S3-like) for assignments, questions, and graded files
-- **AI Services**: MathPix (mathematical OCR) + Deepseek (scoring, future: grading/annotation)
+- **AI Services**: MathPix (mathematical OCR:https://docs.mathpix.com/#introduction)(https://mathpix.com/docs/convert/overview) + Deepseek (scoring, future: grading/annotation)
 
 ### Database Schema (Prisma)
 Key models: `User`, `FileUpload`, `Submission`, `MathPixResult`, `DeepseekResult`, `Classroom`, `Assignment`

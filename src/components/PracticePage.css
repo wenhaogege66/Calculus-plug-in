@@ -335,6 +335,22 @@
   border-color: rgba(59, 130, 246, 0.2);
 }
 
+.practice-session-card.clickable {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.practice-session-card.clickable:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 16px 40px rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.practice-session-card.clickable:active {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
+}
+
 .session-header {
   display: flex;
   justify-content: space-between;
@@ -629,6 +645,137 @@
   margin: 0;
 }
 
+/* 删除按钮 */
+.delete-btn {
+  padding: 4px 8px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 24px;
+}
+
+.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  transform: scale(1.05);
+}
+
+.delete-btn:active {
+  transform: scale(0.95);
+}
+
+/* 删除确认对话框 */
+.delete-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.delete-dialog {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+  width: 90%;
+  overflow: hidden;
+  animation: dialog-appear 0.3s ease-out;
+}
+
+@keyframes dialog-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.delete-dialog-header {
+  padding: 24px 24px 16px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.delete-dialog-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.delete-dialog-body {
+  padding: 16px 24px 24px 24px;
+}
+
+.delete-dialog-body p {
+  font-size: 14px;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.delete-dialog-footer {
+  padding: 16px 24px 24px 24px;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.cancel-btn,
+.confirm-delete-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  min-width: 80px;
+}
+
+.cancel-btn {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.confirm-delete-btn {
+  background: #dc2626;
+  color: white;
+}
+
+.confirm-delete-btn:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.cancel-btn:disabled,
+.confirm-delete-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .practice-page {
@@ -677,6 +824,156 @@
     text-align: center;
     gap: 12px;
   }
+
+  .stats-summary {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .knowledge-tags {
+    gap: 6px;
+  }
+
+  .knowledge-tag {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  .improvement-item,
+  .recommendation-item {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+}
+
+/* 统计信息样式 */
+.stats-summary {
+  display: flex;
+  gap: 16px;
+  margin: 16px 0;
+  padding: 16px;
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+}
+
+.stats-summary.compact {
+  padding: 12px;
+  margin: 12px 0;
+  gap: 12px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.stats-summary.compact .stat-item {
+  font-size: 12px;
+  gap: 4px;
+}
+
+.stat-label {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.stat-value.correct {
+  color: #059669;
+}
+
+.stat-value.incorrect {
+  color: #dc2626;
+}
+
+/* 知识点标签样式 */
+.knowledge-points {
+  margin: 16px 0;
+}
+
+.knowledge-points h5 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 8px 0;
+}
+
+.knowledge-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.knowledge-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #ddd6fe, #e0e7ff);
+  color: #5b21b6;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 16px;
+  border: 1px solid #c4b5fd;
+}
+
+/* 改进领域和建议样式 */
+.improvement-areas,
+.next-step-recommendations {
+  margin: 16px 0;
+}
+
+.improvement-areas h5,
+.next-step-recommendations h5 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 8px 0;
+}
+
+.improvement-list,
+.recommendations-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.improvement-item,
+.recommendation-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  background: #fef3c7;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #92400e;
+  position: relative;
+}
+
+.improvement-item::before {
+  content: "🎯";
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.recommendation-item {
+  background: #dcfce7;
+  border-color: #65a30d;
+  color: #365314;
+}
+
+.recommendation-item::before {
+  content: "🚀";
+  font-size: 12px;
+  flex-shrink: 0;
 }
 
 /* 深色模式支持 */
@@ -719,5 +1016,42 @@
   .progress-chart {
     background: #0f172a;
     border-color: #374151;
+  }
+
+  .stats-summary {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(14, 165, 233, 0.05));
+    border-color: rgba(14, 165, 233, 0.3);
+  }
+
+  .stat-label {
+    color: #94a3b8;
+  }
+
+  .stat-value {
+    color: #e2e8f0;
+  }
+
+  .knowledge-points h5,
+  .improvement-areas h5,
+  .next-step-recommendations h5 {
+    color: #e2e8f0;
+  }
+
+  .knowledge-tag {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.1));
+    color: #a78bfa;
+    border-color: rgba(139, 92, 246, 0.3);
+  }
+
+  .improvement-item {
+    background: rgba(251, 191, 36, 0.15);
+    border-color: rgba(251, 191, 36, 0.3);
+    color: #fbbf24;
+  }
+
+  .recommendation-item {
+    background: rgba(34, 197, 94, 0.15);
+    border-color: rgba(34, 197, 94, 0.3);
+    color: #4ade80;
   }
 }

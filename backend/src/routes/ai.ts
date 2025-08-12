@@ -7,19 +7,8 @@ import axios from 'axios';
 
 const prisma = new PrismaClient();
 
-export async function aiRoutes(fastify: FastifyInstance) {
-  // Deepseek AI批改作业 - 内部调用版本（无需认证）
-  fastify.post('/internal/ai/grade', async (request, reply) => {
-    return await processAIGrading(request, reply, fastify);
-  });
-
-  // Deepseek AI批改作业 - 外部调用版本（需要认证）
-  fastify.post('/ai/grade', { preHandler: requireAuth }, async (request, reply) => {
-    return await processAIGrading(request, reply, fastify);
-  });
-
-// AI批改的核心逻辑
-async function processAIGrading(request: FastifyRequest, reply: FastifyReply, fastify: FastifyInstance) {
+// AI批改的核心逻辑 - 导出供其他模块使用
+export async function processAIGrading(request: FastifyRequest, reply: FastifyReply, fastify: FastifyInstance) {
     try {
       const { submissionId, recognizedText, subject = '微积分', exerciseType = '练习题' } = request.body as any;
       
@@ -102,7 +91,18 @@ async function processAIGrading(request: FastifyRequest, reply: FastifyReply, fa
           suggestions: gradingResult.suggestions,
           strengths: gradingResult.strengths,
           processingTime: processingTime,
-          rawResult: gradingResult.raw
+          rawResult: {
+            ...gradingResult.raw,
+            enhancedData: {
+              questionCount: gradingResult.questionCount,
+              incorrectCount: gradingResult.incorrectCount,
+              correctCount: gradingResult.correctCount,
+              knowledgePoints: gradingResult.knowledgePoints,
+              detailedErrors: gradingResult.detailedErrors,
+              improvementAreas: gradingResult.improvementAreas,
+              nextStepRecommendations: gradingResult.nextStepRecommendations
+            }
+          }
         }
       });
 
@@ -115,6 +115,9 @@ async function processAIGrading(request: FastifyRequest, reply: FastifyReply, fa
         }
       });
 
+      // 从rawResult中提取增强数据
+      const enhancedData = (aiResult.rawResult as any)?.enhancedData || {};
+      
       return {
         success: true,
         data: {
@@ -125,7 +128,15 @@ async function processAIGrading(request: FastifyRequest, reply: FastifyReply, fa
           errors: aiResult.errors,
           suggestions: aiResult.suggestions,
           strengths: aiResult.strengths,
-          processingTime: aiResult.processingTime
+          processingTime: aiResult.processingTime,
+          // 新增的结构化信息
+          questionCount: enhancedData.questionCount || 0,
+          incorrectCount: enhancedData.incorrectCount || 0,
+          correctCount: enhancedData.correctCount || 0,
+          knowledgePoints: enhancedData.knowledgePoints || [],
+          detailedErrors: enhancedData.detailedErrors || [],
+          improvementAreas: enhancedData.improvementAreas || [],
+          nextStepRecommendations: enhancedData.nextStepRecommendations || []
         }
       };
 
@@ -146,6 +157,21 @@ async function processAIGrading(request: FastifyRequest, reply: FastifyReply, fa
       });
     }
 }
+
+export async function aiRoutes(fastify: FastifyInstance) {
+  // Deepseek AI批改作业 - 统一端点（条件认证）
+  fastify.post('/ai/grade', { 
+    preHandler: async (request, reply) => {
+      // 对于内部调用，跳过认证检查
+      if (request.headers['x-internal-call'] === 'true') {
+        return;
+      }
+      // 对于外部调用，需要认证
+      await requireAuth(request, reply);
+    }
+  }, async (request, reply) => {
+    return await processAIGrading(request, reply, fastify);
+  });
 
   // 获取批改结果
   fastify.get('/ai/results/:submissionId', { preHandler: requireAuth }, async (request, reply) => {
@@ -186,57 +212,6 @@ async function processAIGrading(request: FastifyRequest, reply: FastifyReply, fa
       });
     }
   });
-
-  // 生成带批注的PDF
-  fastify.post('/ai/annotate-pdf', { preHandler: requireAuth }, async (request, reply) => {
-    try {
-      const { submissionId, errors } = request.body as any;
-      
-      if (!submissionId || !errors) {
-        return reply.code(400).send({
-          success: false,
-          error: '缺少必要参数'
-        });
-      }
-
-      // 验证提交记录是否属于当前用户
-      const submission = await prisma.submission.findFirst({
-        where: {
-          id: submissionId,
-          userId: request.currentUser!.id
-        },
-        include: {
-          fileUpload: true
-        }
-      });
-
-      if (!submission) {
-        return reply.code(404).send({
-          success: false,
-          error: '提交记录不存在'
-        });
-      }
-
-      // 这里应该实现PDF批注功能
-      // 可以使用pdf-lib或其他PDF处理库
-      // 暂时返回占位符响应
-      
-      return {
-        success: true,
-        data: {
-          annotatedPdfUrl: `/api/files/${submission.fileUploadId}/annotated`,
-          message: 'PDF批注功能正在开发中'
-        }
-      };
-
-    } catch (error) {
-      fastify.log.error('PDF批注处理失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: 'PDF批注处理失败'
-      });
-    }
-  });
 }
 
 // 调用Deepseek API的辅助函数
@@ -253,6 +228,13 @@ async function callDeepseekAPI(
   errors: any[];
   suggestions: any[];
   strengths: any[];
+  questionCount?: number;
+  incorrectCount?: number;
+  correctCount?: number;
+  knowledgePoints?: string[];
+  detailedErrors?: any[];
+  improvementAreas?: string[];
+  nextStepRecommendations?: string[];
   raw: any;
 }> {
   try {
@@ -275,49 +257,101 @@ ${teacherQuestionLatex}
     }
 
     const prompt = `
-作为一位专业的${subject}教师，请对以下学生作业进行详细批改：
+你是一位资深的${subject}教师，请对以下学生作业进行全面、详细的智能批改分析。
 ${questionSection}
-学生答案：
+
+学生提交的解答内容：
 ${text}
 
+批改要求：
 ${teacherQuestionText ? 
-  '请根据题目要求和标准答案评分，重点检查：1) 学生是否理解题目要求；2) 解题步骤是否正确；3) 计算是否准确；4) 最终答案是否合理。' : 
-  '请根据微积分知识点评分，重点检查：1) 解题思路是否正确；2) 数学概念理解是否准确；3) 计算步骤是否合理。'
+  '1. 根据题目要求进行精准评分，检查解题过程的完整性和正确性\n2. 分析学生对题目要求的理解程度\n3. 评估解题步骤的逻辑性和数学严谨性\n4. 验证计算结果的准确性' : 
+  '1. 基于微积分知识体系进行评分\n2. 分析解题思路和方法选择的合理性\n3. 检查数学概念理解的准确程度\n4. 评估计算过程的规范性'
 }
 
-请按以下格式返回JSON：
+知识点选择范围（请仅从以下列表中选择相关知识点）：
+【上册】
+函数与极限: 集合与映射, 数列极限, 函数极限, 极限的性质, 无穷小与无穷大, 极限运算, 极限存在准则, 无穷小比阶与等价无穷小, 函数的连续性与间断点
+一元函数微分学: 导数与微分, 导数的几何意义, 高阶导数, 隐函数与参数方程的求导, 复合函数求导, 对数与指数函数求导, 三角与反三角函数求导, 微分中值定理, 洛必达法则, 泰勒公式, 函数的单调性与极值, 函数的凹凸性与拐点, 渐近线与作图, 极值与最值的实际应用
+不定积分: 原函数与不定积分, 不定积分的基本公式, 换元积分法, 分部积分法, 有理函数积分, 三角函数积分, 指数与对数函数积分, 反三角函数积分
+定积分: 定积分的概念, 定积分的性质, 牛顿–莱布尼茨公式, 定积分的换元与分部积分法, 定积分的几何与物理应用, 反常积分
+微分方程: 一阶微分方程（可分离变量型、齐次方程、线性方程）, 高阶线性微分方程, 常系数齐次线性方程, 常系数非齐次线性方程, 微分方程的应用
+
+【下册】
+矢量代数与空间解析几何: 二阶、三阶行列式及线性方程组, 矢量概念与运算, 空间直角坐标系与矢量的坐标表示, 两矢量的数量积与矢量积, 矢量的混合积与二重矢积, 平面与直线方程, 曲面与空间曲线方程, 二次曲面
+多元函数微分学: 多元函数的极限与连续性, 偏导数与全微分, 复合函数微分法, 隐函数与反函数偏导数, 场的方向导数与梯度, 多元函数的极值与应用, 偏导数的几何应用
+多元函数积分学: 二重积分, 三重积分, 第一类曲线积分与第一类曲面积分, 点函数积分及应用, 第二类曲线积分与第二类曲面积分, 第二类曲线积分与格林公式, 平面曲线积分与路径无关性, 第二类曲面积分与高斯公式, 斯托克斯公式与旋度、势量场
+级数: 数项级数及收敛判别, 函数项级数与一致收敛, 幂级数及泰勒展开, 傅里叶级数
+含参量积分: 含参量的常义积分与反常积分, Γ函数与B函数
+
+请严格按照以下JSON格式返回批改结果：
 {
   "score": 85,
   "maxScore": 100,
-  "feedback": "整体解答思路正确，但在某些步骤上存在小的计算错误...",
-  "errors": [
+  "questionCount": 3,
+  "incorrectCount": 1,
+  "correctCount": 2,
+  "knowledgePoints": [
+    "导数与微分",
+    "复合函数求导",
+    "洛必达法则"
+  ],
+  "feedback": "整体解答思路正确，显示出对微积分基本概念的良好理解。主要问题出现在计算环节，需要加强计算准确性的训练。",
+  "detailedErrors": [
     {
-      "line": 1,
-      "content": "错误的计算步骤",
-      "correction": "正确的做法应该是...",
-      "severity": "major"
+      "questionNumber": 1,
+      "line": 3,
+      "content": "d/dx(x²+1) = 2x+1",
+      "errorType": "计算错误",
+      "correction": "d/dx(x²+1) = 2x",
+      "explanation": "常数的导数为0，所以常数项1求导后应该消除",
+      "severity": "major",
+      "knowledgePoint": "基本导数公式"
     }
   ],
   "suggestions": [
     {
-      "aspect": "解题方法",
-      "recommendation": "建议使用更直接的求导方法..."
+      "aspect": "计算准确性",
+      "recommendation": "建议多练习基本导数公式，特别注意常数项的处理",
+      "priority": "high"
+    },
+    {
+      "aspect": "解题步骤",
+      "recommendation": "可以在每一步计算后进行自检，确保每步都正确",
+      "priority": "medium"
     }
   ],
   "strengths": [
     {
       "aspect": "解题思路",
-      "description": "学生正确识别了问题类型..."
+      "description": "正确识别了需要使用链式法则的复合函数",
+      "importance": "high"
+    },
+    {
+      "aspect": "公式应用",
+      "description": "熟练掌握了基本的求导公式",
+      "importance": "medium"
     }
+  ],
+  "improvementAreas": [
+    "计算准确性需要提升",
+    "细节检查能力有待加强"
+  ],
+  "nextStepRecommendations": [
+    "加强基础计算练习",
+    "学习使用验算方法检查结果",
+    "练习更复杂的复合函数求导"
   ]
 }
 
-要求：
-1. 评分要客观公正，分数范围0-100
-2. 指出具体的错误位置和类型
-3. 提供改进建议
-4. 肯定学生的优点
-5. 返回纯JSON格式，不要额外文字
+关键要求：
+1. 准确统计题目数量和错题数量
+2. 精确识别涉及的微积分知识点
+3. 详细分析每个错误的类型、位置和改正方法
+4. 提供具体可操作的改进建议
+5. 客观评价学生的优点和不足
+6. 评分范围0-100，要基于答题的完整性和准确性
+7. 返回格式必须是有效的JSON，不包含任何其他文字
 `;
 
     const response = await axios.post('https://api.deepseek.com/chat/completions', {
@@ -343,9 +377,16 @@ ${teacherQuestionText ?
       score: result.score || 0,
       maxScore: result.maxScore || 100,
       feedback: result.feedback || '批改完成',
-      errors: result.errors || [],
+      errors: result.errors || result.detailedErrors || [],
       suggestions: result.suggestions || [],
       strengths: result.strengths || [],
+      questionCount: result.questionCount || 0,
+      incorrectCount: result.incorrectCount || 0,
+      correctCount: result.correctCount || 0,
+      knowledgePoints: result.knowledgePoints || [],
+      detailedErrors: result.detailedErrors || [],
+      improvementAreas: result.improvementAreas || [],
+      nextStepRecommendations: result.nextStepRecommendations || [],
       raw: response.data
     };
 
@@ -360,7 +401,14 @@ ${teacherQuestionText ?
       errors: [],
       suggestions: ['请稍后重试AI批改功能'],
       strengths: ['成功提交了作业'],
+      questionCount: 1,
+      incorrectCount: 0,
+      correctCount: 1,
+      knowledgePoints: ['待分析'],
+      detailedErrors: [],
+      improvementAreas: ['暂无分析'],
+      nextStepRecommendations: ['请稍后重试'],
       raw: { error: error instanceof Error ? error.message : '未知错误' }
     };
   }
-} 
+}
