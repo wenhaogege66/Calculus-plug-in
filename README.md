@@ -1,12 +1,12 @@
 # AI微积分助教 Chrome插件
 
-基于Plasmo框架开发的智能微积分学习助手，支持GitHub OAuth登录、多模式学习、角色切换和AI智能批改。
+基于Plasmo框架开发的智能微积分学习助手，支持GitHub OAuth登录、多模式学习、角色切换和AI智能批改。采用现代化科技风UI设计，支持夜间模式和响应式布局。
 
 ## 🏗️ 技术架构
 
 ### 前端技术栈
 - **Chrome插件**: Plasmo框架 + React 18 + TypeScript
-- **UI组件**: 原生CSS + 响应式设计
+- **UI组件**: 科技风设计 + 夜间模式 + 响应式布局
 - **状态管理**: React Hooks + Chrome Storage API
 - **认证方式**: GitHub OAuth 2.0
 - **构建工具**: Plasmo内置构建系统
@@ -15,13 +15,13 @@
 - **API服务**: Node.js + Fastify + TypeScript
 - **数据库**: Supabase PostgreSQL (云数据库) + Prisma ORM
 - **认证**: JWT + GitHub OAuth
-- **AI服务**: MyScript (OCR) + Deepseek (批改)
+- **AI服务**: MathPix (数学OCR) + Deepseek (智能批改)
 
 ### 数据流架构
 ```
 Chrome插件 (Plasmo) → GitHub OAuth → Fastify API → Prisma ORM → Supabase PostgreSQL
                                       ↓
-                                  MyScript OCR
+                                  MathPix OCR
                                       ↓
                                   Deepseek AI
 ```
@@ -149,38 +149,111 @@ npm run build
 
 ```
 Calculus/
-├── popup.tsx              # Popup界面 (React组件)
-├── sidepanel.tsx          # 侧边栏界面 (React组件) 
-├── background.ts          # Service Worker
-├── *.css                  # 样式文件
-├── backend/               # Fastify后端服务
+├── src/                      # 前端源码目录
+│   ├── popup.tsx            # 主Popup界面 (登录+角色导航)
+│   ├── sidepanel.tsx        # 侧边栏界面 (全功能视图)
+│   ├── popup.css            # Popup样式
+│   ├── sidepanel.css        # 侧边栏样式
+│   ├── background.ts        # Service Worker
+│   ├── common/              # 公共配置
+│   │   └── config/
+│   │       └── supabase.ts  # Supabase客户端配置
+│   └── components/          # React组件
+│       ├── AuthSection.tsx         # GitHub OAuth登录组件
+│       ├── MainLayout.tsx          # 主布局组件 (导航+内容区域)
+│       ├── Navigation.tsx          # 侧边栏导航 (角色自适应)
+│       ├── CompactPopup.tsx        # 紧凑型popup界面
+│       ├── HomePage.tsx            # 首页仪表板 (角色自适应)
+│       ├── AssignmentsPage.tsx     # 作业页面 (创建/管理/提交)
+│       ├── ClassroomsPage.tsx      # 班级页面 (创建/管理/加入)
+│       ├── PracticePage.tsx        # 练习页面 (学生自主练习)
+│       ├── *.css                   # 对应组件样式文件
+│       └── [未来扩展组件...]
+├── backend/                  # Fastify后端服务
 │   ├── src/
-│   │   ├── app.ts        # Fastify应用主文件
-│   │   ├── routes/       # API路由
-│   │   │   └── auth.ts   # GitHub OAuth认证
-│   │   └── middleware/   # 中间件
-│   │       └── auth.ts   # JWT认证中间件
-│   ├── prisma/           # Prisma配置
-│   │   ├── schema.prisma # 数据库模型
-│   │   └── migrations/   # 数据库迁移
+│   │   ├── app.ts           # Fastify应用主文件
+│   │   ├── config/
+│   │   │   └── supabase.ts  # Supabase配置
+│   │   ├── middleware/
+│   │   │   └── auth.ts      # JWT认证中间件
+│   │   └── routes/          # API路由模块
+│   │       ├── auth.ts      # 认证路由 (GitHub OAuth)
+│   │       ├── assignment.ts # 作业管理路由
+│   │       ├── classroom.ts # 班级管理路由
+│   │       ├── submissions.ts # 提交管理路由
+│   │       ├── upload.ts    # 文件上传路由
+│   │       ├── ocr.ts       # OCR识别路由
+│   │       └── ai.ts        # AI批改路由
+│   ├── prisma/              # Prisma数据库配置
+│   │   ├── schema.prisma    # 数据库模型定义
+│   │   └── migrations/      # 数据库迁移文件
 │   └── package.json
-├── book/                  # 微积分教材PDF
-└── .cursor/              # Cursor IDE规则
+├── tabs/                     # 全页面标签页 (未来功能)
+├── assets/                   # 静态资源
+├── book/                     # 微积分教材PDF
+├── homework/                 # 测试作业文件
+├── plasmo.config.ts         # Plasmo配置
+├── package.json
+├── pnpm-workspace.yaml      # pnpm工作区配置
+└── .cursor/                 # Cursor IDE规则
 ```
+
+### 核心文件说明
+
+**前端入口文件:**
+- `src/popup.tsx` - Chrome插件的主要入口，处理登录状态和基本导航
+- `src/sidepanel.tsx` - 侧边栏模式的完整应用界面
+
+**核心布局组件:**
+- `MainLayout.tsx` - 应用主布局，包含导航栏、内容区域、主题切换
+- `Navigation.tsx` - 角色自适应的侧边栏导航(教师/学生不同菜单)
+- `CompactPopup.tsx` - 紧凑模式的快捷操作界面
+
+**功能页面组件:**
+- `HomePage.tsx` - 角色自适应的仪表板(展示统计信息、快捷操作)
+- `AssignmentsPage.tsx` - 作业管理页面(教师创建作业，学生查看提交)
+- `ClassroomsPage.tsx` - 班级管理页面(教师管理班级，学生加入班级)
+- `PracticePage.tsx` - 学生练习页面(自主练习模式，即时AI反馈)
+
+**后端API模块:**
+- `routes/auth.ts` - GitHub OAuth认证流程处理
+- `routes/assignment.ts` - 作业CRUD操作、权限验证
+- `routes/classroom.ts` - 班级管理、成员管理、邀请码系统
+- `routes/submissions.ts` - 作业提交、自动批改工作流
+- `routes/upload.ts` - 文件上传、Supabase Storage集成
+- `routes/ocr.ts` - MathPix OCR识别服务
+- `routes/ai.ts` - Deepseek AI批改服务
 
 ## 🗄️ 数据库架构 (Prisma)
 
 ### 核心模型
-- **User**: 用户信息 (支持GitHub OAuth)
-- **FileUpload**: 文件上传记录
-- **Submission**: 作业提交
-- **MyScriptResult**: OCR识别结果
-- **DeepseekResult**: AI批改结果
+- **User**: 用户信息 (支持GitHub OAuth + 本地认证)
+- **Classroom**: 班级信息 (教师创建，学生加入)
+- **ClassroomMember**: 班级成员关系
+- **Assignment**: 作业信息 (教师发布，关联班级)
+- **FileUpload**: 文件上传记录 (支持多种用途)
+- **Submission**: 作业提交 (关联作业和文件)
+- **MathPixResult**: MathPix OCR识别结果
+- **DeepseekResult**: Deepseek AI批改结果
 
 ### 关系设计
 ```prisma
-User (1:N) FileUpload (1:N) Submission (1:N) MyScriptResult
-                                      (1:N) DeepseekResult
+# 用户和认证
+User (1:N) Classroom (教师创建班级)
+User (1:N) ClassroomMember (学生加入班级)
+Classroom (1:N) ClassroomMember
+
+# 作业系统
+User (1:N) Assignment (教师创建作业)
+Classroom (1:N) Assignment (班级的作业)
+Assignment (1:N) Submission (学生提交)
+
+# 文件和处理
+User (1:N) FileUpload (用户上传文件)
+FileUpload (1:N) Submission (文件用于提交)
+FileUpload (1:1) Assignment (作业题目文件)
+Submission (1:N) MathPixResult (OCR识别)
+Submission (1:N) DeepseekResult (AI批改)
 ```
 
 ## 🔧 Chrome扩展加载
@@ -223,33 +296,88 @@ User (1:N) FileUpload (1:N) Submission (1:N) MyScriptResult
 ## 🛠️ API接口
 
 ### 认证相关
-- `GET /api/auth/github` - 获取GitHub OAuth授权URL
-- `GET /api/auth/github/callback` - GitHub OAuth回调
-- `GET /api/auth/verify` - 验证JWT Token
+- `POST /api/auth/github/callback` - GitHub OAuth回调处理
+- `POST /api/auth/supabase/exchange` - Supabase会话交换
+- `POST /api/auth/github/process-token` - GitHub访问令牌处理
+- `GET /api/auth/verify` - JWT Token验证
+- `GET /api/auth/me` - 获取当前用户信息
 - `POST /api/auth/logout` - 用户登出
 
-### 业务接口 (需要认证)
-- `GET /api/health` - 系统健康检查
-- `POST /api/files` - 文件上传
-- `GET /api/submissions` - 获取提交记录
-- `POST /api/submissions` - 提交作业
-- `POST /api/ocr/myscript` - MyScript识别
-- `POST /api/ai/deepseek/grade` - AI批改
+### 作业管理 (教师权限)
+- `POST /api/assignments` - 创建作业
+- `GET /api/assignments/teacher` - 获取教师的作业列表
+- `PUT /api/assignments/:id` - 更新作业信息
+- `PATCH /api/assignments/:id/toggle` - 切换作业状态
+
+### 作业查看 (学生权限)
+- `GET /api/assignments/student` - 获取学生的作业列表
+- `GET /api/classrooms/:id/assignments` - 获取班级作业
+
+### 班级管理
+- `GET /api/classrooms/my-classroom` - 获取用户的主要班级
+- `POST /api/classrooms` - 创建班级 (教师权限)
+- `GET /api/classrooms/teacher` - 获取教师的班级列表
+- `GET /api/classrooms/student` - 获取学生的班级列表
+- `POST /api/classrooms/join` - 通过邀请码加入班级 (学生权限)
+- `GET /api/classrooms/:id/members` - 获取班级成员 (教师权限)
+
+### 提交管理
+- `GET /api/submissions` - 获取用户的提交记录
+- `POST /api/submissions` - 创建提交 (自动启动批改流程)
+- `GET /api/submissions/:id/status` - 获取提交的批改进度
+
+### 文件管理
+- `POST /api/files` - 文件上传 (支持多种用途标识)
+- `GET /api/files/:id/download` - 文件下载
+
+### AI处理 (内部调用)
+- `POST /api/internal/ocr/mathpix` - MathPix OCR识别
+- `POST /api/internal/ai/grade` - Deepseek AI批改
+- `POST /api/internal/ocr/assignment` - 作业题目OCR处理
 
 ### 示例请求
 ```javascript
-// GitHub登录
-const authResponse = await fetch('http://localhost:3000/api/auth/github');
-const { authUrl } = authResponse.data;
-window.open(authUrl);
+// GitHub OAuth登录 (通过Supabase)
+const { data, error } = await supabase.auth.signInWithOAuth({
+  provider: 'github',
+  options: {
+    redirectTo: `${window.location.origin}/auth/callback`
+  }
+});
 
-// 带认证的API请求
-const response = await fetch('http://localhost:3000/api/files', {
+// 文件上传
+const formData = new FormData();
+formData.append('file', file);
+formData.append('purpose', 'assignment_submission'); // 或 'question_upload'
+formData.append('workMode', 'homework'); // 或 'practice'
+
+const uploadResponse = await fetch('http://localhost:3000/api/files', {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${token}`,
   },
   body: formData
+});
+
+// 创建作业提交
+const submissionResponse = await fetch('http://localhost:3000/api/submissions', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+  },
+  body: JSON.stringify({
+    assignmentId: 123,
+    fileUploadIds: [456, 789],
+    note: '解题思路说明...'
+  })
+});
+
+// 查询批改进度
+const statusResponse = await fetch(`http://localhost:3000/api/submissions/${submissionId}/status`, {
+  headers: {
+    'Authorization': `Bearer ${token}`,
+  }
 });
 ```
 

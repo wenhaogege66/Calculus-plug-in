@@ -20,6 +20,7 @@ import { aiRoutes } from './routes/ai';
 import classroomRoutes from './routes/classroom';
 import assignmentRoutes from './routes/assignment';
 import submissionRoutes from './routes/submissions';
+import practiceRoutes from './routes/practice';
 import { requireAuth, optionalAuth } from './middleware/auth';
 
 // 加载环境变量
@@ -122,6 +123,9 @@ async function registerRoutes() {
   // 注册提交管理路由
   await fastify.register(submissionRoutes, { prefix: '/api' });
   
+  // 注册练习模式路由
+  await fastify.register(practiceRoutes, { prefix: '/api' });
+  
   // 健康检查路由
   fastify.get('/api/health', async (request, reply) => {
     try {
@@ -179,6 +183,7 @@ fastify.setNotFoundHandler(async (request, reply) => {
       '/api/auth',
       '/api/files',
       '/api/submissions',
+      '/api/practice',
       '/api/ocr',
       '/api/ai',
       '/api/classrooms',

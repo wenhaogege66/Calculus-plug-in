@@ -19,9 +19,10 @@ interface Submission {
   fileUpload: FileUpload;
   status: 'UPLOADED' | 'OCR_PROCESSING' | 'AI_PROCESSING' | 'COMPLETED' | 'FAILED';
   submittedAt: string;
-  myscriptResults?: Array<{
+  mathpixResults?: Array<{
     id: string;
     recognizedText: string;
+    mathLatex?: string;
     confidence: number;
   }>;
   deepseekResults?: Array<{
@@ -266,7 +267,7 @@ const SidePanel: React.FC = () => {
       setIsProcessing(true);
       showStatus('正在进行OCR识别...', 'info');
 
-      const response = await fetch(`${API_BASE_URL}/ocr/myscript`, {
+      const response = await fetch(`${API_BASE_URL}/ocr/mathpix`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -338,7 +339,7 @@ const SidePanel: React.FC = () => {
       'FAILED': '❌ 处理失败'
     };
 
-    const hasOCRResults = submission.myscriptResults && submission.myscriptResults.length > 0;
+    const hasOCRResults = submission.mathpixResults && submission.mathpixResults.length > 0;
     const hasAIResults = submission.deepseekResults && submission.deepseekResults.length > 0;
 
     return (
@@ -358,9 +359,12 @@ const SidePanel: React.FC = () => {
           {hasOCRResults && (
             <div className="ocr-results">
               <h4>🔍 OCR识别结果:</h4>
-              {submission.myscriptResults!.map(result => (
+              {submission.mathpixResults!.map(result => (
                 <div key={result.id} className="ocr-result">
                   <p><strong>识别文本:</strong> {result.recognizedText}</p>
+                  {result.mathLatex && (
+                    <p><strong>LaTeX公式:</strong> {result.mathLatex}</p>
+                  )}
                   <p><strong>置信度:</strong> {(result.confidence * 100).toFixed(1)}%</p>
                 </div>
               ))}
@@ -440,15 +444,88 @@ const SidePanel: React.FC = () => {
 
   if (!authState.isAuthenticated) {
     return (
-      <div className="sidepanel-container">
-        <div className="header">
-          <h1>📚 AI微积分助教</h1>
-          <p>智能批改 · 错题分析 · 学习建议</p>
-        </div>
-        <div className="auth-required">
-          <div className="auth-icon">🔐</div>
-          <h3>需要登录</h3>
-          <p>请在插件popup中登录GitHub账户后使用侧边栏功能。</p>
+      <div className="sidepanel-container unauthenticated">
+        <div className="login-page">
+          {/* 背景装饰 */}
+          <div className="bg-decoration">
+            <div className="decoration-circle circle-1"></div>
+            <div className="decoration-circle circle-2"></div>
+            <div className="decoration-circle circle-3"></div>
+          </div>
+          
+          {/* 主要内容 */}
+          <div className="login-content">
+            {/* Logo区域 */}
+            <div className="logo-section">
+              <div className="logo-icon-large">
+                <span className="logo-emoji">🔬</span>
+                <div className="logo-glow"></div>
+              </div>
+              <h1 className="app-title">AI微积分助教</h1>
+              <p className="app-subtitle">智能学习助手 · 专业数学批改</p>
+            </div>
+
+            {/* 功能特色 */}
+            <div className="features-preview">
+              <div className="feature-item">
+                <span className="feature-icon">🤖</span>
+                <div className="feature-text">
+                  <h4>智能批改</h4>
+                  <p>AI精准识别数学公式，提供详细批改反馈</p>
+                </div>
+              </div>
+              <div className="feature-item">
+                <span className="feature-icon">📊</span>
+                <div className="feature-text">
+                  <h4>学习分析</h4>
+                  <p>错题统计分析，个性化学习建议</p>
+                </div>
+              </div>
+              <div className="feature-item">
+                <span className="feature-icon">⚡</span>
+                <div className="feature-text">
+                  <h4>高效便捷</h4>
+                  <p>支持多种文件格式，快速处理批改</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 登录提示 */}
+            <div className="login-prompt">
+              <div className="login-icon-wrapper">
+                <div className="login-icon">🚀</div>
+              </div>
+              <h3 className="login-title">开始您的智能学习之旅</h3>
+              <p className="login-description">
+                请点击浏览器扩展图标，通过GitHub账户登录后即可使用全部功能
+              </p>
+              <div className="login-steps">
+                <div className="step-item">
+                  <span className="step-number">1</span>
+                  <span className="step-text">点击扩展图标</span>
+                </div>
+                <div className="step-arrow">→</div>
+                <div className="step-item">
+                  <span className="step-number">2</span>
+                  <span className="step-text">GitHub登录</span>
+                </div>
+                <div className="step-arrow">→</div>
+                <div className="step-item">
+                  <span className="step-number">3</span>
+                  <span className="step-text">开始使用</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 底部信息 */}
+            <div className="login-footer">
+              <div className="tech-info">
+                <span className="tech-badge">Powered by MathPix OCR</span>
+                <span className="tech-badge">DeepSeek AI</span>
+              </div>
+              <p className="version-info">Version 2.0.0 | 智能数学助教系统</p>
+            </div>
+          </div>
         </div>
       </div>
     );

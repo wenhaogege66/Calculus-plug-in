@@ -1,0 +1,327 @@
+/* Navigation.css - 科技风导航栏样式 */
+
+.navigation {
+  width: 280px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 主题切换 */
+.navigation.light {
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-right: 1px solid rgba(148, 163, 184, 0.2);
+  color: #1e293b;
+}
+
+.navigation.dark {
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  border-right: 1px solid rgba(148, 163, 184, 0.1);
+  color: #f1f5f9;
+}
+
+/* 科技风效果 */
+.navigation::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4);
+  animation: tech-glow 3s ease-in-out infinite alternate;
+}
+
+@keyframes tech-glow {
+  0% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* Header区域 */
+.nav-header {
+  padding: 24px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  position: relative;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05));
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 8px 12px;
+  border-radius: 12px;
+}
+
+.logo-container:hover {
+  background: rgba(59, 130, 246, 0.1);
+  transform: scale(1.02);
+}
+
+.logo-icon {
+  font-size: 36px;
+  filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.3));
+}
+
+.animated-logo {
+  animation: float 4s ease-in-out infinite, logo-pulse 2s ease-in-out infinite alternate;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes logo-pulse {
+  0% { filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.3)); }
+  100% { filter: drop-shadow(0 0 20px rgba(139, 92, 246, 0.5)); }
+}
+
+.logo-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.logo-title {
+  font-size: 18px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.2;
+}
+
+.logo-subtitle {
+  font-size: 12px;
+  opacity: 0.7;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.theme-toggle {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(148, 163, 184, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.theme-toggle:hover {
+  background: rgba(148, 163, 184, 0.2);
+  transform: scale(1.05);
+}
+
+.theme-icon {
+  font-size: 18px;
+  transition: transform 0.3s ease;
+}
+
+.theme-toggle:hover .theme-icon {
+  transform: rotate(360deg);
+}
+
+/* 导航菜单 */
+.nav-menu {
+  flex: 1;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.nav-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 100%;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+  transition: right 0.3s ease;
+  z-index: -1;
+}
+
+.nav-item:hover::before,
+.nav-item.active::before {
+  right: 0;
+}
+
+.nav-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.nav-item.active {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2));
+  border-left: 3px solid #3b82f6;
+  font-weight: 600;
+}
+
+.nav-item.logout {
+  margin-top: auto;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(249, 115, 22, 0.1));
+  color: #dc2626;
+}
+
+.nav-item.logout:hover {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(249, 115, 22, 0.2));
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+.nav-icon {
+  font-size: 20px;
+  width: 24px;
+  text-align: center;
+  transition: transform 0.3s ease;
+}
+
+.nav-item:hover .nav-icon {
+  transform: scale(1.1);
+}
+
+.nav-label {
+  font-size: 14px;
+  flex: 1;
+  text-align: left;
+}
+
+.nav-badge {
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: badge-bounce 2s ease-in-out infinite;
+}
+
+@keyframes badge-bounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* Removed unused quick actions styles */
+
+/* 状态指示器 */
+.nav-status {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: status-pulse 2s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .navigation {
+    width: 240px;
+  }
+  
+  .nav-header {
+    padding: 16px;
+  }
+  
+  .logo-title {
+    font-size: 14px;
+  }
+  
+  .nav-item {
+    padding: 10px 12px;
+  }
+  
+  .nav-label {
+    font-size: 13px;
+  }
+}
+
+/* 科技风扫描线效果 */
+.navigation::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+  animation: tech-scan 4s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes tech-scan {
+  0%, 100% { transform: translateY(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+
+/* 深色模式特定样式 */
+.navigation.dark .user-card {
+  background: rgba(71, 85, 105, 0.1);
+}
+
+.navigation.dark .user-card:hover {
+  background: rgba(71, 85, 105, 0.2);
+}
+
+.navigation.dark .theme-toggle {
+  background: rgba(71, 85, 105, 0.2);
+}
+
+.navigation.dark .theme-toggle:hover {
+  background: rgba(71, 85, 105, 0.3);
+}

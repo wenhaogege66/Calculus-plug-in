@@ -11,6 +11,78 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
     return Math.random().toString(36).substr(2, 8).toUpperCase();
   };
 
+  // 获取用户的班级信息（学生获取加入的班级，教师获取创建的班级）
+  fastify.get('/classrooms/my-classroom', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const userId = request.currentUser!.id;
+      const userRole = request.currentUser!.role.toLowerCase();
+      
+      let classroom = null;
+      
+      if (userRole === 'teacher') {
+        // 教师：获取创建的班级（假设教师只有一个班级）
+        classroom = await prisma.classroom.findFirst({
+          where: { 
+            teacherId: userId,
+            isActive: true
+          },
+          include: {
+            _count: {
+              select: { members: true }
+            }
+          }
+        });
+      } else {
+        // 学生：获取加入的班级
+        const membership = await prisma.classroomMember.findFirst({
+          where: { 
+            studentId: userId,
+            isActive: true
+          },
+          include: {
+            classroom: {
+              include: {
+                _count: {
+                  select: { members: true }
+                }
+              }
+            }
+          }
+        });
+        
+        if (membership) {
+          classroom = membership.classroom;
+        }
+      }
+      
+      if (classroom) {
+        return {
+          success: true,
+          data: {
+            classroom: {
+              id: classroom.id,
+              name: classroom.name,
+              description: classroom.description,
+              memberCount: classroom._count.members
+            }
+          }
+        };
+      } else {
+        return {
+          success: true,
+          data: { classroom: null }
+        };
+      }
+      
+    } catch (error) {
+      fastify.log.error('获取班级信息失败:', error);
+      return reply.code(500).send({
+        success: false,
+        error: '获取班级信息失败'
+      });
+    }
+  });
+
   // 创建班级 - 仅教师
   fastify.post('/classrooms', {
     preHandler: async (request, reply) => {

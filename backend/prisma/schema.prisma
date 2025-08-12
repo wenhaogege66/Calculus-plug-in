@@ -82,18 +82,19 @@ model Submission {
   // 关联
   user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   fileUpload   FileUpload        @relation(fields: [fileUploadId], references: [id], onDelete: Cascade)
-  myscriptResults MyScriptResult[]
+  mathpixResults MathPixResult[]
   deepseekResults DeepseekResult[]
   
   @@map("submissions")
 }
 
-// MyScript OCR结果表
-model MyScriptResult {
+// MathPix OCR结果表
+model MathPixResult {
   id             Int      @id @default(autoincrement())
   submissionId   Int      @map("submission_id")
   recognizedText String?  @map("recognized_text") @db.Text
-  confidenceScore Decimal? @map("confidence_score") @db.Decimal(5, 4)
+  mathLatex      String?  @map("math_latex") @db.Text
+  confidence     Decimal? @map("confidence") @db.Decimal(5, 4)
   processingTime Int?     @map("processing_time") // 毫秒
   rawResult      Json?    @map("raw_result")
   createdAt      DateTime @default(now()) @map("created_at")
@@ -101,7 +102,7 @@ model MyScriptResult {
   // 关联
   submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   
-  @@map("myscript_results")
+  @@map("mathpix_results")
 }
 
 // Deepseek AI批改结果表
@@ -204,7 +205,7 @@ model Assignment {
   dueDate     DateTime  @map("due_date")
   isActive    Boolean   @default(true) @map("is_active")
   
-  // MyScript OCR识别结果
+  // MathPix OCR识别结果
   ocrText     String?   @map("ocr_text") @db.Text // 题目识别的文本
   ocrLatex    String?   @map("ocr_latex") @db.Text // 题目识别的LaTeX
   ocrStatus   OcrStatus @default(PENDING) @map("ocr_status") // OCR处理状态

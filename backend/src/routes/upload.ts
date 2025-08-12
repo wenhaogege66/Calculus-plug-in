@@ -105,13 +105,28 @@ export async function uploadRoutes(fastify: FastifyInstance) {
       //   });
       // }
 
-      // 检查文件类型
+      // 检查文件类型 - 扩展支持更多数学相关格式
       const allowedTypes = [
+        // PDF文件
         'application/pdf',
+        // 标准图像格式
         'image/jpeg',
+        'image/jpg', 
         'image/png',
         'image/gif',
-        'image/webp'
+        'image/webp',
+        // 额外支持的图像格式
+        'image/bmp',
+        'image/tiff',
+        'image/tif',
+        'image/svg+xml',
+        // Microsoft Office格式（包含数学公式）
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+        'application/msword', // .doc
+        // 支持常见的扫描仪输出格式
+        'image/x-portable-bitmap', // .pbm
+        'image/x-portable-graymap', // .pgm
+        'image/x-portable-pixmap' // .ppm
       ];
 
       if (!allowedTypes.includes(mimetype)) {
@@ -410,7 +425,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
         include: {
           submissions: {
             include: {
-              myscriptResults: true,
+              mathpixResults: true,
               deepseekResults: true
             }
           }

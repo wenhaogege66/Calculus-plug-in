@@ -1,0 +1,723 @@
+/* PracticePage.css - 自主练习页面样式 */
+
+.practice-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: calc(100vh - 60px);
+  background: #fafbfc;
+}
+
+/* 页面头部 */
+.page-header {
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.page-header h1 {
+  font-size: 32px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0 0 12px 0;
+  animation: title-glow 3s ease-in-out infinite alternate;
+}
+
+@keyframes title-glow {
+  from { filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.3)); }
+  to { filter: drop-shadow(0 0 16px rgba(139, 92, 246, 0.5)); }
+}
+
+.page-header p {
+  font-size: 16px;
+  color: #64748b;
+  margin: 0;
+  opacity: 0.9;
+}
+
+/* 消息提示 */
+.message {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: message-slide-in 0.3s ease-out;
+}
+
+@keyframes message-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-success {
+  background: #d1fae5;
+  border: 1px solid #10b981;
+  color: #065f46;
+}
+
+.message-error {
+  background: #fee2e2;
+  border: 1px solid #ef4444;
+  color: #991b1b;
+}
+
+.message-info {
+  background: #dbeafe;
+  border: 1px solid #3b82f6;
+  color: #1e40af;
+}
+
+/* 标签页导航 */
+.practice-tabs {
+  display: flex;
+  background: white;
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+}
+
+.tab {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.tab:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.tab.active {
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: white;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* 标签页内容 */
+.tab-content {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  min-height: 500px;
+}
+
+/* 上传区域 */
+.upload-area {
+  border: 2px dashed #cbd5e1;
+  border-radius: 16px;
+  padding: 48px 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.02), rgba(139, 92, 246, 0.02));
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 32px;
+}
+
+.upload-area::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, transparent, rgba(59, 130, 246, 0.1), transparent);
+  border-radius: 16px;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.upload-area:hover::before,
+.upload-area.drag-over::before {
+  opacity: 1;
+}
+
+.upload-area:hover {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+}
+
+.upload-area.drag-over {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+  transform: scale(1.02);
+}
+
+.upload-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  animation: float-icon 3s ease-in-out infinite;
+}
+
+@keyframes float-icon {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+.upload-area h3 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 8px 0;
+}
+
+.upload-area p {
+  font-size: 16px;
+  color: #64748b;
+  margin: 0 0 12px 0;
+}
+
+.upload-hint {
+  font-size: 14px;
+  color: #94a3b8;
+  opacity: 0.8;
+}
+
+.file-input {
+  display: none;
+}
+
+/* 上传进度 */
+.upload-progress {
+  margin-top: 24px;
+  position: relative;
+  background: #e5e7eb;
+  border-radius: 20px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 20px;
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+.progress-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: progress-shine 1.5s ease-in-out infinite;
+}
+
+@keyframes progress-shine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.progress-text {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+/* 练习建议 */
+.practice-tips {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(59, 130, 246, 0.05));
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid rgba(16, 185, 129, 0.1);
+}
+
+.practice-tips h4 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.practice-tips ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style-type: none;
+}
+
+.practice-tips li {
+  font-size: 14px;
+  color: #475569;
+  margin-bottom: 8px;
+  position: relative;
+  line-height: 1.5;
+}
+
+.practice-tips li::before {
+  content: '✓';
+  position: absolute;
+  left: -20px;
+  color: #10b981;
+  font-weight: bold;
+}
+
+/* 练习记录 */
+.history-section {
+  min-height: 400px;
+}
+
+.practice-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.practice-session-card {
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.practice-session-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.practice-session-card:hover::before {
+  opacity: 1;
+}
+
+.practice-session-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.session-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-icon {
+  font-size: 20px;
+}
+
+.file-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.session-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.upload-time {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.difficulty-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid currentColor;
+  opacity: 0.9;
+}
+
+/* 练习结果 */
+.session-results {
+  display: grid;
+  gap: 20px;
+}
+
+.score-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.score-display {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.score-number {
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.score-label {
+  font-size: 18px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.score-level {
+  padding: 6px 12px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.feedback-section,
+.suggestions-section {
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  padding: 16px 20px;
+  border: 1px solid #e2e8f0;
+}
+
+.feedback-section h5,
+.suggestions-section h5 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feedback-text,
+.suggestions-text {
+  font-size: 14px;
+  color: #475569;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* 处理状态指示器 */
+.processing-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e5e7eb;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 加载容器 */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #64748b;
+}
+
+.loading-container .loading-spinner {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 16px;
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+}
+
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 24px;
+  opacity: 0.6;
+}
+
+.empty-state h3 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 12px 0;
+}
+
+.empty-state p {
+  font-size: 16px;
+  color: #6b7280;
+  margin: 0 0 32px 0;
+  line-height: 1.5;
+}
+
+.start-practice-btn {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.start-practice-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+}
+
+/* 学习分析 */
+.analytics-section {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05));
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid rgba(59, 130, 246, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+}
+
+.stat-icon {
+  font-size: 32px;
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-number {
+  font-size: 32px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.progress-chart {
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 32px;
+  border: 1px solid #e2e8f0;
+}
+
+.progress-chart h4 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 24px 0;
+}
+
+.chart-placeholder {
+  text-align: center;
+  padding: 60px 20px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.chart-placeholder p {
+  font-size: 16px;
+  color: #64748b;
+  margin: 0 0 8px 0;
+}
+
+.chart-note {
+  font-size: 14px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .practice-page {
+    padding: 16px;
+  }
+  
+  .page-header h1 {
+    font-size: 24px;
+  }
+  
+  .tab-content {
+    padding: 24px 20px;
+  }
+  
+  .upload-area {
+    padding: 32px 20px;
+  }
+  
+  .upload-area h3 {
+    font-size: 20px;
+  }
+  
+  .practice-tabs {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .session-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .session-meta {
+    align-items: flex-start;
+    flex-direction: row;
+    gap: 12px;
+  }
+  
+  .score-section {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+}
+
+/* 深色模式支持 */
+/* 主题适配 - 深色模式 */
+.main-layout.dark {
+  .practice-page {
+    background: #0f172a;
+    color: #f1f5f9;
+  }
+  
+  .tab-content {
+    background: #1e293b;
+    border-color: #374151;
+  }
+  
+  .practice-tabs {
+    background: #1e293b;
+    border-color: #374151;
+  }
+  
+  .upload-area {
+    border-color: #475569;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05));
+  }
+  
+  .practice-session-card {
+    background: #0f172a;
+    border-color: #374151;
+  }
+  
+  .empty-state h3 {
+    color: #f1f5f9;
+  }
+  
+  .stat-card {
+    background: rgba(30, 41, 59, 0.8);
+    border-color: rgba(71, 85, 105, 0.3);
+  }
+  
+  .progress-chart {
+    background: #0f172a;
+    border-color: #374151;
+  }
+}

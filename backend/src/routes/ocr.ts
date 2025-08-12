@@ -1,4 +1,4 @@
-// MyScript OCR识别服务
+// MathPix OCR识别服务
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { PrismaClient } from '@prisma/client';
@@ -19,13 +19,13 @@ export async function ocrRoutes(fastify: FastifyInstance) {
     return await processAssignmentOCR(request, reply, fastify);
   });
 
-  // MyScript手写识别 - 内部调用版本（无需认证）
-  fastify.post('/internal/ocr/myscript', async (request, reply) => {
+  // MathPix手写识别 - 内部调用版本（无需认证）
+  fastify.post('/internal/ocr/mathpix', async (request, reply) => {
     return await processOCR(request, reply, fastify);
   });
 
-  // MyScript手写识别 - 外部调用版本（需要认证）
-  fastify.post('/ocr/myscript', { preHandler: requireAuth }, async (request, reply) => {
+  // MathPix手写识别 - 外部调用版本（需要认证）
+  fastify.post('/ocr/mathpix', { preHandler: requireAuth }, async (request, reply) => {
     return await processOCR(request, reply, fastify);
   });
 
@@ -110,8 +110,11 @@ async function processAssignmentOCR(request: FastifyRequest, reply: FastifyReply
 
     const startTime = Date.now();
 
-    // 调用MyScript API进行识别
-    const myscriptResult = await callMyScriptAPI(imageToProcess);
+    // 获取文件类型信息进行优化识别
+    const fileType = assignment.questionFile.mimeType;
+    
+    // 调用MathPix API进行识别
+    const mathpixResult = await callMathPixAPI(imageToProcess, fileType);
     
     const processingTime = Date.now() - startTime;
 
@@ -119,8 +122,8 @@ async function processAssignmentOCR(request: FastifyRequest, reply: FastifyReply
     await prisma.assignment.update({
       where: { id: assignmentId },
       data: {
-        ocrText: myscriptResult.text,
-        ocrLatex: myscriptResult.latex || null,
+        ocrText: mathpixResult.text,
+        ocrLatex: mathpixResult.latex || null,
         ocrStatus: 'COMPLETED',
         ocrProcessedAt: new Date()
       }
@@ -132,9 +135,9 @@ async function processAssignmentOCR(request: FastifyRequest, reply: FastifyReply
       success: true,
       data: {
         assignmentId: assignmentId,
-        ocrText: myscriptResult.text,
-        ocrLatex: myscriptResult.latex,
-        confidence: myscriptResult.confidence,
+        ocrText: mathpixResult.text,
+        ocrLatex: mathpixResult.latex,
+        confidence: mathpixResult.confidence,
         processingTime: processingTime
       }
     };
@@ -217,11 +220,11 @@ async function processOCR(request: FastifyRequest, reply: FastifyReply, fastify:
             });
           }
 
-          // 将文件转换为base64
-          const fileBuffer = await fileData.arrayBuffer();
-          imageToProcess = Buffer.from(fileBuffer).toString('base64');
+          // 将文件转换为buffer进行预处理
+          const fileBuffer = Buffer.from(await fileData.arrayBuffer());
           
-          fastify.log.info(`文件转换完成，大小: ${Math.round(fileBuffer.byteLength / 1024)}KB`);
+          // 使用文件预处理功能
+          imageToProcess = await preprocessFileForOCR(fileBuffer, fileUpload.mimeType);
           
         } catch (error) {
           fastify.log.error('获取文件数据时出错:', error);
@@ -247,19 +250,23 @@ async function processOCR(request: FastifyRequest, reply: FastifyReply, fastify:
 
       const startTime = Date.now();
 
-      // 调用MyScript API
-      const myscriptResult = await callMyScriptAPI(imageToProcess);
+      // 获取文件类型以优化MathPix识别
+      const fileType = submission.fileUpload?.mimeType;
+
+      // 调用MathPix API
+      const mathpixResult = await callMathPixAPI(imageToProcess, fileType);
       
       const processingTime = Date.now() - startTime;
 
       // 保存识别结果
-      const ocrResult = await prisma.myScriptResult.create({
+      const ocrResult = await prisma.mathPixResult.create({
         data: {
           submissionId: submissionId,
-          recognizedText: myscriptResult.text,
-          confidenceScore: myscriptResult.confidence,
+          recognizedText: mathpixResult.text,
+          mathLatex: mathpixResult.latex,
+          confidence: mathpixResult.confidence,
           processingTime: processingTime,
-          rawResult: myscriptResult.raw
+          rawResult: mathpixResult.raw
         }
       });
 
@@ -268,13 +275,14 @@ async function processOCR(request: FastifyRequest, reply: FastifyReply, fastify:
         data: {
           resultId: ocrResult.id,
           recognizedText: ocrResult.recognizedText,
-          confidence: ocrResult.confidenceScore,
+          mathLatex: ocrResult.mathLatex,
+          confidence: ocrResult.confidence,
           processingTime: ocrResult.processingTime
         }
       };
 
     } catch (error) {
-      fastify.log.error('MyScript OCR处理失败:', error);
+      fastify.log.error('MathPix OCR处理失败:', error);
       
       // 更新提交状态为失败
       if ((request.body as any)?.submissionId) {
@@ -312,7 +320,7 @@ async function processOCR(request: FastifyRequest, reply: FastifyReply, fastify:
       }
 
       // 获取OCR结果
-      const ocrResults = await prisma.myScriptResult.findMany({
+      const ocrResults = await prisma.mathPixResult.findMany({
         where: { submissionId: submissionId },
         orderBy: { createdAt: 'desc' }
       });
@@ -332,71 +340,101 @@ async function processOCR(request: FastifyRequest, reply: FastifyReply, fastify:
   });
 }
 
-// 调用MyScript API的辅助函数
-async function callMyScriptAPI(imageData: string): Promise<{
+// 检测文件格式并处理
+async function preprocessFileForOCR(fileBuffer: Buffer, mimeType: string): Promise<string> {
+  try {
+    if (mimeType === 'application/pdf') {
+      console.log('📄 检测到PDF文件，需要转换为图像');
+      // TODO: 实现PDF到图像的转换
+      // 暂时直接转换为base64，但在实际生产环境中应该先转换为图像
+      console.log('⚠️ PDF处理功能正在开发中，暂时使用fallback处理');
+    }
+    
+    // 对于图像文件，直接转换为base64
+    const base64Data = fileBuffer.toString('base64');
+    
+    // 验证base64数据
+    if (!base64Data || base64Data.length < 100) {
+      throw new Error('生成的base64数据无效或过小');
+    }
+    
+    console.log(`✅ 文件预处理完成，base64大小: ${Math.round(base64Data.length / 1024)}KB`);
+    return base64Data;
+    
+  } catch (error) {
+    console.error('文件预处理失败:', error);
+    throw new Error(`文件预处理失败: ${error instanceof Error ? error.message : '未知错误'}`);
+  }
+}
+
+// 调用MathPix API的辅助函数
+async function callMathPixAPI(imageData: string, fileType?: string): Promise<{
   text: string;
   latex?: string;
   confidence: number;
   raw: any;
 }> {
   try {
-    const appKey = process.env.MYSCRIPT_APPLICATION_KEY;
-    const hmacKey = process.env.MYSCRIPT_HMAC_KEY;
+    const appId = process.env.MATHPIX_APP_ID;
+    const appKey = process.env.MATHPIX_APP_KEY;
 
-    if (!appKey || !hmacKey) {
-      throw new Error('MyScript配置缺失');
+    if (!appId || !appKey) {
+      throw new Error('MathPix配置缺失');
     }
 
-    // 实际MyScript API调用
-    console.log('🔍 调用MyScript Cloud API进行OCR识别');
-    
-    // 将base64转换为Buffer
-    const imageBuffer = Buffer.from(imageData, 'base64');
-    
-    // 创建FormData
-    const FormData = require('form-data');
-    const form = new FormData();
-    
-    // 添加文件数据
-    form.append('file', imageBuffer, {
-      filename: 'image.png',
-      contentType: 'image/png'
-    });
-    
-    // 添加配置参数，按照官方文档格式
-    form.append('parameters', JSON.stringify({
-      configuration: {
-        lang: 'zh_CN',
-        resultTypes: ['TEXT', 'LATEX']
+    // 根据文件类型调整MathPix参数
+    const mathpixOptions: any = {
+      src: `data:image/png;base64,${imageData}`,
+      formats: ["text", "latex_normal", "latex_simplified", "mathml"],
+      data_options: {
+        include_line_data: true,
+        include_word_data: true,
+        include_smiles: true,
+        include_geometry_data: true,
+        include_table_data: true
       }
-    }));
+    };
 
-    // 调用MyScript API - 使用正确的batch端点
-    const response = await axios.post('https://cloud.myscript.com/api/v4.0/iink/batch', form, {
+    // 针对不同文件类型优化处理选项
+    if (fileType === 'application/pdf') {
+      mathpixOptions.data_options.include_asciimath = true;
+      mathpixOptions.data_options.include_tsv = true;
+    } else if (fileType?.startsWith('image/')) {
+      mathpixOptions.data_options.include_confidence = true;
+      mathpixOptions.data_options.include_diagram = true;
+    }
+
+    // 调用MathPix OCR API
+    console.log('🔍 调用MathPix OCR API进行识别，文件类型:', fileType);
+    
+    const response = await axios.post('https://api.mathpix.com/v3/text', mathpixOptions, {
       headers: {
-        ...form.getHeaders(),
-        // 使用基础认证
-        'Authorization': `Basic ${Buffer.from(`${appKey}:${hmacKey}`).toString('base64')}`
+        'app_id': appId,
+        'app_key': appKey,
+        'Content-type': 'application/json'
       },
-      timeout: 30000 // 30秒超时
+      timeout: 45000 // 增加超时时间到45秒，因为复杂文档可能需要更长时间
     });
 
-    console.log('✅ MyScript API调用成功');
+    console.log('✅ MathPix API调用成功');
 
-    // 解析结果
-    const result = response.data.result || {};
-    const textResult = result['text/plain'] || '';
-    const latexResult = result['application/x-latex'] || '';
+    const result = response.data;
+    const text = result.text || '';
+    const latex = result.latex_normal || result.latex_simplified || '';
+    const confidence = result.confidence || result.confidence_rate || 0.95;
+
+    // 记录详细的识别结果
+    console.log(`📊 MathPix识别结果 - 文本长度: ${text.length}, LaTeX长度: ${latex?.length || 0}, 置信度: ${confidence}`);
 
     return {
-      text: textResult,
-      latex: latexResult,
-      confidence: 0.95, // MyScript通常有很高的识别准确率
-      raw: response.data
+      text: text,
+      latex: latex,
+      confidence: confidence,
+      raw: result
     };
 
   } catch (error) {
-    console.error('MyScript API调用失败:', error);
+    console.error('MathPix API调用失败:', error);
     
     // 如果API调用失败，提供fallback模拟结果
     console.log('🔄 API调用失败，使用fallback模拟结果');
@@ -428,8 +466,8 @@ async function callMyScriptAPI(imageData: string): Promise<{
         originalError: error instanceof Error ? error.message : '未知错误',
         originalImageSize: imageSize + 'KB',
         processingTime: '1.0s',
-        language: 'zh_CN'
+        provider: 'MathPix_Fallback'
       }
     };
   }
-} 
+}

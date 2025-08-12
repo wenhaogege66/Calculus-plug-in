@@ -250,4 +250,403 @@
 .empty-icon {
   font-size: 48px;
   margin-bottom: 15px;
+}
+
+/* ===== 新的未登录页面样式 ===== */
+.sidepanel-container.unauthenticated {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+/* 背景装饰 */
+.bg-decoration {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.decoration-circle {
+  position: absolute;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.circle-1 {
+  width: 200px;
+  height: 200px;
+  top: -100px;
+  right: -100px;
+  animation: float-1 6s ease-in-out infinite;
+}
+
+.circle-2 {
+  width: 150px;
+  height: 150px;
+  bottom: -75px;
+  left: -75px;
+  animation: float-2 4s ease-in-out infinite;
+}
+
+.circle-3 {
+  width: 100px;
+  height: 100px;
+  top: 30%;
+  right: 20%;
+  animation: float-3 5s ease-in-out infinite;
+}
+
+@keyframes float-1 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  33% { transform: translate(30px, -30px) rotate(120deg); }
+  66% { transform: translate(-20px, 20px) rotate(240deg); }
+}
+
+@keyframes float-2 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(20px, -40px) rotate(180deg); }
+}
+
+@keyframes float-3 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(-15px, 15px) rotate(90deg); }
+  50% { transform: translate(15px, 30px) rotate(180deg); }
+  75% { transform: translate(-10px, -20px) rotate(270deg); }
+}
+
+/* 主要内容区域 */
+.login-content {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  padding: 40px 32px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+  z-index: 2;
+  animation: login-slide-in 0.8s ease-out;
+}
+
+@keyframes login-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Logo区域 */
+.logo-section {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.logo-icon-large {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+  animation: logo-pulse 3s ease-in-out infinite alternate;
+}
+
+.logo-emoji {
+  font-size: 36px;
+  z-index: 2;
+}
+
+.logo-glow {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  right: -5px;
+  bottom: -5px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  opacity: 0.3;
+  filter: blur(8px);
+  z-index: 1;
+}
+
+@keyframes logo-pulse {
+  0% { 
+    transform: scale(1);
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+  }
+  100% { 
+    transform: scale(1.05);
+    box-shadow: 0 15px 40px rgba(102, 126, 234, 0.5);
+  }
+}
+
+.app-title {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.2;
+}
+
+.app-subtitle {
+  font-size: 16px;
+  color: #64748b;
+  margin: 0;
+  opacity: 0.8;
+}
+
+/* 功能特色 */
+.features-preview {
+  margin-bottom: 40px;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: 16px;
+  border: 1px solid rgba(102, 126, 234, 0.1);
+  transition: all 0.3s ease;
+}
+
+.feature-item:hover {
+  background: rgba(102, 126, 234, 0.1);
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.feature-icon {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.feature-text h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+}
+
+.feature-text p {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* 登录提示 */
+.login-prompt {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-icon-wrapper {
+  margin-bottom: 20px;
+}
+
+.login-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+  border-radius: 50%;
+  font-size: 28px;
+  margin: 0 auto;
+  animation: icon-bounce 2s ease-in-out infinite;
+}
+
+@keyframes icon-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.login-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 12px 0;
+}
+
+.login-description {
+  font-size: 16px;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0 0 24px 0;
+}
+
+/* 登录步骤 */
+.login-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 12px;
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: 12px;
+  min-width: 100px;
+}
+
+.step-number {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.step-text {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+  text-align: center;
+}
+
+.step-arrow {
+  color: #667eea;
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0 4px;
+}
+
+/* 底部信息 */
+.login-footer {
+  text-align: center;
+  padding-top: 24px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.tech-info {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.tech-badge {
+  padding: 4px 12px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: 16px;
+  font-size: 12px;
+  color: #667eea;
+  font-weight: 500;
+}
+
+.version-info {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .login-page {
+    padding: 16px;
+  }
+  
+  .login-content {
+    padding: 32px 24px;
+    margin: 16px 0;
+  }
+  
+  .app-title {
+    font-size: 28px;
+  }
+  
+  .login-steps {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .step-arrow {
+    transform: rotate(90deg);
+  }
+  
+  .decoration-circle {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-content {
+    padding: 24px 20px;
+  }
+  
+  .logo-icon-large {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .logo-emoji {
+    font-size: 28px;
+  }
+  
+  .app-title {
+    font-size: 24px;
+  }
+  
+  .feature-item {
+    padding: 12px;
+  }
+  
+  .feature-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+  }
 } 

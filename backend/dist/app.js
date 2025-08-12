@@ -19,6 +19,7 @@ const ai_1 = require("./routes/ai");
 const classroom_1 = __importDefault(require("./routes/classroom"));
 const assignment_1 = __importDefault(require("./routes/assignment"));
 const submissions_1 = __importDefault(require("./routes/submissions"));
+const practice_1 = __importDefault(require("./routes/practice"));
 dotenv_1.default.config();
 const PORT = Number(process.env.PORT) || 3000;
 const prisma = new client_1.PrismaClient();
@@ -86,6 +87,7 @@ async function registerRoutes() {
     await fastify.register(classroom_1.default, { prefix: '/api' });
     await fastify.register(assignment_1.default, { prefix: '/api' });
     await fastify.register(submissions_1.default, { prefix: '/api' });
+    await fastify.register(practice_1.default, { prefix: '/api' });
     fastify.get('/api/health', async (request, reply) => {
         try {
             let dbStatus = 'healthy';
@@ -136,6 +138,7 @@ fastify.setNotFoundHandler(async (request, reply) => {
             '/api/auth',
             '/api/files',
             '/api/submissions',
+            '/api/practice',
             '/api/ocr',
             '/api/ai',
             '/api/classrooms',

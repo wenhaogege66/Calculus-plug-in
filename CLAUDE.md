@@ -5,7 +5,7 @@ Every time you complete the modification of the code, you should determine wheth
 
 ## Project Overview
 
-AI微积分助教 (AI Calculus Assistant) - A Chrome extension built with Plasmo framework for intelligent calculus homework grading. The system provides OCR recognition using MyScript API and AI grading using Deepseek API, supporting both student practice mode and homework mode with teacher-student role management.
+AI微积分助教 (AI Calculus Assistant) - A Chrome extension built with Plasmo framework for intelligent calculus homework grading. The system provides OCR recognition using MathPix API and AI grading using Deepseek API, supporting both student practice mode and homework mode with teacher-student role management. Features a modern, tech-styled UI with dark mode support and responsive design.
 
 ## Architecture
 
@@ -13,17 +13,34 @@ AI微积分助教 (AI Calculus Assistant) - A Chrome extension built with Plasmo
 - **Framework**: Plasmo + React 18 + TypeScript
 - **Authentication**: GitHub OAuth via Supabase
 - **State Management**: React Hooks + Chrome Storage API
-- **Entry Points**: `popup.tsx` (main interface), `sidepanel.tsx` (detailed view), `background.ts` (service worker)
+- **UI Design**: Modern tech-styled interface with dark mode support and responsive design
+- **Architecture**: Component-based modular design with page routing and role-based UI
+- **Entry Points**: 
+  - `popup.tsx` - Main popup interface (compact mode)
+  - `sidepanel.tsx` - Side panel view (full-width mode)
+  - `tabs/` - Full-page tab views (future implementation)
+  - `background.ts` - Service worker for background tasks
+- **Core Layout Components**:
+  - `MainLayout.tsx` - Main application layout with navigation
+  - `Navigation.tsx` - Role-based sidebar navigation (teacher/student)
+  - `CompactPopup.tsx` - Compact popup interface for quick actions
+- **Page Components** (Role-based routing):
+  - `HomePage.tsx` - Dashboard with role-specific widgets and stats
+  - `AssignmentsPage.tsx` - Assignment management (teacher) / assignment list (student)
+  - `ClassroomsPage.tsx` - Classroom management and member administration
+  - `PracticePage.tsx` - Self-practice mode for students
+- **Authentication Components**:
+  - `AuthSection.tsx` - GitHub OAuth login interface
 
 ### Backend (API Server)
 - **Framework**: Fastify + TypeScript
 - **Database**: Supabase PostgreSQL with Prisma ORM
 - **Authentication**: Supabase built-in OAuth with GitHub Provider
 - **File Storage**: Supabase Storage (S3-like) for assignments, questions, and graded files
-- **AI Services**: MyScript (handwriting OCR) + Deepseek (scoring, future: grading/annotation)
+- **AI Services**: MathPix (mathematical OCR) + Deepseek (scoring, future: grading/annotation)
 
 ### Database Schema (Prisma)
-Key models: `User`, `FileUpload`, `Submission`, `MyScriptResult`, `DeepseekResult`, `Classroom`, `Assignment`
+Key models: `User`, `FileUpload`, `Submission`, `MathPixResult`, `DeepseekResult`, `Classroom`, `Assignment`
 - Supports both GitHub OAuth and local authentication
 - Role-based access (STUDENT/TEACHER)
 - Submission tracking with status management
@@ -83,8 +100,8 @@ Backend requires:
 - `SUPABASE_ANON_KEY` - Supabase anonymous key  
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (for admin operations)
 - `DEEPSEEK_API_KEY` - AI scoring service
-- `MYSCRIPT_APPLICATION_KEY` - MyScript app key
-- `MYSCRIPT_HMAC_KEY` - MyScript HMAC key
+- `MATHPIX_APP_ID` - MathPix application ID
+- `MATHPIX_APP_KEY` - MathPix application key
 
 Frontend (Plasmo) requires:
 - `PLASMO_PUBLIC_SUPABASE_URL` - Same as backend SUPABASE_URL
@@ -104,22 +121,70 @@ Note: Storage endpoints are handled automatically by Supabase client - no additi
 
 ## Important Files and Locations
 
-### Core Components
-- `src/popup.tsx` - Main popup interface with login and mode selection
-- `src/components/AuthSection.tsx` - GitHub OAuth authentication
-- `src/components/TeacherSection.tsx` - Teacher-specific functionality
-- `backend/src/app.ts` - Fastify server setup
-- `backend/src/routes/` - API route handlers
+### Frontend Components Structure
+
+**Entry Points:**
+- `src/popup.tsx` - Main popup interface with authentication and role-based navigation
+- `src/sidepanel.tsx` - Side panel view with full application features
+
+**Layout & Navigation:**
+- `src/components/MainLayout.tsx` - Main application layout with sidebar navigation and theme management
+- `src/components/Navigation.tsx` - Role-based navigation menu (teacher/student specific items)
+- `src/components/CompactPopup.tsx` - Compact popup interface for quick access
+
+**Page Components:**
+- `src/components/HomePage.tsx` - Role-specific dashboard with widgets, stats, and quick actions
+- `src/components/AssignmentsPage.tsx` - Full-featured assignment management with filtering, creation, and submission
+- `src/components/ClassroomsPage.tsx` - Classroom management, member administration, and invite system
+- `src/components/PracticePage.tsx` - Self-practice mode with file upload and AI grading
+
+**Authentication:**
+- `src/components/AuthSection.tsx` - GitHub OAuth authentication flow
+
+**Backend Core:**
+- `backend/src/app.ts` - Fastify server setup with route registration
+- `backend/src/routes/` - API route handlers (auth, assignments, classrooms, submissions, files, OCR, AI)
 - `backend/src/middleware/auth.ts` - JWT authentication middleware
 
 ### API Endpoints
-- `/api/auth/github` - GitHub OAuth flow
-- `/api/files` - File upload (multipart)
-- `/api/submissions` - Submission management
-- `/api/ocr/myscript` - OCR processing
-- `/api/ai/deepseek/grade` - AI grading
-- `/api/assignments` - Assignment management (teachers)
-- `/api/classrooms` - Classroom management
+
+**Authentication:**
+- `POST /api/auth/github/callback` - GitHub OAuth callback processing
+- `POST /api/auth/supabase/exchange` - Supabase session exchange
+- `POST /api/auth/github/process-token` - Process GitHub access token
+- `GET /api/auth/verify` - JWT token verification
+- `GET /api/auth/me` - Get current user information
+- `POST /api/auth/logout` - User logout
+
+**File Management:**
+- `POST /api/files` - File upload (multipart) with purpose-based routing
+- `GET /api/files/:id/download` - File download
+
+**Assignment Management:**
+- `POST /api/assignments` - Create assignment (teacher only)
+- `GET /api/assignments/teacher` - Get teacher's assignments
+- `GET /api/assignments/student` - Get student's assignments
+- `GET /api/classrooms/:id/assignments` - Get classroom assignments
+- `PUT /api/assignments/:id` - Update assignment
+- `PATCH /api/assignments/:id/toggle` - Toggle assignment status
+
+**Classroom Management:**
+- `GET /api/classrooms/my-classroom` - Get user's primary classroom
+- `POST /api/classrooms` - Create classroom (teacher only)
+- `GET /api/classrooms/teacher` - Get teacher's classrooms
+- `GET /api/classrooms/student` - Get student's classrooms
+- `POST /api/classrooms/join` - Join classroom via invite code
+- `GET /api/classrooms/:id/members` - Get classroom members
+
+**Submission Management:**
+- `GET /api/submissions` - Get user submissions
+- `POST /api/submissions` - Create submission with auto-grading workflow
+- `GET /api/submissions/:id/status` - Get submission processing status
+
+**AI Processing:**
+- `/api/ocr/mathpix` - OCR processing (internal)
+- `/api/ai/deepseek/grade` - AI grading (internal)
+- Internal workflow endpoints for automated processing
 
 ### File Storage
 - Test files available at `/Users/wenhao/XLab/Calculus/homework/test.pdf`
@@ -142,10 +207,10 @@ Note: Storage endpoints are handled automatically by Supabase client - no additi
 Use backend's built-in endpoints or Prisma Studio (`npm run db:studio`) for database inspection.
 
 ### AI Service Usage
-**MyScript OCR:**
-- Teachers: Upload and recognize handwritten questions from images → Build structured question bank
-- Students: Convert handwritten homework solutions to text for AI processing
-- Future: Question-answer matching and automated assignment detection
+**MathPix OCR:**
+- Teachers: Upload and recognize mathematical content from images → Build structured question bank
+- Students: Convert handwritten/printed mathematical solutions to text and LaTeX for AI processing
+- Advanced: Mathematical formula recognition, equation parsing, and symbol detection
 
 **DeepSeek AI:**
 - Currently: Basic scoring of student submissions (0-100 points)
@@ -175,9 +240,31 @@ Use backend's built-in endpoints or Prisma Studio (`npm run db:studio`) for data
 - Learning analytics and progress tracking
 
 ### Working with Submissions
-The system supports two modes:
-- **Practice Mode** (`workMode: "practice"`) - Student uploads complete problems with solutions
-- **Homework Mode** (`workMode: "homework"`) - Student uploads solutions, matched against assignment questions
+
+The system supports role-based submission workflows:
+
+**Student Workflows:**
+- **Practice Mode** (`workMode: "practice"`) - Self-paced learning with immediate AI feedback
+  - Upload complete problems with solutions
+  - Automatic OCR recognition and AI grading
+  - No assignment association required
+- **Homework Mode** (`workMode: "homework"`) - Assignment-based submissions
+  - Upload solutions for specific assignments
+  - Matched against teacher-created assignments
+  - Deadline and classroom validation
+  - Progress tracking and status management
+
+**Teacher Workflows:**
+- **Question Upload** - Teachers upload questions for OCR recognition and question bank building
+- **Assignment Creation** - Create assignments with optional question files
+- **Submission Review** - Monitor student submissions and grading results
+
+**Automated Processing Pipeline:**
+1. **File Upload** → Supabase Storage
+2. **OCR Recognition** → MathPix API processing
+3. **AI Grading** → Deepseek API analysis (students only)
+4. **Result Storage** → Database with progress tracking
+5. **Status Updates** → Real-time progress monitoring
 
 ## Technical Implementation Notes
 

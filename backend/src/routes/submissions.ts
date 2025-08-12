@@ -13,7 +13,7 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
         where: { userId: request.currentUser!.id },
         include: {
           fileUpload: true,
-          myscriptResults: true,
+          mathpixResults: true,
           deepseekResults: true,
         },
         orderBy: { submittedAt: 'desc' },
@@ -157,13 +157,13 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
           fileUpload: {
             select: { originalName: true, fileSize: true, mimeType: true }
           },
-          myscriptResults: {
+          mathpixResults: {
             orderBy: { createdAt: 'desc' },
             take: 1,
             select: {
               id: true,
               recognizedText: true,
-              confidenceScore: true,
+              confidence: true,
               processingTime: true,
               rawResult: true,
               createdAt: true
@@ -200,11 +200,11 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
       let stage = '';
       let message = '';
 
-      if (submission.myscriptResults && submission.myscriptResults.length > 0) {
-        const myscriptResult = submission.myscriptResults[0];
+      if (submission.mathpixResults && submission.mathpixResults.length > 0) {
+        const mathpixResult = submission.mathpixResults[0];
         
         // 如果有文字识别结果且有文本内容，说明OCR完成
-        if (myscriptResult.recognizedText && myscriptResult.recognizedText.trim().length > 0) {
+        if (mathpixResult.recognizedText && mathpixResult.recognizedText.trim().length > 0) {
           progress = 60;
           stage = 'grading';
           message = 'AI智能批改中...';
@@ -226,7 +226,7 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
             }
           }
         } else {
-          // 有MyScript记录但没有识别文本，可能还在处理中
+          // 有MathPix记录但没有识别文本，可能还在处理中
           progress = 30;
           stage = 'ocr';
           message = '文字识别处理中...';
@@ -246,7 +246,7 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
           workMode: submission.workMode,
           submittedAt: submission.submittedAt,
           fileUpload: submission.fileUpload,
-          myscriptResults: submission.myscriptResults,
+          mathpixResults: submission.mathpixResults,
           deepseekResults: submission.deepseekResults,
           progress: {
             percent: progress,
@@ -273,7 +273,7 @@ async function startGradingProcess(submissionId: number) {
     
     // 1. 首先进行OCR识别
     console.log(`📝 步骤1: 启动OCR识别`);
-    const ocrResponse = await fetch(`http://localhost:3000/api/internal/ocr/myscript`, {
+    const ocrResponse = await fetch(`http://localhost:3000/api/internal/ocr/mathpix`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -360,7 +360,7 @@ async function startQuestionProcessing(submissionId: number) {
     
     // 进行OCR识别
     console.log(`📝 步骤1: 启动题目OCR识别`);
-    const ocrResponse = await fetch(`http://localhost:3000/api/internal/ocr/myscript`, {
+    const ocrResponse = await fetch(`http://localhost:3000/api/internal/ocr/mathpix`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

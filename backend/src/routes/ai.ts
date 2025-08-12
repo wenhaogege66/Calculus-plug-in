@@ -38,7 +38,7 @@ async function processAIGrading(request: FastifyRequest, reply: FastifyReply, fa
         },
         include: {
           fileUpload: true,
-          myscriptResults: true
+          mathpixResults: true
         }
       });
 
@@ -358,8 +358,8 @@ ${teacherQuestionText ?
       maxScore: 100,
       feedback: 'AI批改服务暂时不可用，请稍后重试。',
       errors: [],
-      suggestions: [{ aspect: '服务状态', recommendation: '请稍后重试AI批改功能' }],
-      strengths: [{ aspect: '提交', description: '成功提交了作业' }],
+      suggestions: ['请稍后重试AI批改功能'],
+      strengths: ['成功提交了作业'],
       raw: { error: error instanceof Error ? error.message : '未知错误' }
     };
   }
