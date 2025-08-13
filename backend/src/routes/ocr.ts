@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
 import { supabase, supabaseAdmin, STORAGE_BUCKETS } from '../config/supabase';
 import axios from 'axios';
+import FormData from 'form-data';
 
 const prisma = new PrismaClient();
 
@@ -38,55 +39,53 @@ export async function processOCR(request: FastifyRequest, reply: FastifyReply, f
         });
       }
 
-      let imageToProcess = imageData;
+      let imageToProcess: Buffer | undefined = undefined;
       
-      // 如果没有提供图片数据，从Supabase Storage获取文件
-      if (!imageToProcess) {
-        try {
-          // 从文件上传记录获取文件路径
-          const fileUpload = submission.fileUpload;
-          if (!fileUpload) {
-            return reply.code(400).send({
-              success: false,
-              error: '文件信息不存在'
-            });
-          }
-
-          fastify.log.info(`从Supabase Storage获取文件: ${fileUpload.filePath}`);
-          
-          // 使用Admin客户端从Supabase Storage下载文件
-          const storageClient = supabaseAdmin || supabase;
-          const { data: fileData, error: downloadError } = await storageClient.storage
-            .from(STORAGE_BUCKETS.ASSIGNMENTS)
-            .download(fileUpload.filePath);
-
-          if (downloadError || !fileData) {
-            fastify.log.error('从Supabase Storage下载文件失败:', downloadError);
-            return reply.code(400).send({
-              success: false,
-              error: '无法获取文件数据'
-            });
-          }
-
-          // 将文件转换为buffer进行预处理
-          const fileBuffer = Buffer.from(await fileData.arrayBuffer());
-          
-          // 使用文件预处理功能
-          imageToProcess = await preprocessFileForOCR(fileBuffer, fileUpload.mimeType);
-          
-        } catch (error) {
-          fastify.log.error('获取文件数据时出错:', error);
-          return reply.code(500).send({
+      // 从Supabase Storage获取文件
+      try {
+        // 从文件上传记录获取文件路径
+        const fileUpload = submission.fileUpload;
+        if (!fileUpload) {
+          return reply.code(400).send({
             success: false,
-            error: '获取文件数据失败'
+            error: '文件信息不存在'
           });
         }
+
+        fastify.log.info(`从Supabase Storage获取文件: ${fileUpload.filePath}`);
+        
+        // 使用Admin客户端从Supabase Storage下载文件
+        const storageClient = supabaseAdmin || supabase;
+        const { data: fileData, error: downloadError } = await storageClient.storage
+          .from(STORAGE_BUCKETS.ASSIGNMENTS)
+          .download(fileUpload.filePath);
+
+        if (downloadError || !fileData) {
+          fastify.log.error('从Supabase Storage下载文件失败:', downloadError);
+          return reply.code(400).send({
+            success: false,
+            error: '无法获取文件数据'
+          });
+        }
+
+        // 将文件转换为buffer
+        const fileBuffer = Buffer.from(await fileData.arrayBuffer());
+        
+        // 直接使用buffer，不需要base64转换
+        imageToProcess = fileBuffer;
+        
+      } catch (error) {
+        fastify.log.error('获取文件数据时出错:', error);
+        return reply.code(500).send({
+          success: false,
+          error: '获取文件数据失败'
+        });
       }
 
       if (!imageToProcess) {
         return reply.code(400).send({
           success: false,
-          error: '缺少图片数据'
+          error: '缺少文件数据'
         });
       }
 
@@ -101,29 +100,41 @@ export async function processOCR(request: FastifyRequest, reply: FastifyReply, f
       // 获取文件类型以优化MathPix识别
       const fileType = submission.fileUpload?.mimeType;
 
-      // 调用MathPix API
-      const mathpixResult = await callMathPixAPI(imageToProcess, fileType);
+      // 调用MathPix API - 现在使用Buffer而不是base64字符串
+      const mathpixResult = await callMathPixAPI(imageToProcess as Buffer, fileType);
       
       const processingTime = Date.now() - startTime;
 
       // 保存识别结果 - 包括fallback结果
-      const ocrResult = await prisma.mathPixResult.create({
-        data: {
-          submissionId: submissionId,
-          recognizedText: mathpixResult.text,
-          mathLatex: mathpixResult.latex,
-          confidence: mathpixResult.confidence,
-          processingTime: processingTime,
-          rawResult: mathpixResult.raw
-        }
-      });
+      let ocrResult;
+      try {
+        ocrResult = await prisma.mathPixResult.create({
+          data: {
+            submissionId: submissionId,
+            recognizedText: mathpixResult.text,
+            mathLatex: mathpixResult.latex,
+            confidence: mathpixResult.confidence,
+            processingTime: processingTime,
+            rawResult: mathpixResult.raw
+          }
+        });
 
-      fastify.log.info(`OCR结果已保存到数据库:`, {
-        submissionId,
-        resultId: ocrResult.id,
-        textLength: mathpixResult.text?.length || 0,
-        isFallback: mathpixResult.raw?.fallback || false
-      });
+        fastify.log.info(`OCR结果已保存到数据库:`, {
+          submissionId,
+          resultId: ocrResult.id,
+          textLength: mathpixResult.text?.length || 0,
+          isFallback: mathpixResult.raw?.fallback || false
+        });
+      } catch (dbError) {
+        fastify.log.error('数据库保存失败:', dbError);
+        
+        // 检查是否是字符编码问题
+        if (dbError instanceof Error && dbError.message.includes('invalid byte sequence')) {
+          throw new Error('OCR识别结果包含特殊字符，无法保存。请联系管理员：3220104512@zju.edu.cn');
+        }
+        
+        throw new Error(`数据库保存失败，请联系管理员：3220104512@zju.edu.cn。错误详情：${dbError instanceof Error ? dbError.message : '未知错误'}`);
+      }
 
       return {
         success: true,
@@ -211,35 +222,10 @@ export async function ocrRoutes(fastify: FastifyInstance) {
   });
 }
 
-// 检测文件格式并处理
-async function preprocessFileForOCR(fileBuffer: Buffer, mimeType: string): Promise<string> {
-  try {
-    if (mimeType === 'application/pdf') {
-      console.log('📄 检测到PDF文件，需要转换为图像');
-      // TODO: 实现PDF到图像的转换
-      // 暂时直接转换为base64，但在实际生产环境中应该先转换为图像
-      console.log('⚠️ PDF处理功能正在开发中，暂时使用fallback处理');
-    }
-    
-    // 对于图像文件，直接转换为base64
-    const base64Data = fileBuffer.toString('base64');
-    
-    // 验证base64数据
-    if (!base64Data || base64Data.length < 100) {
-      throw new Error('生成的base64数据无效或过小');
-    }
-    
-    console.log(`✅ 文件预处理完成，base64大小: ${Math.round(base64Data.length / 1024)}KB`);
-    return base64Data;
-    
-  } catch (error) {
-    console.error('文件预处理失败:', error);
-    throw new Error(`文件预处理失败: ${error instanceof Error ? error.message : '未知错误'}`);
-  }
-}
+// 预处理函数已删除 - 直接使用Buffer处理文件
 
-// 调用MathPix API的辅助函数
-async function callMathPixAPI(imageData: string, fileType?: string): Promise<{
+// 调用MathPix API的辅助函数 - 基于v3/pdf端点
+async function callMathPixAPI(fileBuffer: Buffer, fileType?: string): Promise<{
   text: string;
   latex?: string;
   confidence: number;
@@ -253,94 +239,133 @@ async function callMathPixAPI(imageData: string, fileType?: string): Promise<{
       throw new Error('MathPix配置缺失: MATHPIX_APP_ID或MATHPIX_APP_KEY未设置');
     }
 
-    // 根据文件类型确定正确的MIME类型
-    let mimeType = 'image/png'; // 默认
-    if (fileType) {
-      if (fileType === 'application/pdf') {
-        mimeType = 'application/pdf';
-      } else if (fileType.includes('jpeg') || fileType.includes('jpg')) {
-        mimeType = 'image/jpeg';
-      } else if (fileType.includes('png')) {
-        mimeType = 'image/png';
-      } else if (fileType.includes('gif')) {
-        mimeType = 'image/gif';
-      } else if (fileType.includes('webp')) {
-        mimeType = 'image/webp';
-      }
-    }
+    console.log('🔑 使用MathPix配置:', { 
+      app_id: appId.slice(0, 4) + '***' + appId.slice(-4),
+      file_size: Math.round(fileBuffer.length / 1024) + 'KB',
+      file_type: fileType 
+    });
 
-    // 构建MathPix API请求参数 - 根据官方文档优化
-    // 基础配置，适用于数学内容识别
-    const mathpixOptions: any = {
-      src: `data:${mimeType};base64,${imageData}`,
-      formats: ["text", "latex_normal"],
-      data_options: {
-        include_asciimath: true,
-        include_latex: true,
-        include_table_html: false, // 对于数学作业，通常不需要表格HTML
-        include_tsv: false
-      }
+    const BASE = 'https://api.mathpix.com/v3';
+    const AXIOS_DEFAULTS = {
+      maxContentLength: Infinity as any,
+      maxBodyLength: Infinity as any,
+      timeout: 60000,
+      headers: {
+        app_id: appId,
+        app_key: appKey,
+      },
     };
 
-    console.log('🔧 使用标准数学识别配置');
-
-    // 调用MathPix OCR API
-    console.log('🔍 调用MathPix OCR API进行识别');
-    console.log('📋 请求参数:', {
-      fileType,
-      mimeType,
-      formats: mathpixOptions.formats,
-      imageSize: Math.round(imageData.length / 1024) + 'KB'
-    });
+    // Step 1: 上传PDF到MathPix
+    const form = new FormData();
     
-    const response = await axios.post('https://api.mathpix.com/v3/text', mathpixOptions, {
-      headers: {
-        'app_id': appId,
-        'app_key': appKey,
-        'Content-Type': 'application/json'
-      },
-      timeout: 60000, // 增加超时时间到60秒
-      validateStatus: function (status) {
-        return status < 500; // 接受400-499的错误响应，以便更好地处理错误
-      }
+    // 配置选项 - 针对数学内容优化
+    form.append('options_json', JSON.stringify({
+      conversion_formats: { docx: false }, // 暂时不需要docx
+      math_inline_delimiters: ['$', '$'],
+      rm_spaces: true,
+      numbers_default_to_math: true
+    }));
+    
+    form.append('file', fileBuffer, {
+      filename: 'upload.pdf',
+      contentType: fileType || 'application/pdf'
     });
 
-    console.log('📡 MathPix API响应状态:', response.status);
+    console.log('📤 正在上传文件到MathPix...');
+    const uploadResponse = await axios.post(`${BASE}/pdf`, form, {
+      ...AXIOS_DEFAULTS,
+      headers: { ...AXIOS_DEFAULTS.headers, ...form.getHeaders() },
+    });
 
-    if (response.status !== 200) {
-      console.error('❌ MathPix API返回错误:', {
-        status: response.status,
-        statusText: response.statusText,
-        data: response.data
-      });
-      throw new Error(`MathPix API返回错误 ${response.status}: ${JSON.stringify(response.data)}`);
+    const pdf_id = uploadResponse.data?.pdf_id;
+    if (!pdf_id) {
+      console.error('⚠️ 上传响应:', uploadResponse.data);
+      throw new Error('未返回 pdf_id');
+    }
+    console.log('✅ 上传成功，pdf_id =', pdf_id);
+
+    // Step 2: 轮询等待OCR完成
+    console.log('⏳ 等待OCR完成...');
+    const POLL_INTERVAL_MS = 3000;
+    const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10分钟超时
+    const start = Date.now();
+    
+    let ocrCompleted = false;
+    let progress = 0;
+    
+    while (!ocrCompleted) {
+      const statusResponse = await axios.get(`${BASE}/pdf/${pdf_id}`, AXIOS_DEFAULTS);
+      const status = statusResponse.data?.status;
+      progress = statusResponse.data?.percent_done || 0;
+      
+      if (status === 'completed') {
+        console.log(`🎉 OCR完成！进度=${progress}%`);
+        ocrCompleted = true;
+        break;
+      }
+      
+      if (status === 'error') {
+        throw new Error(`PDF 处理错误: ${JSON.stringify(statusResponse.data)}`);
+      }
+      
+      if (Date.now() - start > POLL_TIMEOUT_MS) {
+        throw new Error('等待超时：PDF 处理未完成');
+      }
+      
+      console.log(`📊 OCR进度: ${progress}%`);
+      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
     }
 
-    const result = response.data;
-    console.log('📊 MathPix原始响应:', JSON.stringify(result, null, 2));
+    // Step 3: 获取识别结果
+    console.log('📥 下载识别结果...');
+    const resultResponse = await axios.get(`${BASE}/pdf/${pdf_id}.mmd`, {
+      ...AXIOS_DEFAULTS,
+      responseType: 'text'
+    });
 
-    // 提取识别结果 - 根据MathPix API v3响应格式
-    const text = result.text || '';
-    const latex = result.latex_normal || result.latex || '';
-    const confidence = parseFloat(result.confidence) || 0.0;
+    const text = resultResponse.data as string;
+    console.log('📊 识别结果长度:', text.length);
 
     // 验证结果有效性
     if (!text || text.trim().length === 0) {
-      console.warn('⚠️ MathPix返回空文本结果');
       throw new Error('MathPix OCR未能识别出任何文本内容');
     }
 
+    // 清理文本中的null字节和其他不支持的字符
+    const cleanText = text.replace(/\x00/g, '').replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+
+    // 尝试获取LaTeX格式 (可选)
+    let latex = '';
+    try {
+      const latexResponse = await axios.get(`${BASE}/pdf/${pdf_id}.tex`, {
+        ...AXIOS_DEFAULTS,
+        responseType: 'text'
+      });
+      const rawLatex = latexResponse.data as string;
+      // 同样清理LaTeX中的无效字符
+      latex = rawLatex.replace(/\x00/g, '').replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    } catch (e) {
+      console.log('📝 LaTeX格式不可用，使用Markdown格式');
+    }
+
     console.log('✅ MathPix识别成功:', {
-      textLength: text.length,
-      latexLength: latex?.length || 0,
-      confidence: confidence
+      originalLength: text.length,
+      cleanedLength: cleanText.length,
+      latexLength: latex.length,
+      confidence: 0.95 // v3/pdf API不返回置信度，使用默认值
     });
 
     return {
-      text: text,
+      text: cleanText,
       latex: latex,
-      confidence: confidence,
-      raw: result
+      confidence: 0.95,
+      raw: {
+        pdf_id,
+        status: 'completed',
+        progress: 100,
+        provider: 'MathPix_v3_PDF'
+      }
     };
 
   } catch (error) {
@@ -360,17 +385,11 @@ async function callMathPixAPI(imageData: string, fileType?: string): Promise<{
       console.error('HTTP错误响应:', {
         status: (error as any).response.status,
         statusText: (error as any).response.statusText,
-        data: (error as any).response.data,
-        headers: (error as any).response.headers
+        data: (error as any).response.data
       });
     }
     
-    // 检查是否是请求配置问题
-    if ((error as any).request) {
-      console.error('请求配置问题:', (error as any).request);
-    }
-    
-    // 不要返回mock数据，直接抛出真实的错误
+    // 直接抛出真实的错误
     throw new Error(`MathPix OCR识别失败: ${error instanceof Error ? error.message : '未知网络错误'}`);
   }
 }

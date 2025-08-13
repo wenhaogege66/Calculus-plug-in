@@ -51,9 +51,11 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
   const [session, setSession] = useState<DetailedSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'recognition' | 'grading'>('recognition');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [aiQuestion, setAiQuestion] = useState('');
+  const [aiThinking, setAiThinking] = useState(false);
+  const [chatHistory, setChatHistory] = useState<{question: string, answer: string}[]>([]);
 
   useEffect(() => {
     loadSessionDetails();
@@ -131,6 +133,71 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
     if (score >= 70) return '#f59e0b';
     if (score >= 60) return '#f97316';
     return '#ef4444';
+  };
+
+  const handleAskAI = async () => {
+    if (!aiQuestion.trim() || aiThinking || !authState.token) return;
+
+    try {
+      setAiThinking(true);
+      
+      // 准备上下文信息
+      const context = {
+        ocrText: session?.ocrResult?.recognizedText || '',
+        gradingResult: session?.gradingResult || null,
+        question: aiQuestion.trim()
+      };
+
+      const response = await fetch(`${API_BASE_URL}/ai/question`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authState.token}`
+        },
+        body: JSON.stringify({
+          submissionId: sessionId,
+          question: aiQuestion.trim(),
+          context: context
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          // 添加到聊天历史
+          setChatHistory(prev => [...prev, {
+            question: aiQuestion.trim(),
+            answer: result.data.answer || '抱歉，我无法回答这个问题。'
+          }]);
+          // 清空输入框
+          setAiQuestion('');
+        } else {
+          // 如果API调用失败，提供通用回复
+          setChatHistory(prev => [...prev, {
+            question: aiQuestion.trim(),
+            answer: '抱歉，当前AI服务暂时不可用，请稍后再试。'
+          }]);
+          setAiQuestion('');
+        }
+      } else {
+        // 如果没有专门的questioning端点，提供通用回复
+        setChatHistory(prev => [...prev, {
+          question: aiQuestion.trim(),
+          answer: '感谢你的提问！AI问答功能正在开发中，暂时无法提供详细回答。你可以查看上方的批改结果和改进建议。'
+        }]);
+        setAiQuestion('');
+      }
+    } catch (error) {
+      console.error('AI提问失败:', error);
+      // 提供友好的错误回复
+      setChatHistory(prev => [...prev, {
+        question: aiQuestion.trim(),
+        answer: '抱歉，网络连接出现问题，请检查网络后重试。'
+      }]);
+      setAiQuestion('');
+    } finally {
+      setAiThinking(false);
+    }
   };
 
   const renderErrorDetails = (errors: any[]) => {
@@ -273,221 +340,211 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
   }
 
   return (
-    <div className="practice-detail-page">
-      {/* 头部信息 */}
-      <div className="detail-header">
-        <div className="header-actions">
+    <div className="practice-detail-fullpage">
+      {/* 顶部导航栏 */}
+      <div className="detail-navbar">
+        <div className="navbar-left">
           <button className="back-button" onClick={onBack}>
-            ← 返回练习记录
+            ← 返回
           </button>
+          <div className="file-title">
+            <span className="status-icon">{getStatusIcon(session.status)}</span>
+            <h2>{session.fileInfo.originalName}</h2>
+          </div>
+        </div>
+        <div className="navbar-right">
+          <div className="score-display">
+            {session.gradingResult && (
+              <span className="score-badge">
+                {session.gradingResult.score}/{session.gradingResult.maxScore}分
+              </span>
+            )}
+          </div>
           <button 
             className="delete-button" 
             onClick={() => setShowDeleteDialog(true)}
-            title="删除此练习记录"
           >
-            🗑️ 删除记录
+            🗑️
           </button>
         </div>
-        <div className="file-info">
-          <div className="file-title">
-            <span className="status-icon">{getStatusIcon(session.status)}</span>
-            <h1>{session.fileInfo.originalName}</h1>
-          </div>
-          <div className="file-meta">
-            <span>提交时间：{new Date(session.submittedAt).toLocaleString('zh-CN')}</span>
-            {session.completedAt && (
-              <span>完成时间：{new Date(session.completedAt).toLocaleString('zh-CN')}</span>
-            )}
-            <span>文件大小：{(session.fileInfo.fileSize / 1024 / 1024).toFixed(2)} MB</span>
-          </div>
-        </div>
       </div>
 
-      {/* 进度指示器 */}
-      {session.status !== 'COMPLETED' && (
-        <div className="progress-section">
-          <div className="progress-info">
-            <h4>{session.progress.message}</h4>
-            <div className="progress-bar-container">
-              <div 
-                className="progress-bar" 
-                style={{ width: `${session.progress.percent}%` }}
-              ></div>
-              <span className="progress-text">{session.progress.percent}%</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 标签页导航 */}
-      <div className="detail-tabs">
-        <button
-          className={`tab ${activeTab === 'recognition' ? 'active' : ''}`}
-          onClick={() => setActiveTab('recognition')}
-        >
-          🔍 作业识别
-        </button>
-        <button
-          className={`tab ${activeTab === 'grading' ? 'active' : ''}`}
-          onClick={() => setActiveTab('grading')}
-          disabled={!session.gradingResult}
-        >
-          🤖 AI批改解答
-        </button>
-      </div>
-
-      {/* 标签页内容 */}
+      {/* 主内容区域 - 左右分栏 */}
       <div className="detail-content">
-        {activeTab === 'recognition' && (
-          <div className="recognition-section">
-            <div className="section-header">
-              <h3>📄 OCR识别结果</h3>
-              {session.ocrResult && (
-                <div className="confidence-badge">
-                  置信度：{(session.ocrResult.confidence * 100).toFixed(1)}%
-                </div>
-              )}
+        {/* 左侧：识别结果 */}
+        <div className="left-panel">
+          <div className="panel-header">
+            <h3>📋 作业识别</h3>
+            <div className="file-meta">
+              <span>{(session.fileInfo.fileSize / 1024 / 1024).toFixed(2)} MB</span>
+              <span>{new Date(session.submittedAt).toLocaleString('zh-CN')}</span>
             </div>
-
+          </div>
+          
+          <div className="recognition-content">
+            {session.progress.stage === 'ocr_processing' && (
+              <div className="processing-indicator">
+                <div className="loading-spinner"></div>
+                <p>正在识别文档内容...</p>
+              </div>
+            )}
+            
             {session.ocrResult ? (
-              <div className="ocr-content">
+              <div className="ocr-result">
+                <div className="confidence-info">
+                  <span>识别置信度: {(session.ocrResult.confidence * 100).toFixed(1)}%</span>
+                </div>
                 <div className="recognized-text">
-                  <h4>识别文本</h4>
-                  <div className="text-content">
-                    {session.ocrResult.recognizedText}
-                  </div>
+                  <pre>{session.ocrResult.recognizedText}</pre>
+                </div>
+              </div>
+            ) : session.status === 'COMPLETED' || session.status === 'FAILED' ? (
+              <div className="error-content">
+                <div className="error-icon">⚠️</div>
+                <h4>OCR识别失败</h4>
+                <p>文档识别过程中出现问题，可能是文件格式不支持或内容包含特殊字符。</p>
+                <div className="contact-info">
+                  <p><strong>如需帮助，请联系管理员：</strong></p>
+                  <p>📧 <a href="mailto:3220104512@zju.edu.cn">3220104512@zju.edu.cn</a></p>
                 </div>
               </div>
             ) : (
-              <div className="empty-result">
-                <div className="empty-icon">🔍</div>
-                <p>OCR识别尚未完成或识别失败</p>
+              <div className="empty-content">
+                <p>📄 OCR识别结果将在此显示</p>
               </div>
             )}
           </div>
-        )}
+        </div>
 
-        {activeTab === 'grading' && (
-          <div className="grading-section">
+        {/* 右侧：AI批改结果 */}
+        <div className="right-panel">
+          <div className="panel-header">
+            <h3>🤖 AI批改解答</h3>
+            {session.gradingResult && (
+              <div className="grading-summary">
+                <span className="question-count">题目数: {session.gradingResult.questionCount || 0}</span>
+                <span className="correct-count">正确: {session.gradingResult.correctCount || 0}</span>
+                <span className="incorrect-count">错误: {session.gradingResult.incorrectCount || 0}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="grading-content">
+            {session.progress.stage === 'ai_processing' && (
+              <div className="processing-indicator">
+                <div className="loading-spinner"></div>
+                <p>AI正在智能批改...</p>
+              </div>
+            )}
+
             {session.gradingResult ? (
-              <>
-                {/* 分数总览 */}
-                <div className="score-overview">
-                  <div className="score-display">
-                    <span 
-                      className="score-number"
-                      style={{ color: getScoreColor(session.gradingResult.score) }}
-                    >
-                      {session.gradingResult.score}
-                    </span>
-                    <span className="score-separator">/</span>
-                    <span className="max-score">{session.gradingResult.maxScore}</span>
-                  </div>
-                  <div className="score-level">
-                    {session.gradingResult.score >= 90 ? '优秀' : 
-                     session.gradingResult.score >= 80 ? '良好' : 
-                     session.gradingResult.score >= 70 ? '中等' : 
-                     session.gradingResult.score >= 60 ? '及格' : '待提升'}
-                  </div>
-                </div>
-
-                {/* 统计信息 */}
-                {(session.gradingResult.questionCount || session.gradingResult.correctCount || session.gradingResult.incorrectCount) && (
-                  <div className="stats-overview">
-                    <div className="stat-card">
-                      <span className="stat-icon">📊</span>
-                      <div className="stat-content">
-                        <div className="stat-number">{session.gradingResult.questionCount || 0}</div>
-                        <div className="stat-label">题目数</div>
-                      </div>
-                    </div>
-                    <div className="stat-card">
-                      <span className="stat-icon">✅</span>
-                      <div className="stat-content">
-                        <div className="stat-number correct">{session.gradingResult.correctCount || 0}</div>
-                        <div className="stat-label">正确</div>
-                      </div>
-                    </div>
-                    <div className="stat-card">
-                      <span className="stat-icon">❌</span>
-                      <div className="stat-content">
-                        <div className="stat-number incorrect">{session.gradingResult.incorrectCount || 0}</div>
-                        <div className="stat-label">错误</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
+              <div className="grading-result">
                 {/* 知识点 */}
                 {session.gradingResult.knowledgePoints && session.gradingResult.knowledgePoints.length > 0 && (
-                  <div className="knowledge-section">
+                  <div className="knowledge-points-section">
                     <h4>📚 涉及知识点</h4>
                     <div className="knowledge-tags">
                       {session.gradingResult.knowledgePoints.map((point, index) => (
-                        <span key={index} className="knowledge-tag">
-                          {point}
-                        </span>
+                        <span key={index} className="knowledge-tag">{point}</span>
                       ))}
                     </div>
                   </div>
                 )}
 
                 {/* AI反馈 */}
-                {session.gradingResult.feedback && (
-                  <div className="feedback-section">
-                    <h4>📝 AI总体反馈</h4>
-                    <div className="feedback-content">
-                      {session.gradingResult.feedback}
-                    </div>
-                  </div>
-                )}
+                <div className="feedback-section">
+                  <h4>📝 AI分析反馈</h4>
+                  <p className="feedback-text">{session.gradingResult.feedback}</p>
+                </div>
 
-                {/* 错误详情 */}
-                {session.gradingResult.detailedErrors && renderErrorDetails(session.gradingResult.detailedErrors)}
+                {/* 错误分析 */}
+                {session.gradingResult.detailedErrors && session.gradingResult.detailedErrors.length > 0 && 
+                  renderErrorDetails(session.gradingResult.detailedErrors)
+                }
 
                 {/* 改进建议 */}
-                {session.gradingResult.suggestions && renderSuggestions(session.gradingResult.suggestions)}
+                {session.gradingResult.suggestions && session.gradingResult.suggestions.length > 0 && 
+                  renderSuggestions(session.gradingResult.suggestions)
+                }
 
                 {/* 优点分析 */}
-                {session.gradingResult.strengths && renderStrengths(session.gradingResult.strengths)}
+                {session.gradingResult.strengths && session.gradingResult.strengths.length > 0 && 
+                  renderStrengths(session.gradingResult.strengths)
+                }
 
-                {/* 改进领域 */}
-                {session.gradingResult.improvementAreas && session.gradingResult.improvementAreas.length > 0 && (
-                  <div className="improvement-section">
-                    <h4>🎯 需要改进的方面</h4>
-                    <ul className="improvement-list">
-                      {session.gradingResult.improvementAreas.map((area, index) => (
-                        <li key={index} className="improvement-item">
-                          {area}
-                        </li>
+                {/* AI问答区域 */}
+                <div className="ai-chat-section">
+                  <h4>💬 进一步提问</h4>
+                  
+                  {/* 聊天历史 */}
+                  {chatHistory.length > 0 && (
+                    <div className="chat-history">
+                      {chatHistory.map((chat, index) => (
+                        <div key={index} className="chat-pair">
+                          <div className="user-question">
+                            <strong>🙋 你：</strong> {chat.question}
+                          </div>
+                          <div className="ai-answer">
+                            <strong>🤖 AI：</strong> {chat.answer}
+                          </div>
+                        </div>
                       ))}
-                    </ul>
-                  </div>
-                )}
+                    </div>
+                  )}
 
-                {/* 下步建议 */}
-                {session.gradingResult.nextStepRecommendations && session.gradingResult.nextStepRecommendations.length > 0 && (
-                  <div className="recommendations-section">
-                    <h4>🚀 下步学习建议</h4>
-                    <ul className="recommendations-list">
-                      {session.gradingResult.nextStepRecommendations.map((recommendation, index) => (
-                        <li key={index} className="recommendation-item">
-                          {recommendation}
-                        </li>
-                      ))}
-                    </ul>
+                  {/* 问题输入 */}
+                  <div className="question-input-area">
+                    <textarea
+                      value={aiQuestion}
+                      onChange={(e) => setAiQuestion(e.target.value)}
+                      placeholder="向AI提问关于这道题的任何问题..."
+                      rows={3}
+                      className="question-textarea"
+                    />
+                    <button 
+                      className="ask-button"
+                      onClick={handleAskAI}
+                      disabled={!aiQuestion.trim() || aiThinking}
+                    >
+                      {aiThinking ? '🤔 思考中...' : '🚀 提问'}
+                    </button>
                   </div>
-                )}
-              </>
+                </div>
+              </div>
+            ) : session.status === 'COMPLETED' || session.status === 'FAILED' ? (
+              <div className="error-content">
+                <div className="error-icon">⚠️</div>
+                <h4>AI批改失败</h4>
+                <p>由于OCR识别失败，无法进行AI批改。请先解决文档识别问题。</p>
+                <div className="contact-info">
+                  <p><strong>如需帮助，请联系管理员：</strong></p>
+                  <p>📧 <a href="mailto:3220104512@zju.edu.cn">3220104512@zju.edu.cn</a></p>
+                </div>
+              </div>
             ) : (
-              <div className="empty-result">
-                <div className="empty-icon">🤖</div>
-                <p>AI批改尚未完成</p>
+              <div className="empty-content">
+                <p>🤖 AI批改结果将在此显示</p>
               </div>
             )}
           </div>
-        )}
+        </div>
       </div>
+
+      {/* 全页面底部进度指示器 - 只在处理中显示 */}
+      {session.status === 'PROCESSING' && (
+        <div className="bottom-progress-bar">
+          <div className="progress-info">
+            <span className="progress-message">{session.progress.message}</span>
+            <span className="progress-percent">{session.progress.percent}%</span>
+          </div>
+          <div className="progress-track">
+            <div 
+              className="progress-fill" 
+              style={{ width: `${session.progress.percent}%` }}
+            ></div>
+          </div>
+        </div>
+      )}
 
       {/* 删除确认对话框 */}
       {showDeleteDialog && (

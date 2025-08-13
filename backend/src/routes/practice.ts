@@ -241,24 +241,44 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // 计算处理进度
+      // 增强的进度计算
       let progress = 0;
-      let stage = 'processing';
-      let message = '正在处理...';
+      let stage = 'uploading';
+      let message = '正在上传文件...';
 
       const latestOCR = practiceSession.mathpixResults[0];
       const latestGrading = practiceSession.deepseekResults[0];
 
-      if (latestOCR) {
-        progress = 50;
-        stage = 'ocr_completed';
-        message = 'OCR识别完成，正在AI批改...';
-
-        if (latestGrading) {
-          progress = 100;
-          stage = 'completed';
-          message = '练习批改完成';
+      // 检查OCR进度
+      if (practiceSession.status === 'PROCESSING') {
+        if (!latestOCR) {
+          progress = 25;
+          stage = 'ocr_processing';
+          message = '正在进行OCR识别...';
+        } else {
+          // OCR已完成，检查AI进度
+          progress = 60;
+          stage = 'ai_processing';
+          message = '正在AI批改...';
+          
+          if (latestGrading) {
+            progress = 100;
+            stage = 'completed';
+            message = '练习批改完成';
+          }
         }
+      } else if (practiceSession.status === 'COMPLETED') {
+        progress = 100;
+        stage = 'completed';
+        message = '练习批改完成';
+      } else if (practiceSession.status === 'FAILED') {
+        progress = 0;
+        stage = 'failed';
+        message = '处理失败，请重试';
+      } else {
+        progress = 10;
+        stage = 'uploading';
+        message = '文件已上传，等待处理...';
       }
 
       return {
