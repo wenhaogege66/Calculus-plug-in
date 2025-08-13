@@ -1,0 +1,260 @@
+/* MarkdownRenderer.css - Markdown渲染组件样式 */
+
+.markdown-renderer {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+  color: #374151;
+}
+
+/* 标题样式 */
+.markdown-renderer .md-h1 {
+  font-size: 1.5em;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 1em 0 0.5em 0;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0.3em;
+}
+
+.markdown-renderer .md-h2 {
+  font-size: 1.3em;
+  font-weight: 600;
+  color: #374151;
+  margin: 0.8em 0 0.4em 0;
+}
+
+.markdown-renderer .md-h3 {
+  font-size: 1.2em;
+  font-weight: 600;
+  color: #4b5563;
+  margin: 0.6em 0 0.3em 0;
+}
+
+.markdown-renderer .md-h4 {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #6b7280;
+  margin: 0.5em 0 0.25em 0;
+}
+
+/* 段落样式 */
+.markdown-renderer .md-p {
+  margin: 0.8em 0;
+  line-height: 1.6;
+}
+
+/* 列表样式 */
+.markdown-renderer .md-ul,
+.markdown-renderer .md-ol {
+  margin: 0.8em 0;
+  padding-left: 1.5em;
+}
+
+.markdown-renderer .md-li {
+  margin: 0.3em 0;
+}
+
+/* 代码样式 */
+.markdown-renderer .md-code-inline {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #dc2626;
+}
+
+.markdown-renderer .md-code-block {
+  display: block;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1em;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #374151;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+/* 引用样式 */
+.markdown-renderer .md-blockquote {
+  border-left: 4px solid #3b82f6;
+  background: #f0f9ff;
+  margin: 1em 0;
+  padding: 0.8em 1.2em;
+  border-radius: 0 8px 8px 0;
+}
+
+.markdown-renderer .md-blockquote p {
+  margin: 0.5em 0;
+}
+
+/* 表格样式 */
+.markdown-renderer .md-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+  font-size: 0.9em;
+}
+
+.markdown-renderer .md-th,
+.markdown-renderer .md-td {
+  border: 1px solid #d1d5db;
+  padding: 0.5em 0.8em;
+  text-align: left;
+}
+
+.markdown-renderer .md-th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+}
+
+/* 数学公式样式 */
+.markdown-renderer .katex {
+  font-size: 1em;
+}
+
+.markdown-renderer .katex-display {
+  margin: 1em 0;
+  text-align: center;
+}
+
+/* 截断指示器 */
+.md-truncated-indicator {
+  text-align: center;
+  color: #9ca3af;
+  font-style: italic;
+  margin-top: 0.5em;
+  font-size: 0.9em;
+}
+
+/* 预览模式样式 */
+.markdown-renderer.preview {
+  font-size: 0.9em;
+  max-height: 120px;
+  overflow: hidden;
+  position: relative;
+}
+
+.markdown-renderer.preview .md-h1,
+.markdown-renderer.preview .md-h2 {
+  font-size: 1em;
+  margin: 0.3em 0;
+  border: none;
+  padding: 0;
+}
+
+.markdown-renderer.preview .md-h3,
+.markdown-renderer.preview .md-h4 {
+  font-size: 0.95em;
+  margin: 0.2em 0;
+}
+
+.markdown-renderer.preview .md-p {
+  margin: 0.4em 0;
+}
+
+.markdown-renderer.preview .md-ul,
+.markdown-renderer.preview .md-ol {
+  margin: 0.4em 0;
+  padding-left: 1.2em;
+}
+
+.markdown-renderer.preview .md-li {
+  margin: 0.1em 0;
+}
+
+.markdown-renderer.preview .katex {
+  font-size: 0.9em;
+}
+
+/* 紧凑模式样式 */
+.markdown-renderer.compact {
+  font-size: 0.85em;
+  line-height: 1.4;
+}
+
+.markdown-renderer.compact .md-h1,
+.markdown-renderer.compact .md-h2,
+.markdown-renderer.compact .md-h3,
+.markdown-renderer.compact .md-h4 {
+  margin: 0.2em 0;
+  font-size: 1em;
+  border: none;
+  padding: 0;
+}
+
+.markdown-renderer.compact .md-p {
+  margin: 0.3em 0;
+}
+
+.markdown-renderer.compact .md-ul,
+.markdown-renderer.compact .md-ol {
+  margin: 0.3em 0;
+  padding-left: 1em;
+}
+
+.markdown-renderer.compact .md-li {
+  margin: 0.1em 0;
+}
+
+.markdown-renderer.compact .katex {
+  font-size: 0.85em;
+}
+
+/* 深色模式支持 */
+.main-layout.dark .markdown-renderer {
+  color: #e5e7eb;
+}
+
+.main-layout.dark .markdown-renderer .md-h1 {
+  color: #f1f5f9;
+  border-bottom-color: #374151;
+}
+
+.main-layout.dark .markdown-renderer .md-h2 {
+  color: #e5e7eb;
+}
+
+.main-layout.dark .markdown-renderer .md-h3 {
+  color: #d1d5db;
+}
+
+.main-layout.dark .markdown-renderer .md-h4 {
+  color: #9ca3af;
+}
+
+.main-layout.dark .markdown-renderer .md-code-inline {
+  background: #374151;
+  border-color: #4b5563;
+  color: #f87171;
+}
+
+.main-layout.dark .markdown-renderer .md-code-block {
+  background: #1e293b;
+  border-color: #374151;
+  color: #e5e7eb;
+}
+
+.main-layout.dark .markdown-renderer .md-blockquote {
+  background: rgba(59, 130, 246, 0.1);
+  border-left-color: #3b82f6;
+}
+
+.main-layout.dark .markdown-renderer .md-th {
+  background: #374151;
+  color: #e5e7eb;
+}
+
+.main-layout.dark .markdown-renderer .md-th,
+.main-layout.dark .markdown-renderer .md-td {
+  border-color: #4b5563;
+}
+
+.main-layout.dark .markdown-renderer .md-truncated-indicator {
+  color: #6b7280;
+}

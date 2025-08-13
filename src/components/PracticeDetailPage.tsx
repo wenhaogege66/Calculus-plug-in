@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
+import { SimpleMarkdownRenderer } from './SimpleMarkdownRenderer';
 import './PracticeDetailPage.css';
 
 interface PracticeDetailProps {
@@ -395,7 +396,10 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                   <span>识别置信度: {(session.ocrResult.confidence * 100).toFixed(1)}%</span>
                 </div>
                 <div className="recognized-text">
-                  <pre>{session.ocrResult.recognizedText}</pre>
+                  <SimpleMarkdownRenderer 
+                    content={session.ocrResult.recognizedText} 
+                    className="ocr-content"
+                  />
                 </div>
               </div>
             ) : session.status === 'COMPLETED' || session.status === 'FAILED' ? (
@@ -454,7 +458,12 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                 {/* AI反馈 */}
                 <div className="feedback-section">
                   <h4>📝 AI分析反馈</h4>
-                  <p className="feedback-text">{session.gradingResult.feedback}</p>
+                  <div className="feedback-text">
+                    <SimpleMarkdownRenderer 
+                      content={session.gradingResult.feedback} 
+                      className="feedback-content"
+                    />
+                  </div>
                 </div>
 
                 {/* 错误分析 */}

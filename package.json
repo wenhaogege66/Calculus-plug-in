@@ -14,9 +14,13 @@
     "@plasmohq/messaging": "^0.6.2",
     "@plasmohq/storage": "^1.9.3",
     "@supabase/supabase-js": "^2.39.0",
+    "katex": "^0.16.22",
     "plasmo": "0.84.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
+    "react-markdown": "9.0.1",
+    "rehype-katex": "6.0.3",
+    "remark-math": "5.1.1",
     "sharp": "^0.34.3"
   },
   "devDependencies": {

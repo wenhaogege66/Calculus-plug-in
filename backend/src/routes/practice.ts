@@ -86,8 +86,35 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
             : suggestions.toString()
         ) : undefined;
 
-        // 从rawResult中提取增强数据
+        // 从rawResult中提取增强数据和基础统计数据
         const enhancedData = (latestGrading?.rawResult as any)?.enhancedData || {};
+        const rawResult = latestGrading?.rawResult as any || {};
+        
+        // 智能提取统计数据 - 从多个可能的来源
+        const questionCount = enhancedData.questionCount || 
+                             rawResult.questionCount || 
+                             (rawResult.analysis?.questionCount) || 
+                             (latestGrading?.suggestions as any)?.length || 0;
+        
+        const correctCount = enhancedData.correctCount || 
+                            rawResult.correctCount || 
+                            (rawResult.analysis?.correctCount) || 0;
+        
+        const incorrectCount = enhancedData.incorrectCount || 
+                              rawResult.incorrectCount || 
+                              (rawResult.analysis?.incorrectCount) || 0;
+        
+        // 智能提取知识点
+        const knowledgePoints = enhancedData.knowledgePoints || 
+                               rawResult.knowledgePoints || 
+                               (rawResult.analysis?.knowledgePoints) || 
+                               [];
+        
+        // 截取OCR文本用于预览（前200字符）
+        const ocrPreview = latestOCR?.recognizedText ? 
+          (latestOCR.recognizedText.length > 200 ? 
+            latestOCR.recognizedText.substring(0, 200) + '...' : 
+            latestOCR.recognizedText) : undefined;
         
         return {
           id: submission.id.toString(),
@@ -97,13 +124,13 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
           score: latestGrading?.score || undefined,
           feedback: latestGrading?.feedback || undefined,
           suggestions: suggestionsText,
-          ocrText: latestOCR?.recognizedText || undefined,
+          ocrText: ocrPreview, // 使用截取后的预览文本
           difficulty: difficulty,
-          // 新增的结构化信息
-          questionCount: enhancedData.questionCount || 0,
-          incorrectCount: enhancedData.incorrectCount || 0,
-          correctCount: enhancedData.correctCount || 0,
-          knowledgePoints: enhancedData.knowledgePoints || [],
+          // 优化的结构化信息
+          questionCount: questionCount,
+          incorrectCount: incorrectCount,
+          correctCount: correctCount,
+          knowledgePoints: knowledgePoints,
           detailedErrors: enhancedData.detailedErrors || [],
           improvementAreas: enhancedData.improvementAreas || [],
           nextStepRecommendations: enhancedData.nextStepRecommendations || []

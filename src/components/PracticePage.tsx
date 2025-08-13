@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
 import { PracticeDetailPage } from './PracticeDetailPage';
+import { SimpleMarkdownRenderer } from './SimpleMarkdownRenderer';
 import './PracticePage.css';
 
 interface PracticeSession {
@@ -217,11 +218,10 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 90) return '#10b981';
-    if (score >= 80) return '#3b82f6';
-    if (score >= 70) return '#f59e0b';
-    if (score >= 60) return '#f97316';
-    return '#ef4444';
+    if (score >= 90) return '#10b981';      // 90+ 绿色 (优秀)
+    if (score >= 75) return '#3b82f6';      // 75-89 蓝色 (良好)
+    if (score >= 60) return '#f59e0b';      // 60-74 黄色 (及格)
+    return '#ef4444';                       // <60 红色 (不及格)
   };
 
   const calculateAverageScore = () => {
@@ -353,9 +353,24 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
             </div>
           </div>
 
+          {/* OCR预览 */}
+          {session.ocrText && (
+            <div className="ocr-preview">
+              <h5>📄 识别内容预览</h5>
+              <div className="ocr-text-preview">
+                <SimpleMarkdownRenderer 
+                  content={session.ocrText} 
+                  className="preview compact"
+                  maxLength={150}
+                />
+              </div>
+            </div>
+          )}
+
           {/* 知识点标签 */}
           {session.knowledgePoints && session.knowledgePoints.length > 0 && (
             <div className="knowledge-points">
+              <h5>📚 涉及知识点</h5>
               <div className="knowledge-tags">
                 {session.knowledgePoints.map((point, index) => (
                   <span key={index} className="knowledge-tag">
