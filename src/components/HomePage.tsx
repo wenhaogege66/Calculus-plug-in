@@ -65,30 +65,15 @@ export const HomePage: React.FC<HomePageProps> = ({ authState, isDarkMode, onPag
   const [error, setError] = useState<string>('');
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [courseProgress, setCourseProgress] = useState<CourseProgress[]>([
-    { subject: '高等数学A', progress: 78, color: '#3b82f6' },
-    { subject: '线性代数', progress: 65, color: '#8b5cf6' },
-    { subject: '概率论', progress: 42, color: '#06b6d4' }
-  ]);
-
-  const [recentGrade, setRecentGrade] = useState<RecentGrade>({
-    score: 85,
-    subject: '微积分作业',
-    date: '2024-01-08',
-    status: 'good'
-  });
-
-  const [notifications, setNotifications] = useState<NotificationItem[]>([
-    { type: 'homework', title: '作业截止提醒', time: '1小时前', urgent: true },
-    { type: 'system', title: '系统更新通知', time: '2小时前' },
-    { type: 'deadline', title: '期末考试安排', time: '1天前' }
-  ]);
-
+  const [courseProgress, setCourseProgress] = useState<CourseProgress[]>([]);
+  const [recentGrade, setRecentGrade] = useState<RecentGrade | null>(null);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [stats, setStats] = useState({
     completed: 0,
     urgent: 0,
-    unread: 1
+    unread: 0
   });
+  const [dashboardData, setDashboardData] = useState<any>(null);
 
   const isTeacher = authState.user?.role?.toLowerCase() === 'teacher';
 
@@ -103,81 +88,256 @@ export const HomePage: React.FC<HomePageProps> = ({ authState, isDarkMode, onPag
       setLoading(true);
       setError('');
 
-      // 并行获取班级和作业数据
-      const promises = [];
-      
-      // 获取班级信息
-      if (isTeacher) {
+      if (!isTeacher) {
+        // 学生端：使用新的dashboard API
+        const dashboardRes = await fetch(`${API_BASE_URL}/dashboard/student/stats`, {
+          headers: { 'Authorization': `Bearer ${authState.token}` }
+        });
+
+        if (dashboardRes.ok) {
+          const dashboardData = await dashboardRes.json();
+          if (dashboardData.success) {
+            setDashboardData(dashboardData.data);
+            
+            // 设置动态统计数据
+            setStats({
+              completed: dashboardData.data.overview?.completedPractices || 0,
+              urgent: dashboardData.data.learningRecommendations?.filter((r: any) => r.priority === 'high').length || 0,
+              unread: dashboardData.data.learningRecommendations?.filter((r: any) => !r.isRead).length || 0
+            });
+
+            // 更新课程进度（基于知识点掌握度）
+            const knowledgeProgress = dashboardData.data.knowledgePointMastery || [];
+            const courseProgressData = knowledgeProgress.slice(0, 3).map((point: any, index: number) => ({
+              subject: point.knowledgePoint,
+              progress: point.masteryLevel || 0,
+              color: ['#3b82f6', '#10b981', '#f59e0b'][index % 3]
+            }));
+            setCourseProgress(courseProgressData);
+
+            // 设置最近成绩
+            const recentActivities = dashboardData.data.recentActivities || [];
+            if (recentActivities.length > 0) {
+              const latestActivity = recentActivities[0];
+              if (latestActivity.score !== null) {
+                setRecentGrade({
+                  score: latestActivity.score,
+                  subject: '最近练习',
+                  date: new Date(latestActivity.date).toLocaleDateString('zh-CN'),
+                  status: latestActivity.score >= 90 ? 'excellent' : latestActivity.score >= 70 ? 'good' : 'pass'
+                });
+              }
+            }
+
+            // 设置动态通知（基于学习建议）
+            const recommendations = dashboardData.data.learningRecommendations || [];
+            const dynamicNotifications = recommendations.slice(0, 3).map((rec: any) => ({
+              type: rec.type === 'knowledge_point' ? 'homework' : 'system',
+              title: rec.title,
+              time: new Date(rec.createdAt).toLocaleString('zh-CN'),
+              urgent: rec.priority === 'high'
+            }));
+            setNotifications(dynamicNotifications);
+          }
+        }
+
+        // 学生端仍需要班级信息
+        const classroomsRes = await fetch(`${API_BASE_URL}/classrooms/student`, {
+          headers: { 'Authorization': `Bearer ${authState.token}` }
+        });
+        if (classroomsRes.ok) {
+          const classroomsData = await classroomsRes.json();
+          if (classroomsData.success) {
+            setClassrooms(classroomsData.data || []);
+          }
+        }
+
+        // 学生端仍需要作业信息
+        const assignmentsRes = await fetch(`${API_BASE_URL}/assignments/student`, {
+          headers: { 'Authorization': `Bearer ${authState.token}` }
+        });
+        if (assignmentsRes.ok) {
+          const assignmentsData = await assignmentsRes.json();
+          if (assignmentsData.success) {
+            const processedAssignments = (assignmentsData.data || []).map((assignment: any) => {
+              const now = new Date();
+              const dueDate = new Date(assignment.dueDate);
+              const isOverdue = now > dueDate;
+              const isSubmitted = assignment.isSubmitted || false;
+              
+              let status: 'pending' | 'urgent' | 'completed';
+              if (isSubmitted) {
+                status = 'completed';
+              } else if (isOverdue) {
+                status = 'urgent';
+              } else {
+                const timeUntilDue = dueDate.getTime() - now.getTime();
+                const hoursUntilDue = timeUntilDue / (1000 * 60 * 60);
+                status = hoursUntilDue <= 24 ? 'urgent' : 'pending';
+              }
+
+              return {
+                ...assignment,
+                status,
+                isOverdue
+              };
+            });
+            
+            setAssignments(processedAssignments);
+          }
+        }
+      } else {
+        // 教师端：使用新的dashboard API + 原有数据
+        const promises = [];
+        
+        // 获取教师班级分析数据
+        promises.push(
+          fetch(`${API_BASE_URL}/dashboard/teacher/class-analytics`, {
+            headers: { 'Authorization': `Bearer ${authState.token}` }
+          })
+        );
+
+        // 获取班级信息
         promises.push(
           fetch(`${API_BASE_URL}/classrooms/teacher`, {
             headers: { 'Authorization': `Bearer ${authState.token}` }
           })
         );
-      } else {
+
+        // 获取作业信息
         promises.push(
-          fetch(`${API_BASE_URL}/classrooms/student`, {
+          fetch(`${API_BASE_URL}/assignments/teacher`, {
             headers: { 'Authorization': `Bearer ${authState.token}` }
           })
         );
-      }
 
-      // 获取作业信息
-      const assignmentEndpoint = isTeacher ? '/assignments/teacher' : '/assignments/student';
-      promises.push(
-        fetch(`${API_BASE_URL}${assignmentEndpoint}`, {
-          headers: { 'Authorization': `Bearer ${authState.token}` }
-        })
-      );
+        const [dashboardRes, classroomsRes, assignmentsRes] = await Promise.all(promises);
 
-      const [classroomsRes, assignmentsRes] = await Promise.all(promises);
-
-      // 处理班级数据
-      if (classroomsRes.ok) {
-        const classroomsData = await classroomsRes.json();
-        if (classroomsData.success) {
-          setClassrooms(classroomsData.data || []);
-        }
-      }
-
-      // 处理作业数据
-      if (assignmentsRes.ok) {
-        const assignmentsData = await assignmentsRes.json();
-        if (assignmentsData.success) {
-          const processedAssignments = (assignmentsData.data || []).map((assignment: any) => {
-            const now = new Date();
-            const dueDate = new Date(assignment.dueDate);
-            const isOverdue = now > dueDate;
-            const isSubmitted = assignment.isSubmitted || false;
+        // 处理教师分析数据
+        if (dashboardRes.ok) {
+          const teacherDashboardData = await dashboardRes.json();
+          if (teacherDashboardData.success) {
+            setDashboardData(teacherDashboardData.data);
             
-            let status: 'pending' | 'urgent' | 'completed';
-            if (isSubmitted) {
-              status = 'completed';
-            } else if (isOverdue) {
-              status = 'urgent';
-            } else {
-              const timeUntilDue = dueDate.getTime() - now.getTime();
-              const hoursUntilDue = timeUntilDue / (1000 * 60 * 60);
-              status = hoursUntilDue <= 24 ? 'urgent' : 'pending';
+            // 设置动态统计数据（基于AI分析结果）
+            setStats({
+              completed: teacherDashboardData.data.overview?.totalSubmissions || 0,
+              urgent: teacherDashboardData.data.studentsNeedingAttention?.length || 0,
+              unread: teacherDashboardData.data.teachingRecommendations?.filter((r: any) => r.priority === 'high').length || 0
+            });
+          }
+        }
+
+
+        // 处理班级数据
+        if (classroomsRes.ok) {
+          const classroomsData = await classroomsRes.json();
+          if (classroomsData.success) {
+            setClassrooms(classroomsData.data || []);
+          }
+        }
+
+        // 处理作业数据
+        if (assignmentsRes.ok) {
+          const assignmentsData = await assignmentsRes.json();
+          if (assignmentsData.success) {
+            const processedAssignments = (assignmentsData.data || []).map((assignment: any) => {
+              const now = new Date();
+              const dueDate = new Date(assignment.dueDate);
+              const isOverdue = now > dueDate;
+              const isSubmitted = assignment.isSubmitted || false;
+              
+              let status: 'pending' | 'urgent' | 'completed';
+              if (isSubmitted) {
+                status = 'completed';
+              } else if (isOverdue) {
+                status = 'urgent';
+              } else {
+                const timeUntilDue = dueDate.getTime() - now.getTime();
+                const hoursUntilDue = timeUntilDue / (1000 * 60 * 60);
+                status = hoursUntilDue <= 24 ? 'urgent' : 'pending';
+              }
+
+              return {
+                ...assignment,
+                status,
+                isOverdue
+              };
+            });
+            
+            setAssignments(processedAssignments);
+
+            // 更新统计数据
+            const completedCount = processedAssignments.filter((a: Assignment) => a.status === 'completed').length;
+            const urgentCount = processedAssignments.filter((a: Assignment) => a.status === 'urgent').length;
+            
+            setStats({
+              completed: completedCount,
+              urgent: urgentCount,
+              unread: 1
+            });
+          }
+        }
+
+        // 教师端设置基于AI分析的动态数据
+        if (dashboardData && dashboardData.knowledgePointAnalysis) {
+          const knowledgeProgress = dashboardData.knowledgePointAnalysis.slice(0, 3).map((point: any, index: number) => ({
+            subject: point.knowledgePoint,
+            progress: Math.max(0, 100 - point.errorRate), // 错误率转换为掌握度
+            color: ['#3b82f6', '#10b981', '#f59e0b'][index % 3]
+          }));
+          setCourseProgress(knowledgeProgress.length > 0 ? knowledgeProgress : [
+            { subject: '极限与连续', progress: 85, color: '#3b82f6' },
+            { subject: '导数与微分', progress: 72, color: '#10b981' },
+            { subject: '积分学', progress: 68, color: '#f59e0b' }
+          ]);
+
+          // 基于AI教学建议和学生关注情况设置通知
+          const dynamicNotifications = [];
+          
+          if (dashboardData.teachingRecommendations && dashboardData.teachingRecommendations.length > 0) {
+            const highPriorityRecs = dashboardData.teachingRecommendations.filter((r: any) => r.priority === 'high');
+            if (highPriorityRecs.length > 0) {
+              dynamicNotifications.push({
+                type: 'system',
+                title: `AI建议：${highPriorityRecs[0].title}`,
+                time: '刚刚',
+                urgent: true
+              });
             }
+          }
 
-            return {
-              ...assignment,
-              status,
-              isOverdue
-            };
-          });
-          
-          setAssignments(processedAssignments);
+          if (dashboardData.studentsNeedingAttention && dashboardData.studentsNeedingAttention.length > 0) {
+            dynamicNotifications.push({
+              type: 'homework',
+              title: `${dashboardData.studentsNeedingAttention.length}名学生需要关注`,
+              time: '1小时前',
+              urgent: dashboardData.studentsNeedingAttention.length > 3
+            });
+          }
 
-          // 更新统计数据
-          const completedCount = processedAssignments.filter((a: Assignment) => a.status === 'completed').length;
-          const urgentCount = processedAssignments.filter((a: Assignment) => a.status === 'urgent').length;
-          
-          setStats({
-            completed: completedCount,
-            urgent: urgentCount,
-            unread: 1
-          });
+          dynamicNotifications.push(
+            { type: 'deadline', title: '《导数应用》作业即将截止', time: '1天前' }
+          );
+
+          setNotifications(dynamicNotifications.length > 0 ? dynamicNotifications : [
+            { type: 'homework', title: '新的作业提交需要批改', time: '2小时前', urgent: true },
+            { type: 'deadline', title: '《导数应用》作业即将截止', time: '1天前' },
+            { type: 'system', title: 'AI助教系统更新完成', time: '3天前' }
+          ]);
+        } else {
+          // 如果没有AI分析数据，使用默认值
+          setCourseProgress([
+            { subject: '极限与连续', progress: 85, color: '#3b82f6' },
+            { subject: '导数与微分', progress: 72, color: '#10b981' },
+            { subject: '积分学', progress: 68, color: '#f59e0b' }
+          ]);
+
+          setNotifications([
+            { type: 'homework', title: '新的作业提交需要批改', time: '2小时前', urgent: true },
+            { type: 'deadline', title: '《导数应用》作业即将截止', time: '1天前' },
+            { type: 'system', title: 'AI助教系统更新完成', time: '3天前' }
+          ]);
         }
       }
     } catch (err) {
@@ -255,7 +415,7 @@ export const HomePage: React.FC<HomePageProps> = ({ authState, isDarkMode, onPag
   }
 
   return (
-    <div className="homepage">
+    <div className={`homepage ${isDarkMode ? 'dark' : ''}`}>
       {/* 欢迎区域 */}
       <div className="welcome-section">
         <div className="welcome-content">
@@ -554,41 +714,57 @@ export const HomePage: React.FC<HomePageProps> = ({ authState, isDarkMode, onPag
 
         {/* 教师端和学生端显示不同的成绩/分析卡片 */}
         {isTeacher ? (
-          /* 教师端 - 学习分析 */
+          /* 教师端 - AI学习分析 */
           <div className="content-card analytics-card teacher-analytics">
             <div className="card-header">
               <div className="card-title">
                 <span className="card-icon">📊</span>
-                学习分析
+                AI学习分析
               </div>
             </div>
             <div className="analytics-content">
               <div className="analytics-summary">
                 <div className="summary-item">
                   <span className="summary-label">班级平均分</span>
-                  <span className="summary-value highlight">82.5</span>
+                  <span className="summary-value highlight">
+                    {dashboardData?.overview?.classAverage || 82.5}
+                  </span>
                 </div>
                 <div className="summary-item">
                   <span className="summary-label">提交率</span>
-                  <span className="summary-value">94%</span>
+                  <span className="summary-value">
+                    {dashboardData?.overview?.submitRate || 94}%
+                  </span>
                 </div>
               </div>
               <div className="difficulty-analysis">
-                <h5>题目难点分析</h5>
-                <div className="difficulty-item">
-                  <span className="difficulty-topic">极限计算</span>
-                  <div className="difficulty-bar">
-                    <div className="difficulty-fill" style={{width: '75%'}}></div>
+                <h5>AI错题难点分析</h5>
+                {dashboardData?.knowledgePointAnalysis?.slice(0, 3).map((point: any, index: number) => (
+                  <div key={index} className="difficulty-item">
+                    <span className="difficulty-topic">{point.knowledgePoint}</span>
+                    <div className="difficulty-bar">
+                      <div className="difficulty-fill" style={{width: `${point.errorRate}%`}}></div>
+                    </div>
+                    <span className="difficulty-rate">{point.errorRate}%错误</span>
                   </div>
-                  <span className="difficulty-rate">75%错误</span>
-                </div>
-                <div className="difficulty-item">
-                  <span className="difficulty-topic">导数应用</span>
-                  <div className="difficulty-bar">
-                    <div className="difficulty-fill" style={{width: '45%'}}></div>
-                  </div>
-                  <span className="difficulty-rate">45%错误</span>
-                </div>
+                )) || (
+                  <>
+                    <div className="difficulty-item">
+                      <span className="difficulty-topic">极限计算</span>
+                      <div className="difficulty-bar">
+                        <div className="difficulty-fill" style={{width: '75%'}}></div>
+                      </div>
+                      <span className="difficulty-rate">75%错误</span>
+                    </div>
+                    <div className="difficulty-item">
+                      <span className="difficulty-topic">导数应用</span>
+                      <div className="difficulty-bar">
+                        <div className="difficulty-fill" style={{width: '45%'}}></div>
+                      </div>
+                      <span className="difficulty-rate">45%错误</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -602,59 +778,80 @@ export const HomePage: React.FC<HomePageProps> = ({ authState, isDarkMode, onPag
               </div>
             </div>
             <div className="grade-content">
-              <div className="grade-score">
-                <span className="score-number">{recentGrade.score}分</span>
-                <span 
-                  className="score-status"
-                  style={{ color: getGradeColor(recentGrade.status) }}
-                >
-                  通过
-                </span>
-              </div>
-              <div className="grade-info">
-                <p className="grade-subject">得分: {recentGrade.subject}</p>
-                <p className="grade-date">批改时间: {recentGrade.date}</p>
-              </div>
+              {recentGrade ? (
+                <>
+                  <div className="grade-score">
+                    <span className="score-number">{recentGrade.score}分</span>
+                    <span 
+                      className="score-status"
+                      style={{ color: getGradeColor(recentGrade.status) }}
+                    >
+                      {recentGrade.status === 'excellent' ? '优秀' : 
+                       recentGrade.status === 'good' ? '良好' : '通过'}
+                    </span>
+                  </div>
+                  <div className="grade-info">
+                    <p className="grade-subject">{recentGrade.subject}</p>
+                    <p className="grade-date">批改时间: {recentGrade.date}</p>
+                  </div>
+                </>
+              ) : (
+                <div className="empty-state-mini">
+                  <p>暂无批改记录</p>
+                  <span className="empty-hint">开始练习来获得AI批改反馈</span>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* 教师端专用卡片 - 学生表现 */}
+        {/* 教师端专用卡片 - AI学生表现分析 */}
         {isTeacher && (
           <div className="content-card performance-card teacher-performance">
             <div className="card-header">
               <div className="card-title">
-                <span className="card-icon">🌟</span>
-                学生表现
+                <span className="card-icon">🤖</span>
+                AI学生表现分析
               </div>
             </div>
             <div className="performance-content">
               <div className="top-students">
-                <h5>本周优秀学生</h5>
+                <h5>班级概况</h5>
                 <div className="student-list">
                   <div className="student-item">
-                    <div className="student-avatar">👨‍🎓</div>
+                    <div className="student-avatar">👥</div>
                     <div className="student-details">
-                      <span className="student-name">王小明</span>
-                      <span className="student-score">95分</span>
+                      <span className="student-name">总学生数</span>
+                      <span className="student-score">{dashboardData?.overview?.totalStudents || 0}人</span>
                     </div>
-                    <div className="performance-badge excellent">优秀</div>
+                    <div className="performance-badge">活跃学生: {dashboardData?.overview?.activeStudents || 0}</div>
                   </div>
                   <div className="student-item">
-                    <div className="student-avatar">👩‍🎓</div>
+                    <div className="student-avatar">📊</div>
                     <div className="student-details">
-                      <span className="student-name">李小红</span>
-                      <span className="student-score">92分</span>
+                      <span className="student-name">总练习次数</span>
+                      <span className="student-score">{dashboardData?.overview?.totalSubmissions || 0}次</span>
                     </div>
-                    <div className="performance-badge good">良好</div>
+                    <div className="performance-badge good">班级平均: {dashboardData?.overview?.classAverage || 0}分</div>
                   </div>
                 </div>
               </div>
               <div className="need-attention">
-                <h5>需要关注</h5>
+                <h5>AI识别需要关注的学生</h5>
                 <div className="attention-list">
-                  <span className="attention-item">2名学生连续3次作业未提交</span>
-                  <span className="attention-item">5名学生最近成绩下降明显</span>
+                  {dashboardData?.studentsNeedingAttention?.slice(0, 3).map((student: any, index: number) => (
+                    <span key={index} className="attention-item">
+                      {student.username}: {student.issues.join(', ')}
+                    </span>
+                  )) || (
+                    <>
+                      <span className="attention-item">2名学生连续3次作业未提交</span>
+                      <span className="attention-item">5名学生最近成绩下降明显</span>
+                    </>
+                  )}
+                  {(!dashboardData?.studentsNeedingAttention || dashboardData.studentsNeedingAttention.length === 0) && (
+                    <span className="attention-item success">🎉 所有学生表现良好，无需特别关注</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -689,6 +886,90 @@ export const HomePage: React.FC<HomePageProps> = ({ authState, isDarkMode, onPag
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* 知识图谱导航 */}
+        <div className="content-card knowledge-graph-card">
+          <div className="card-header">
+            <div className="card-title">
+              <span className="card-icon">🌐</span>
+              知识图谱
+            </div>
+            <button 
+              className="card-action-btn"
+              onClick={() => onPageChange?.('knowledge-graph')}
+            >
+              <span>📊</span>
+              查看完整图谱
+            </button>
+          </div>
+          <div className="knowledge-preview">
+            <div className="knowledge-stats">
+              <div className="knowledge-stat">
+                <div className="stat-circle mastered">
+                  <span className="stat-number">12</span>
+                </div>
+                <span className="stat-label">已掌握</span>
+              </div>
+              <div className="knowledge-stat">
+                <div className="stat-circle learning">
+                  <span className="stat-number">8</span>
+                </div>
+                <span className="stat-label">学习中</span>
+              </div>
+              <div className="knowledge-stat">
+                <div className="stat-circle weak">
+                  <span className="stat-number">3</span>
+                </div>
+                <span className="stat-label">需加强</span>
+              </div>
+            </div>
+            <div className="knowledge-progress-ring">
+              <div className="progress-ring">
+                <svg className="progress-ring-svg" width="120" height="120">
+                  <circle
+                    className="progress-ring-circle-bg"
+                    cx="60"
+                    cy="60"
+                    r="50"
+                    strokeWidth="8"
+                    fill="transparent"
+                    stroke="#e5e7eb"
+                  />
+                  <circle
+                    className="progress-ring-circle"
+                    cx="60"
+                    cy="60"
+                    r="50"
+                    strokeWidth="8"
+                    fill="transparent"
+                    stroke="#10b981"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(12 / 23) * 314} 314`}
+                    strokeDashoffset="78.5"
+                  />
+                </svg>
+                <div className="progress-text">
+                  <span className="progress-percentage">52%</span>
+                  <span className="progress-label">总体掌握度</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="knowledge-actions">
+            <button 
+              className="knowledge-action-btn weak"
+              onClick={() => onPageChange?.('practice')}
+            >
+              🎯 专项练习弱项
+            </button>
+            <button 
+              className="knowledge-action-btn explore"
+              onClick={() => onPageChange?.('knowledge-graph')}
+            >
+              🔍 探索知识关联
+            </button>
           </div>
         </div>
 

@@ -571,13 +571,37 @@ function buildFollowUpPrompt(
   previousSuggestions: string,
   userQuestion: string
 ): string {
+  // 检测用户问题的类型
+  const casualGreetings = ['你好', '您好', 'hello', 'hi', '嗨', '谢谢', '感谢', '再见', 'bye'];
+  const isSimpleCasualMessage = casualGreetings.some(greeting => 
+    userQuestion.toLowerCase().trim().includes(greeting.toLowerCase())
+  ) && userQuestion.trim().length <= 10;
+
+  // 检测是否包含数学相关词汇
+  const mathKeywords = ['公式', '定理', '微积分', '极限', '导数', '积分', '函数', '求导', '计算', '解法', '方法', '为什么', '怎么', '如何'];
+  const isMathRelated = mathKeywords.some(keyword => userQuestion.includes(keyword));
+
+  // 如果是简单的问候或感谢，不需要大量上下文
+  if (isSimpleCasualMessage && !isMathRelated) {
+    return `
+你是一位友善的微积分教师，学生向你说了："${userQuestion}"
+
+请给出自然、友善的回应，保持简短和亲切。如果学生需要数学帮助，可以鼓励他们具体提问。
+
+要求：
+1. 回应要自然、亲切
+2. 不要主动解释数学问题
+3. 保持简短，1-2句话即可`;
+  }
+
+  // 对于数学相关问题，提供完整上下文
   const questionSection = originalQuestion ? `
 原题目内容：
 ${originalQuestion}
 ` : '';
 
   return `
-你是一位资深的微积分教师，学生基于之前的批改结果向你提出了进一步的问题。请结合题目、学生解答和之前的批改意见，给出清晰、有帮助的回答。
+你是一位资深的微积分教师，学生基于之前的批改结果向你提出了进一步的问题。请结合相关信息给出清晰、有帮助的回答。
 
 ${questionSection}
 学生的解答：
@@ -594,9 +618,9 @@ ${userQuestion}
 
 请回答学生的问题，要求：
 1. 回答要准确、清晰、有针对性
-2. 结合具体的数学概念和公式进行解释
-3. 如果涉及计算错误，请给出正确的步骤
-4. 鼓励学生继续思考和学习
+2. 如果问题与题目相关，结合具体的数学概念和公式进行解释
+3. 如果问题比较一般化，可以适当简化回答
+4. 如果涉及计算错误，请给出正确的步骤
 5. 语言要通俗易懂，适合学生理解
 
 请直接回答问题，不需要特殊格式。

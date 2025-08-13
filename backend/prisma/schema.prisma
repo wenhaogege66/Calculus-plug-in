@@ -42,6 +42,7 @@ model User {
   
   // 学生相关
   classroomMemberships ClassroomMember[]
+  learningRecommendations LearningRecommendation[]
   
   @@map("users")
 }
@@ -84,6 +85,8 @@ model Submission {
   fileUpload   FileUpload        @relation(fields: [fileUploadId], references: [id], onDelete: Cascade)
   mathpixResults MathPixResult[]
   deepseekResults DeepseekResult[]
+  errorAnalysis ErrorAnalysis[]
+  similarQuestions SimilarQuestion[]
   
   @@map("submissions")
 }
@@ -220,4 +223,100 @@ model Assignment {
   questionFile FileUpload? @relation("AssignmentQuestions", fields: [fileUploadId], references: [id])
   
   @@map("assignments")
+}
+
+// 知识点表
+model KnowledgePoint {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  chapter     String?  @db.VarChar(50)
+  parentId    Int?     @map("parent_id") // 父级知识点
+  level       Int      @default(1) // 1=章, 2=节, 3=概念点
+  description String?  @db.Text
+  keywords    String[]
+  functionExamples String[] @map("function_examples") // 相关函数示例
+  difficultyLevel Int   @default(1) @map("difficulty_level")
+  aiExplanation String? @map("ai_explanation") @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  // 关联
+  parent      KnowledgePoint? @relation("KnowledgePointHierarchy", fields: [parentId], references: [id])
+  children    KnowledgePoint[] @relation("KnowledgePointHierarchy")
+  errorAnalysis ErrorAnalysis[]
+  similarQuestionRelations SimilarQuestionKnowledgePoint[]
+  
+  @@map("knowledge_points")
+}
+
+// 错题分析表
+model ErrorAnalysis {
+  id              Int      @id @default(autoincrement())
+  submissionId    Int      @map("submission_id")
+  errorType       String   @map("error_type") @db.VarChar(50) // 'calculation', 'concept', 'formula', 'logic'
+  knowledgePointId Int?    @map("knowledge_point_id")
+  errorDescription String  @map("error_description") @db.Text
+  frequencyCount  Int      @default(1) @map("frequency_count")
+  severity        String   @default("medium") @db.VarChar(20) // 'low', 'medium', 'high'
+  aiSuggestion    String?  @map("ai_suggestion") @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  // 关联
+  submission      Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  knowledgePoint  KnowledgePoint? @relation(fields: [knowledgePointId], references: [id])
+  
+  @@map("error_analysis")
+}
+
+// 类似题生成记录
+model SimilarQuestion {
+  id                  Int      @id @default(autoincrement())
+  originalSubmissionId Int     @map("original_submission_id")
+  generatedContent    String   @map("generated_content") @db.Text
+  standardAnswer      String?  @map("standard_answer") @db.Text
+  difficultyLevel     Int      @default(1) @map("difficulty_level")
+  generationPrompt    String   @map("generation_prompt") @db.Text
+  userRating          Int?     @map("user_rating") // 1-5分用户评分
+  isCompleted         Boolean  @default(false) @map("is_completed")
+  userAnswer          String?  @map("user_answer") @db.Text
+  aiGradingResult     Json?    @map("ai_grading_result")
+  createdAt           DateTime @default(now()) @map("created_at")
+  
+  // 关联
+  originalSubmission  Submission @relation(fields: [originalSubmissionId], references: [id], onDelete: Cascade)
+  knowledgePointRelations SimilarQuestionKnowledgePoint[]
+  
+  @@map("similar_questions")
+}
+
+// 类似题和知识点的多对多关系表
+model SimilarQuestionKnowledgePoint {
+  id                Int      @id @default(autoincrement())
+  similarQuestionId Int      @map("similar_question_id")
+  knowledgePointId  Int      @map("knowledge_point_id")
+  
+  similarQuestion   SimilarQuestion @relation(fields: [similarQuestionId], references: [id], onDelete: Cascade)
+  knowledgePoint    KnowledgePoint  @relation(fields: [knowledgePointId], references: [id], onDelete: Cascade)
+  
+  @@unique([similarQuestionId, knowledgePointId])
+  @@map("similar_question_knowledge_points")
+}
+
+// AI学习建议表
+model LearningRecommendation {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  type         String   @db.VarChar(50) // 'knowledge_point', 'study_path', 'practice_suggestion'
+  title        String   @db.VarChar(200)
+  content      String   @db.Text
+  priority     String   @default("medium") @db.VarChar(20) // 'low', 'medium', 'high'
+  isRead       Boolean  @default(false) @map("is_read")
+  isApplied    Boolean  @default(false) @map("is_applied")
+  expiresAt    DateTime? @map("expires_at")
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  
+  // 关联
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("learning_recommendations")
 } 

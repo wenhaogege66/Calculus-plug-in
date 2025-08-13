@@ -848,6 +848,223 @@
   }
 }
 
+/* 知识图谱卡片 */
+.knowledge-graph-card {
+  grid-column: span 2;
+}
+
+.knowledge-preview {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 12px;
+  margin: 8px 0;
+  backdrop-filter: blur(10px);
+}
+
+.knowledge-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.knowledge-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stat-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: white;
+  font-size: 14px;
+}
+
+.stat-circle.mastered {
+  background: linear-gradient(135deg, #10b981, #047857);
+}
+
+.stat-circle.learning {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.stat-circle.weak {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.knowledge-stat .stat-label {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.knowledge-progress-ring {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress-ring {
+  position: relative;
+}
+
+.progress-ring-svg {
+  transform: rotate(-90deg);
+}
+
+.progress-ring-circle {
+  transition: stroke-dasharray 0.6s ease-in-out;
+}
+
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, calc(-50% + 2px));
+  text-align: center;
+  z-index: 1;
+}
+
+.progress-percentage {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.progress-label {
+  display: block;
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 4px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.knowledge-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.knowledge-action-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.knowledge-action-btn.weak {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+}
+
+.knowledge-action-btn.weak:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.knowledge-action-btn.explore {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.knowledge-action-btn.explore:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* 响应式 - 知识图谱卡片 */
+@media (max-width: 1200px) {
+  .knowledge-graph-card {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .knowledge-preview {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  
+  .knowledge-stats {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-around;
+  }
+  
+  .knowledge-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+}
+
+/* 深色模式 - 知识图谱卡片 */
+@media (prefers-color-scheme: dark) {
+  .knowledge-graph-card {
+    background: #1f2937;
+    border-color: #374151;
+  }
+  
+  .knowledge-preview {
+    background: rgba(31, 41, 55, 0.8);
+    border-color: rgba(55, 65, 81, 0.8);
+  }
+  
+  .progress-percentage {
+    color: #f3f4f6;
+  }
+  
+  .progress-label, .knowledge-stat .stat-label {
+    color: #9ca3af;
+  }
+  
+  .progress-ring-circle-bg {
+    stroke: #374151 !important;
+  }
+}
+
+/* 确保进度环和文字在深色模式下可见 */
+.dark .knowledge-preview {
+  background: rgba(31, 41, 55, 0.8);
+  border-color: rgba(55, 65, 81, 0.8);
+}
+
+.dark .progress-percentage {
+  color: #f3f4f6;
+}
+
+.dark .progress-label, 
+.dark .knowledge-stat .stat-label {
+  color: #9ca3af;
+}
+
+.dark .progress-ring-circle-bg {
+  stroke: #374151 !important;
+}
+
 /* ===== 教师端专用样式 ===== */
 
 /* 教师班级管理卡片 */

@@ -2,6 +2,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
+import axios from 'axios';
 
 const prisma = new PrismaClient();
 
@@ -354,6 +355,395 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
+  // AI生成类似题 - 基于练习错题
+  fastify.post('/practice/:sessionId/generate-similar', { 
+    preHandler: requireAuth 
+  }, async (request, reply) => {
+    try {
+      const userId = request.currentUser!.id;
+      const sessionId = parseInt((request.params as any).sessionId);
+      const { difficultyLevel, questionCount } = request.body as {
+        difficultyLevel?: number; // 1-5，默认与原题相同
+        questionCount?: number;   // 生成题目数量，默认3
+      };
+
+      if (!sessionId) {
+        return reply.code(400).send({
+          success: false,
+          error: '无效的练习ID'
+        });
+      }
+
+      // 获取原练习的详细信息
+      const originalSubmission = await prisma.submission.findFirst({
+        where: {
+          id: sessionId,
+          userId: userId,
+          workMode: 'practice'
+        },
+        include: {
+          mathpixResults: {
+            orderBy: { createdAt: 'desc' },
+            take: 1
+          },
+          deepseekResults: {
+            orderBy: { createdAt: 'desc' },
+            take: 1
+          },
+          errorAnalysis: {
+            include: {
+              knowledgePoint: true
+            }
+          }
+        }
+      });
+
+      if (!originalSubmission) {
+        return reply.code(404).send({
+          success: false,
+          error: '原练习记录不存在'
+        });
+      }
+
+      const latestOCR = originalSubmission.mathpixResults[0];
+      const latestGrading = originalSubmission.deepseekResults[0];
+
+      if (!latestOCR?.recognizedText || !latestGrading) {
+        return reply.code(400).send({
+          success: false,
+          error: '原练习缺少OCR识别结果或AI评分，无法生成类似题'
+        });
+      }
+
+      // 分析错误知识点
+      const errorKnowledgePoints = originalSubmission.errorAnalysis.map(error => ({
+        name: error.knowledgePoint?.name || '未分类',
+        errorType: error.errorType,
+        description: error.errorDescription
+      }));
+
+      // 调用AI生成类似题
+      const similarQuestions = await generateSimilarQuestions({
+        originalText: latestOCR.recognizedText,
+        score: latestGrading.score || 0,
+        errorAnalysis: errorKnowledgePoints,
+        difficultyLevel: difficultyLevel || 3,
+        questionCount: questionCount || 3,
+        subject: '微积分'
+      });
+
+      // 保存生成的类似题到数据库
+      const savedQuestions = await Promise.all(
+        similarQuestions.map(async (question: any) => {
+          // 创建类似题记录
+          const similarQuestion = await prisma.similarQuestion.create({
+            data: {
+              originalSubmissionId: sessionId,
+              generatedContent: question.content,
+              standardAnswer: question.standardAnswer,
+              difficultyLevel: question.difficultyLevel,
+              generationPrompt: question.prompt,
+              isCompleted: false
+            }
+          });
+
+          // 关联知识点
+          if (question.knowledgePoints && question.knowledgePoints.length > 0) {
+            // 查找或创建知识点
+            for (const kpName of question.knowledgePoints) {
+              let knowledgePoint = await prisma.knowledgePoint.findFirst({
+                where: { name: kpName }
+              });
+
+              if (!knowledgePoint) {
+                // 创建新知识点
+                knowledgePoint = await prisma.knowledgePoint.create({
+                  data: {
+                    name: kpName,
+                    chapter: '微积分基础', // 默认章节
+                    level: 3, // 概念点级别
+                    keywords: [kpName],
+                    functionExamples: [],
+                    difficultyLevel: question.difficultyLevel
+                  }
+                });
+              }
+
+              // 创建关联关系
+              await prisma.similarQuestionKnowledgePoint.create({
+                data: {
+                  similarQuestionId: similarQuestion.id,
+                  knowledgePointId: knowledgePoint.id
+                }
+              });
+            }
+          }
+
+          return {
+            id: similarQuestion.id,
+            content: similarQuestion.generatedContent,
+            standardAnswer: similarQuestion.standardAnswer,
+            difficultyLevel: similarQuestion.difficultyLevel,
+            knowledgePoints: question.knowledgePoints || []
+          };
+        })
+      );
+
+      return {
+        success: true,
+        data: {
+          originalSubmissionId: sessionId,
+          generatedQuestions: savedQuestions,
+          generatedAt: new Date().toISOString(),
+          analysisBase: {
+            originalScore: latestGrading.score,
+            errorKnowledgePoints: errorKnowledgePoints,
+            targetDifficulty: difficultyLevel || 3
+          }
+        }
+      };
+
+    } catch (error) {
+      fastify.log.error('生成类似题失败:', error);
+      return reply.code(500).send({
+        success: false,
+        error: '生成类似题失败'
+      });
+    }
+  });
+
+  // 获取用户的类似题列表
+  fastify.get('/practice/similar-questions', { 
+    preHandler: requireAuth 
+  }, async (request, reply) => {
+    try {
+      const userId = request.currentUser!.id;
+      
+      const similarQuestions = await prisma.similarQuestion.findMany({
+        where: {
+          originalSubmission: {
+            userId: userId
+          }
+        },
+        include: {
+          originalSubmission: {
+            select: {
+              id: true,
+              submittedAt: true,
+              fileUpload: {
+                select: {
+                  originalName: true
+                }
+              }
+            }
+          },
+          knowledgePointRelations: {
+            include: {
+              knowledgePoint: {
+                select: {
+                  id: true,
+                  name: true,
+                  chapter: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50
+      });
+
+      const formattedQuestions = similarQuestions.map(sq => ({
+        id: sq.id,
+        content: sq.generatedContent,
+        standardAnswer: sq.standardAnswer,
+        difficultyLevel: sq.difficultyLevel,
+        isCompleted: sq.isCompleted,
+        userAnswer: sq.userAnswer,
+        userRating: sq.userRating,
+        createdAt: sq.createdAt,
+        knowledgePoints: sq.knowledgePointRelations.map(rel => ({
+          id: rel.knowledgePoint.id,
+          name: rel.knowledgePoint.name,
+          chapter: rel.knowledgePoint.chapter
+        })),
+        originalPractice: {
+          id: sq.originalSubmission.id,
+          fileName: sq.originalSubmission.fileUpload.originalName,
+          practiceDate: sq.originalSubmission.submittedAt
+        },
+        aiGradingResult: sq.aiGradingResult
+      }));
+
+      return {
+        success: true,
+        data: formattedQuestions
+      };
+
+    } catch (error) {
+      fastify.log.error('获取类似题列表失败:', error);
+      return reply.code(500).send({
+        success: false,
+        error: '获取类似题列表失败'
+      });
+    }
+  });
+
+  // 提交类似题答案并获得AI评分
+  fastify.post('/practice/similar-questions/:questionId/submit', { 
+    preHandler: requireAuth 
+  }, async (request, reply) => {
+    try {
+      const userId = request.currentUser!.id;
+      const questionId = parseInt((request.params as any).questionId);
+      const { userAnswer, requestFeedback } = request.body as {
+        userAnswer: string;
+        requestFeedback?: boolean;
+      };
+
+      if (!questionId || !userAnswer) {
+        return reply.code(400).send({
+          success: false,
+          error: '缺少题目ID或用户答案'
+        });
+      }
+
+      // 验证类似题是否属于当前用户
+      const similarQuestion = await prisma.similarQuestion.findFirst({
+        where: {
+          id: questionId,
+          originalSubmission: {
+            userId: userId
+          }
+        },
+        include: {
+          knowledgePointRelations: {
+            include: {
+              knowledgePoint: true
+            }
+          }
+        }
+      });
+
+      if (!similarQuestion) {
+        return reply.code(404).send({
+          success: false,
+          error: '类似题不存在或无权限访问'
+        });
+      }
+
+      // 如果请求AI反馈，调用AI评分
+      let aiGradingResult = null;
+      if (requestFeedback) {
+        aiGradingResult = await gradeSimilarQuestion({
+          questionContent: similarQuestion.generatedContent,
+          standardAnswer: similarQuestion.standardAnswer || '',
+          userAnswer: userAnswer,
+          knowledgePoints: similarQuestion.knowledgePointRelations.map(rel => rel.knowledgePoint.name),
+          difficultyLevel: similarQuestion.difficultyLevel
+        });
+      }
+
+      // 更新类似题记录
+      const updatedQuestion = await prisma.similarQuestion.update({
+        where: { id: questionId },
+        data: {
+          userAnswer: userAnswer,
+          isCompleted: true,
+          aiGradingResult: aiGradingResult || undefined
+        }
+      });
+
+      return {
+        success: true,
+        data: {
+          questionId: updatedQuestion.id,
+          submitted: true,
+          userAnswer: updatedQuestion.userAnswer,
+          aiGradingResult: updatedQuestion.aiGradingResult,
+          completedAt: new Date().toISOString()
+        }
+      };
+
+    } catch (error) {
+      fastify.log.error('提交类似题答案失败:', error);
+      return reply.code(500).send({
+        success: false,
+        error: '提交答案失败'
+      });
+    }
+  });
+
+  // 用户评分类似题质量
+  fastify.post('/practice/similar-questions/:questionId/rate', { 
+    preHandler: requireAuth 
+  }, async (request, reply) => {
+    try {
+      const userId = request.currentUser!.id;
+      const questionId = parseInt((request.params as any).questionId);
+      const { rating, feedback } = request.body as {
+        rating: number; // 1-5分
+        feedback?: string;
+      };
+
+      if (!questionId || !rating || rating < 1 || rating > 5) {
+        return reply.code(400).send({
+          success: false,
+          error: '缺少题目ID或评分无效（应为1-5分）'
+        });
+      }
+
+      // 验证类似题是否属于当前用户
+      const similarQuestion = await prisma.similarQuestion.findFirst({
+        where: {
+          id: questionId,
+          originalSubmission: {
+            userId: userId
+          }
+        }
+      });
+
+      if (!similarQuestion) {
+        return reply.code(404).send({
+          success: false,
+          error: '类似题不存在或无权限访问'
+        });
+      }
+
+      // 更新评分
+      await prisma.similarQuestion.update({
+        where: { id: questionId },
+        data: {
+          userRating: rating,
+          // 可以将feedback存储在metadata中
+          ...(feedback && {
+            aiGradingResult: {
+              ...(similarQuestion.aiGradingResult as any || {}),
+              userFeedback: feedback
+            }
+          })
+        }
+      });
+
+      return {
+        success: true,
+        data: {
+          questionId: questionId,
+          rating: rating,
+          feedback: feedback || null,
+          message: '评分已保存，感谢您的反馈！'
+        }
+      };
+
+    } catch (error) {
+      fastify.log.error('评分类似题失败:', error);
+      return reply.code(500).send({
+        success: false,
+        error: '保存评分失败'
+      });
+    }
+  });
+
   // 删除练习记录
   fastify.delete('/practice/:sessionId', { 
     preHandler: requireAuth 
@@ -483,6 +873,20 @@ async function startPracticeProcessing(submissionId: number, fastify: any) {
             score: aiResult.data?.score,
             maxScore: aiResult.data?.maxScore
           });
+
+          // 3. 如果批改完成且分数较低，自动进行错题分析
+          if (aiResult.data?.score !== null && aiResult.data.score < 80) {
+            try {
+              await performErrorAnalysis(submissionId, {
+                recognizedText: ocrResult.data.recognizedText,
+                gradingResult: aiResult.data,
+                fastify: fastify
+              });
+              fastify.log.info(`✅ 错题分析完成: submissionId=${submissionId}`);
+            } catch (errorAnalysisError) {
+              fastify.log.error(`⚠️ 错题分析失败 (不影响主流程): submissionId=${submissionId}`, errorAnalysisError);
+            }
+          }
         }
       } catch (error) {
         fastify.log.error(`AI批改过程异常:`, error);
@@ -519,6 +923,328 @@ async function startPracticeProcessing(submissionId: number, fastify: any) {
       fastify.log.error(`❌ 更新提交状态失败 - submissionId: ${submissionId}`, updateError);
     }
   }
+}
+
+// AI生成类似题的辅助函数
+async function generateSimilarQuestions(params: {
+  originalText: string;
+  score: number;
+  errorAnalysis: Array<{ name: string; errorType: string; description: string }>;
+  difficultyLevel: number;
+  questionCount: number;
+  subject: string;
+}) {
+  try {
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) {
+      throw new Error('Deepseek API密钥未配置');
+    }
+
+    const { originalText, score, errorAnalysis, difficultyLevel, questionCount, subject } = params;
+
+    const prompt = `
+你是一位资深的微积分教师，需要基于学生的练习情况生成针对性的类似题目。
+
+原题内容：
+${originalText}
+
+学生表现分析：
+- 原题得分：${score}分
+- 错误分析：${JSON.stringify(errorAnalysis, null, 2)}
+
+生成要求：
+- 学科：${subject}
+- 题目数量：${questionCount}道
+- 难度等级：${difficultyLevel}/5 (1=最简单，5=最困难)
+- 重点加强学生的薄弱环节
+
+请为每道题生成：
+1. content: 题目内容（包含完整的数学表达式，使用LaTeX格式）
+2. standardAnswer: 标准答案和解题步骤
+3. difficultyLevel: 实际难度等级
+4. knowledgePoints: 涉及的知识点数组
+5. prompt: 生成时使用的思路说明
+
+返回JSON格式：
+{
+  "questions": [
+    {
+      "content": "求函数 $f(x) = x^2 + 2x + 1$ 在区间 $[0, 2]$ 上的最大值。",
+      "standardAnswer": "解：首先求导数 $f'(x) = 2x + 2$，令其为0得到驻点...",
+      "difficultyLevel": 3,
+      "knowledgePoints": ["导数", "函数极值", "最值问题"],
+      "prompt": "基于学生在导数应用方面的错误，生成一道关于求最值的题目"
+    }
+  ]
+}
+
+注意：
+- 题目要与原题知识点相关但不完全相同
+- 根据错误分析调整题目难度和考查重点
+- 答案要详细包含解题步骤
+- 使用标准的数学LaTeX符号`;
+
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0.8 // 稍高的温度以增加创造性
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI API调用失败: ${response.status}`);
+    }
+
+    const result = await response.json();
+    const parsed = JSON.parse(result.choices[0].message.content);
+
+    // 为每个题目添加生成提示信息
+    const questions = (parsed.questions || []).map((q: any) => ({
+      ...q,
+      prompt: q.prompt || `基于原题(得分${score})的错误分析生成，难度${difficultyLevel}/5`
+    }));
+
+    return questions;
+  } catch (error) {
+    console.error('AI生成类似题失败:', error);
+    // 返回备用题目
+    return [{
+      content: '求函数 $f(x) = x^3 - 3x + 1$ 的导数，并求其极值点。',
+      standardAnswer: '解：$f\'(x) = 3x^2 - 3 = 3(x^2 - 1) = 3(x-1)(x+1)$\n令$f\'(x) = 0$，得$x = ±1$\n当$x < -1$时，$f\'(x) > 0$；当$-1 < x < 1$时，$f\'(x) < 0$；当$x > 1$时，$f\'(x) > 0$\n所以$x = -1$是极大值点，$x = 1$是极小值点',
+      difficultyLevel: params.difficultyLevel,
+      knowledgePoints: ['导数', '极值'],
+      prompt: '基于原练习错误生成的备用题目'
+    }];
+  }
+}
+
+// AI评分类似题的辅助函数
+async function gradeSimilarQuestion(params: {
+  questionContent: string;
+  standardAnswer: string;
+  userAnswer: string;
+  knowledgePoints: string[];
+  difficultyLevel: number;
+}) {
+  try {
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) {
+      throw new Error('Deepseek API密钥未配置');
+    }
+
+    const { questionContent, standardAnswer, userAnswer, knowledgePoints, difficultyLevel } = params;
+
+    const prompt = `
+你是一位微积分教师，需要评分学生对类似题的回答。
+
+题目：${questionContent}
+
+标准答案：${standardAnswer}
+
+学生答案：${userAnswer}
+
+涉及知识点：${knowledgePoints.join(', ')}
+题目难度：${difficultyLevel}/5
+
+请按以下标准评分：
+1. 解题思路正确性 (40%)
+2. 计算过程准确性 (30%)  
+3. 答案正确性 (20%)
+4. 步骤完整性 (10%)
+
+返回JSON格式评分结果：
+{
+  "score": 85,
+  "maxScore": 100,
+  "feedback": "解题思路正确，但在第二步计算中有小错误...",
+  "strengths": ["思路清晰", "步骤完整"],
+  "improvements": ["计算准确性需提高", "注意符号处理"],
+  "detailedAnalysis": {
+    "methodScore": 35,
+    "calculationScore": 22,
+    "answerScore": 18,
+    "completenessScore": 10
+  },
+  "nextRecommendations": ["多练习类似的计算题", "注意验证答案的合理性"]
+}`;
+
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0.3 // 较低温度保证评分一致性
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI评分API调用失败: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return JSON.parse(result.choices[0].message.content);
+  } catch (error) {
+    console.error('AI评分失败:', error);
+    // 返回默认评分
+    return {
+      score: 70,
+      maxScore: 100,
+      feedback: '系统暂时无法提供详细评分，建议检查解题步骤的完整性和计算准确性。',
+      strengths: ['已提交答案'],
+      improvements: ['可以进一步检查解题过程'],
+      detailedAnalysis: {
+        methodScore: 28,
+        calculationScore: 21,
+        answerScore: 14,
+        completenessScore: 7
+      },
+      nextRecommendations: ['继续练习相关题目']
+    };
+  }
+}
+
+// 错题分析辅助函数
+async function performErrorAnalysis(submissionId: number, params: {
+  recognizedText: string;
+  gradingResult: any;
+  fastify: any;
+}) {
+  try {
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) {
+      throw new Error('Deepseek API密钥未配置');
+    }
+
+    const { recognizedText, gradingResult } = params;
+
+    const prompt = `
+你是微积分教师，需要分析学生的错误并提供改进建议。
+
+题目内容：
+${recognizedText}
+
+AI评分结果：
+- 得分：${gradingResult.score}/${gradingResult.maxScore}
+- 反馈：${gradingResult.feedback || '无'}
+- 建议：${JSON.stringify(gradingResult.suggestions || [])}
+
+请分析学生的主要错误类型和知识点缺陷，返回JSON格式：
+{
+  "errorAnalysis": [
+    {
+      "errorType": "calculation", // 'concept', 'calculation', 'formula', 'logic'
+      "knowledgePointName": "导数计算",
+      "errorDescription": "在求导过程中，忽略了复合函数的链式法则",
+      "severity": "high", // 'low', 'medium', 'high'
+      "aiSuggestion": "建议重新学习复合函数求导法则，多做相关练习题"
+    }
+  ],
+  "overallAssessment": {
+    "mainWeaknesses": ["复合函数求导", "符号处理"],
+    "recommendedActions": ["复习导数基本公式", "练习链式法则应用"],
+    "nextLearningGoals": ["掌握复杂函数求导", "提高计算准确性"]
+  }
+}
+
+分析要求：
+- 识别具体的错误类型和涉及知识点
+- 评估错误严重程度
+- 提供针对性的学习建议
+- 基于微积分知识体系给出系统性指导`;
+
+    const response = await axios.post('https://api.deepseek.com/chat/completions', {
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      temperature: 0.3
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      }
+    });
+
+    const result = JSON.parse(response.data.choices[0].message.content);
+    const errorAnalysisData = result.errorAnalysis || [];
+
+    // 保存错误分析到数据库
+    for (const error of errorAnalysisData) {
+      // 查找或创建知识点
+      let knowledgePoint = await prisma.knowledgePoint.findFirst({
+        where: { name: error.knowledgePointName }
+      });
+
+      if (!knowledgePoint) {
+        // 推断章节信息
+        const chapter = inferChapter(error.knowledgePointName);
+        knowledgePoint = await prisma.knowledgePoint.create({
+          data: {
+            name: error.knowledgePointName,
+            chapter: chapter,
+            level: 3, // 概念点级别
+            keywords: [error.knowledgePointName],
+            functionExamples: [],
+            difficultyLevel: error.severity === 'high' ? 4 : error.severity === 'medium' ? 3 : 2,
+            aiExplanation: error.aiSuggestion
+          }
+        });
+      }
+
+      // 创建错误分析记录
+      await prisma.errorAnalysis.create({
+        data: {
+          submissionId: submissionId,
+          errorType: error.errorType,
+          knowledgePointId: knowledgePoint.id,
+          errorDescription: error.errorDescription,
+          severity: error.severity,
+          aiSuggestion: error.aiSuggestion,
+          frequencyCount: 1
+        }
+      });
+    }
+
+    params.fastify.log.info(`✅ 错误分析已保存到数据库: ${errorAnalysisData.length}个错误点`);
+    return result;
+
+  } catch (error) {
+    console.error('错题分析失败:', error);
+    throw error;
+  }
+}
+
+// 根据知识点名称推断章节
+function inferChapter(knowledgePointName: string): string {
+  const chapterMappings = [
+    { keywords: ['极限', '连续', '趋于', 'lim'], chapter: '极限与连续' },
+    { keywords: ['导数', '求导', '微分', 'derivative'], chapter: '导数与微分' },
+    { keywords: ['积分', '原函数', '定积分', '不定积分'], chapter: '积分学' },
+    { keywords: ['级数', '收敛', '发散', '幂级数'], chapter: '无穷级数' },
+    { keywords: ['偏导', '梯度', '多元', '二重积分'], chapter: '多元函数' },
+    { keywords: ['微分方程', '解微分', '常微分'], chapter: '微分方程' }
+  ];
+
+  for (const mapping of chapterMappings) {
+    if (mapping.keywords.some(keyword => 
+      knowledgePointName.toLowerCase().includes(keyword.toLowerCase())
+    )) {
+      return mapping.chapter;
+    }
+  }
+
+  return '微积分基础'; // 默认章节
 }
 
 export default practiceRoutes;

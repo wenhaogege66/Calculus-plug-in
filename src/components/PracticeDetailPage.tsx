@@ -44,6 +44,26 @@ interface DetailedSession {
   completedAt?: string;
 }
 
+interface SimilarQuestion {
+  id: number;
+  content: string;
+  standardAnswer: string;
+  difficultyLevel: number;
+  knowledgePoints: string[];
+  aiGradingResult?: {
+    score: number;
+    maxScore: number;
+    feedback: string;
+    strengths: string[];
+    improvements: string[];
+  };
+}
+
+interface SimilarQuestionsParams {
+  difficultyLevel: number;
+  questionCount: number;
+}
+
 export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({ 
   sessionId, 
   authState, 
@@ -57,6 +77,17 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
   const [aiQuestion, setAiQuestion] = useState('');
   const [aiThinking, setAiThinking] = useState(false);
   const [chatHistory, setChatHistory] = useState<{question: string, answer: string}[]>([]);
+  
+  // 类似题相关状态
+  const [similarQuestions, setSimilarQuestions] = useState<SimilarQuestion[]>([]);
+  const [similarQuestionsParams, setSimilarQuestionsParams] = useState<SimilarQuestionsParams>({
+    difficultyLevel: 3,
+    questionCount: 3
+  });
+  const [generatingSimilar, setGeneratingSimilar] = useState(false);
+  const [visibleAnswers, setVisibleAnswers] = useState<Set<number>>(new Set());
+  const [questionAnswers, setQuestionAnswers] = useState<{[key: number]: string}>({});
+  const [questionRatings, setQuestionRatings] = useState<{[key: number]: number}>({});
 
   useEffect(() => {
     loadSessionDetails();
@@ -134,6 +165,108 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
     if (score >= 70) return '#f59e0b';
     if (score >= 60) return '#f97316';
     return '#ef4444';
+  };
+
+  // 类似题相关函数
+  const generateSimilarQuestions = async () => {
+    if (!authState.token || !session || generatingSimilar) return;
+
+    try {
+      setGeneratingSimilar(true);
+      
+      const response = await fetch(`${API_BASE_URL}/practice/${sessionId}/generate-similar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authState.token}`
+        },
+        body: JSON.stringify(similarQuestionsParams)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setSimilarQuestions(result.data.generatedQuestions || []);
+        } else {
+          setError('生成类似题失败: ' + (result.error || '未知错误'));
+        }
+      } else {
+        setError('生成类似题失败，请稍后重试');
+      }
+    } catch (error) {
+      console.error('生成类似题出错:', error);
+      setError('生成类似题失败，请检查网络连接');
+    } finally {
+      setGeneratingSimilar(false);
+    }
+  };
+
+  const toggleAnswerVisibility = (questionId: number) => {
+    setVisibleAnswers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(questionId)) {
+        newSet.delete(questionId);
+      } else {
+        newSet.add(questionId);
+      }
+      return newSet;
+    });
+  };
+
+  const submitSimilarQuestionAnswer = async (questionId: number) => {
+    const userAnswer = questionAnswers[questionId];
+    if (!userAnswer?.trim() || !authState.token) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/practice/similar-questions/${questionId}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authState.token}`
+        },
+        body: JSON.stringify({
+          userAnswer: userAnswer.trim(),
+          requestFeedback: true
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data.aiGradingResult) {
+          // 更新题目的AI评分结果
+          setSimilarQuestions(prev => prev.map(q => 
+            q.id === questionId 
+              ? { ...q, aiGradingResult: result.data.aiGradingResult }
+              : q
+          ));
+        }
+      } else {
+        setError('提交答案失败，请稍后重试');
+      }
+    } catch (error) {
+      console.error('提交答案出错:', error);
+      setError('提交答案失败，请检查网络连接');
+    }
+  };
+
+  const rateQuestion = async (questionId: number, rating: number) => {
+    if (!authState.token) return;
+
+    try {
+      setQuestionRatings(prev => ({ ...prev, [questionId]: rating }));
+      
+      await fetch(`${API_BASE_URL}/practice/similar-questions/${questionId}/rate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authState.token}`
+        },
+        body: JSON.stringify({ rating })
+      });
+    } catch (error) {
+      console.error('评分失败:', error);
+      // 静默处理评分错误，不影响用户体验
+    }
   };
 
   const handleAskAI = async () => {
@@ -472,6 +605,156 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                 {session.gradingResult.strengths && session.gradingResult.strengths.length > 0 && 
                   renderStrengths(session.gradingResult.strengths)
                 }
+
+                {/* 类似题生成区域 */}
+                <div className="similar-questions-section">
+                  <h4>🔄 AI智能练习</h4>
+                  <div className="similar-questions-controls">
+                    <div className="generation-options">
+                      <div className="option-group">
+                        <label>难度等级:</label>
+                        <select 
+                          value={similarQuestionsParams.difficultyLevel} 
+                          onChange={(e) => setSimilarQuestionsParams({
+                            ...similarQuestionsParams,
+                            difficultyLevel: parseInt(e.target.value)
+                          })}
+                        >
+                          <option value={1}>⭐ 简单</option>
+                          <option value={2}>⭐⭐ 较易</option>
+                          <option value={3}>⭐⭐⭐ 中等</option>
+                          <option value={4}>⭐⭐⭐⭐ 较难</option>
+                          <option value={5}>⭐⭐⭐⭐⭐ 困难</option>
+                        </select>
+                      </div>
+                      <div className="option-group">
+                        <label>生成数量:</label>
+                        <select 
+                          value={similarQuestionsParams.questionCount} 
+                          onChange={(e) => setSimilarQuestionsParams({
+                            ...similarQuestionsParams,
+                            questionCount: parseInt(e.target.value)
+                          })}
+                        >
+                          <option value={1}>1题</option>
+                          <option value={2}>2题</option>
+                          <option value={3}>3题</option>
+                          <option value={5}>5题</option>
+                        </select>
+                      </div>
+                    </div>
+                    <button 
+                      className="generate-similar-btn" 
+                      onClick={generateSimilarQuestions}
+                      disabled={generatingSimilar}
+                    >
+                      {generatingSimilar ? (
+                        <>
+                          <div className="loading-spinner-small"></div>
+                          AI生成中...
+                        </>
+                      ) : (
+                        <>🎯 生成针对性练习题</>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* 类似题显示区域 */}
+                  {similarQuestions.length > 0 && (
+                    <div className="generated-questions">
+                      <h5>🎯 基于你的错误生成的针对性练习题</h5>
+                      {similarQuestions.map((question, index) => (
+                        <div key={question.id} className="similar-question-card">
+                          <div className="question-header">
+                            <span className="question-number">第 {index + 1} 题</span>
+                            <div className="question-meta">
+                              <span className="difficulty-badge difficulty-{question.difficultyLevel}">
+                                {'⭐'.repeat(question.difficultyLevel)}
+                              </span>
+                              {question.knowledgePoints.map((kp, idx) => (
+                                <span key={idx} className="knowledge-point-tag">{kp}</span>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div className="question-content">
+                            <SimpleMarkdownRenderer 
+                              content={question.content} 
+                              className="question-text"
+                            />
+                          </div>
+
+                          <div className="question-actions">
+                            <button 
+                              className="show-answer-btn"
+                              onClick={() => toggleAnswerVisibility(question.id)}
+                            >
+                              {visibleAnswers.has(question.id) ? '隐藏答案' : '查看答案'}
+                            </button>
+                            
+                            <div className="answer-input-section">
+                              <textarea
+                                placeholder="在此输入你的解答..."
+                                value={questionAnswers[question.id] || ''}
+                                onChange={(e) => setQuestionAnswers({
+                                  ...questionAnswers,
+                                  [question.id]: e.target.value
+                                })}
+                                className="answer-input"
+                                rows={4}
+                              />
+                              <button
+                                className="submit-answer-btn"
+                                onClick={() => submitSimilarQuestionAnswer(question.id)}
+                                disabled={!questionAnswers[question.id]?.trim()}
+                              >
+                                📋 提交并获得AI反馈
+                              </button>
+                            </div>
+                          </div>
+
+                          {visibleAnswers.has(question.id) && (
+                            <div className="standard-answer">
+                              <h6>📚 标准答案：</h6>
+                              <SimpleMarkdownRenderer 
+                                content={question.standardAnswer} 
+                                className="answer-content"
+                              />
+                            </div>
+                          )}
+
+                          {question.aiGradingResult && (
+                            <div className="ai-feedback">
+                              <h6>🤖 AI评分反馈：</h6>
+                              <div className="feedback-score">
+                                得分：{question.aiGradingResult.score}/{question.aiGradingResult.maxScore}分
+                              </div>
+                              <div className="feedback-text">
+                                <SimpleMarkdownRenderer 
+                                  content={question.aiGradingResult.feedback} 
+                                  className="feedback-content"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="question-rating">
+                            <span>题目质量评分：</span>
+                            {[1, 2, 3, 4, 5].map(rating => (
+                              <button
+                                key={rating}
+                                className={`rating-star ${(questionRatings[question.id] || 0) >= rating ? 'filled' : ''}`}
+                                onClick={() => rateQuestion(question.id, rating)}
+                              >
+                                ⭐
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 {/* AI问答区域 */}
                 <div className="ai-chat-section">

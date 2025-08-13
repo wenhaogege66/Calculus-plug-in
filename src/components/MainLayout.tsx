@@ -3,6 +3,7 @@ import { Navigation } from './Navigation';
 import { AssignmentsPage } from './AssignmentsPage';
 import { ClassroomsPage } from './ClassroomsPage';
 import { PracticePage } from './PracticePage';
+import { KnowledgeGraph } from './KnowledgeGraph';
 import { Storage } from '@plasmohq/storage';
 import type { AuthState } from '../common/config/supabase';
 
@@ -96,15 +97,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           </div>
         );
       case 'knowledge':
-        return (
-          <div className="placeholder-page">
-            <div className="placeholder-content">
-              <div className="placeholder-icon">🧠</div>
-              <h2>知识图谱</h2>
-              <p>知识图谱功能正在开发中...</p>
-            </div>
-          </div>
-        );
+      case 'knowledge-graph':
+        return <KnowledgeGraph authState={authState} isDarkMode={isDarkMode} />;
       case 'profile':
         return (
           <div className="placeholder-page">

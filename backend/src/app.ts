@@ -126,6 +126,14 @@ async function registerRoutes() {
   // 注册练习模式路由
   await fastify.register(practiceRoutes, { prefix: '/api' });
   
+  // 注册dashboard路由
+  const { dashboardRoutes } = await import('./routes/dashboard');
+  await fastify.register(dashboardRoutes, { prefix: '/api' });
+  
+  // 注册知识图谱路由
+  const { knowledgeRoutes } = await import('./routes/knowledge');
+  await fastify.register(knowledgeRoutes, { prefix: '/api' });
+  
   // 健康检查路由
   fastify.get('/api/health', async (request, reply) => {
     try {
