@@ -332,8 +332,8 @@ async function callMathPixAPI(fileBuffer: Buffer, fileType?: string): Promise<{
       throw new Error('MathPix OCR未能识别出任何文本内容');
     }
 
-    // 清理文本中的null字节和其他不支持的字符
-    const cleanText = text.replace(/\x00/g, '').replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    // 仅清理null字节和极少数有害字符，保留LaTeX格式字符
+    const cleanText = text.replace(/\x00/g, ''); // 只移除null字节，保留其他字符以维持LaTeX格式
 
     // 尝试获取LaTeX格式 (可选)
     let latex = '';
@@ -343,8 +343,8 @@ async function callMathPixAPI(fileBuffer: Buffer, fileType?: string): Promise<{
         responseType: 'text'
       });
       const rawLatex = latexResponse.data as string;
-      // 同样清理LaTeX中的无效字符
-      latex = rawLatex.replace(/\x00/g, '').replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+      // 同样仅清理null字节，保留LaTeX格式字符
+      latex = rawLatex.replace(/\x00/g, '');
     } catch (e) {
       console.log('📝 LaTeX格式不可用，使用Markdown格式');
     }

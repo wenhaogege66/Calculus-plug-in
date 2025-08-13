@@ -142,23 +142,15 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
     try {
       setAiThinking(true);
       
-      // 准备上下文信息
-      const context = {
-        ocrText: session?.ocrResult?.recognizedText || '',
-        gradingResult: session?.gradingResult || null,
-        question: aiQuestion.trim()
-      };
-
-      const response = await fetch(`${API_BASE_URL}/ai/question`, {
+      const response = await fetch(`${API_BASE_URL}/ai/follow-up`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authState.token}`
         },
         body: JSON.stringify({
-          submissionId: sessionId,
-          question: aiQuestion.trim(),
-          context: context
+          submissionId: parseInt(sessionId),
+          question: aiQuestion.trim()
         })
       });
 

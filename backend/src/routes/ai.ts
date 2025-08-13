@@ -173,6 +173,95 @@ export async function aiRoutes(fastify: FastifyInstance) {
     return await processAIGrading(request, reply, fastify);
   });
 
+  // 进一步提问功能
+  fastify.post('/ai/follow-up', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const { submissionId, question } = request.body as any;
+      
+      if (!submissionId || !question || question.trim().length === 0) {
+        return reply.code(400).send({
+          success: false,
+          error: '缺少提交ID或问题内容'
+        });
+      }
+
+      // 获取提交记录及相关数据
+      const submission = await prisma.submission.findFirst({
+        where: {
+          id: submissionId,
+          userId: request.currentUser!.id
+        },
+        include: {
+          mathpixResults: {
+            orderBy: { createdAt: 'desc' },
+            take: 1
+          },
+          deepseekResults: {
+            orderBy: { createdAt: 'desc' },
+            take: 1
+          }
+        }
+      });
+
+      // 如果有关联作业，获取作业信息
+      let assignmentInfo = null;
+      if (submission?.assignmentId) {
+        assignmentInfo = await prisma.assignment.findUnique({
+          where: { id: submission.assignmentId },
+          select: {
+            title: true,
+            ocrText: true
+          }
+        });
+      }
+
+      if (!submission) {
+        return reply.code(404).send({
+          success: false,
+          error: '提交记录不存在'
+        });
+      }
+
+      const latestOCR = submission.mathpixResults[0];
+      const latestGrading = submission.deepseekResults[0];
+
+      if (!latestOCR || !latestGrading) {
+        return reply.code(400).send({
+          success: false,
+          error: '缺少OCR识别或AI批改结果'
+        });
+      }
+
+      // 构建问答prompt
+      const followUpPrompt = buildFollowUpPrompt(
+        assignmentInfo?.ocrText || null,
+        latestOCR.recognizedText || '',
+        latestGrading.feedback || '',
+        latestGrading.suggestions ? JSON.stringify(latestGrading.suggestions) : '',
+        question.trim()
+      );
+
+      // 调用Deepseek API
+      const response = await callDeepseekFollowUpAPI(followUpPrompt);
+
+      return {
+        success: true,
+        data: {
+          question: question.trim(),
+          answer: response.answer,
+          timestamp: new Date()
+        }
+      };
+
+    } catch (error) {
+      fastify.log.error('进一步提问处理失败:', error);
+      return reply.code(500).send({
+        success: false,
+        error: '处理提问请求失败'
+      });
+    }
+  });
+
   // 获取批改结果
   fastify.get('/ai/results/:submissionId', { preHandler: requireAuth }, async (request, reply) => {
     try {
@@ -244,31 +333,154 @@ async function callDeepseekAPI(
       throw new Error('Deepseek API密钥未配置');
     }
 
-    // 构建包含题目信息的prompt
-    let questionSection = '';
-    if (teacherQuestionText) {
-      questionSection = `
+    // 根据模式构建不同的prompt
+    const isAssignmentMode = teacherQuestionText !== null;
+    const prompt = isAssignmentMode ? 
+      buildAssignmentModePrompt(subject, teacherQuestionText || null, teacherQuestionLatex || null, text) :
+      buildPracticeModePrompt(subject, text);
+
+    const response = await axios.post('https://api.deepseek.com/chat/completions', {
+      model: 'deepseek-chat',
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.3
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      }
+    });
+
+    const result = JSON.parse(response.data.choices[0].message.content);
+
+    return {
+      score: result.score || 0,
+      maxScore: result.maxScore || 100,
+      feedback: result.feedback || '批改完成',
+      errors: result.errors || result.detailedErrors || [],
+      suggestions: result.suggestions || [],
+      strengths: result.strengths || [],
+      questionCount: result.questionCount || 0,
+      incorrectCount: result.incorrectCount || 0,
+      correctCount: result.correctCount || 0,
+      knowledgePoints: result.knowledgePoints || [],
+      detailedErrors: result.detailedErrors || [],
+      improvementAreas: result.improvementAreas || [],
+      nextStepRecommendations: result.nextStepRecommendations || [],
+      raw: response.data
+    };
+
+  } catch (error) {
+    console.error('Deepseek API调用失败:', error);
+    
+    // 返回默认批改结果
+    return {
+      score: 75,
+      maxScore: 100,
+      feedback: 'AI批改服务暂时不可用，请稍后重试。',
+      errors: [],
+      suggestions: ['请稍后重试AI批改功能'],
+      strengths: ['成功提交了作业'],
+      questionCount: 1,
+      incorrectCount: 0,
+      correctCount: 1,
+      knowledgePoints: ['待分析'],
+      detailedErrors: [],
+      improvementAreas: ['暂无分析'],
+      nextStepRecommendations: ['请稍后重试'],
+      raw: { error: error instanceof Error ? error.message : '未知错误' }
+    };
+  }
+}
+
+// 作业模式prompt - 题目和解答分开处理
+function buildAssignmentModePrompt(
+  subject: string,
+  teacherQuestionText: string | null,
+  teacherQuestionLatex: string | null,
+  studentAnswerText: string
+): string {
+  const questionSection = teacherQuestionText ? `
 题目内容：
 ${teacherQuestionText}
 ${teacherQuestionLatex ? `
 LaTeX格式：
 ${teacherQuestionLatex}
-` : ''}`;
-    }
+` : ''}` : '';
 
-    const prompt = `
+  return `
 你是一位资深的${subject}教师，请对以下学生作业进行全面、详细的智能批改分析。
+
+【作业模式 - 题目与解答分离】
 ${questionSection}
 
 学生提交的解答内容：
-${text}
+${studentAnswerText}
 
 批改要求：
-${teacherQuestionText ? 
-  '1. 根据题目要求进行精准评分，检查解题过程的完整性和正确性\n2. 分析学生对题目要求的理解程度\n3. 评估解题步骤的逻辑性和数学严谨性\n4. 验证计算结果的准确性' : 
-  '1. 基于微积分知识体系进行评分\n2. 分析解题思路和方法选择的合理性\n3. 检查数学概念理解的准确程度\n4. 评估计算过程的规范性'
+1. 根据上述题目要求进行精准评分，检查解题过程的完整性和正确性
+2. 分析学生对题目要求的理解程度和解题思路是否正确
+3. 评估解题步骤的逻辑性和数学严谨性
+4. 验证计算结果的准确性
+5. 检查是否完整回答了题目的所有部分
+
+${getKnowledgePointsSection()}
+
+${getJsonFormatSection()}
+
+关键要求：
+1. 准确统计题目数量和错题数量（基于教师提供的题目）
+2. 精确识别涉及的微积分知识点
+3. 详细分析每个错误的类型、位置和改正方法
+4. 提供具体可操作的改进建议
+5. 客观评价学生的优点和不足
+6. 评分范围0-100，要基于答题的完整性和准确性
+7. 返回格式必须是有效的JSON，不包含任何其他文字
+`;
 }
 
+// 练习模式prompt - 题目和解答一体处理
+function buildPracticeModePrompt(subject: string, contentText: string): string {
+  return `
+你是一位资深的${subject}教师，请对以下学生练习进行全面、详细的智能批改分析。
+
+【练习模式 - 题目与解答一体】
+以下内容既包含题目又包含学生的解答，请仔细识别哪些是题目，哪些是学生的解答过程：
+
+练习内容：
+${contentText}
+
+批改要求：
+1. 首先识别出具体的题目内容和学生解答内容
+2. 基于微积分知识体系进行评分
+3. 分析解题思路和方法选择的合理性
+4. 检查数学概念理解的准确程度
+5. 评估计算过程的规范性
+6. 对于每道题目，分析学生的解题过程是否正确
+
+${getKnowledgePointsSection()}
+
+${getJsonFormatSection()}
+
+关键要求：
+1. 准确识别和统计题目数量，以及学生答对/答错的题目数量
+2. 精确识别涉及的微积分知识点
+3. 详细分析每个错误的类型、位置和改正方法
+4. 提供具体可操作的改进建议
+5. 客观评价学生的优点和不足
+6. 评分范围0-100，要基于答题的完整性和准确性
+7. 返回格式必须是有效的JSON，不包含任何其他文字
+`;
+}
+
+// 知识点选择范围 - 公共部分
+function getKnowledgePointsSection(): string {
+  return `
 知识点选择范围（请仅从以下列表中选择相关知识点）：
 【上册】
 函数与极限: 集合与映射, 数列极限, 函数极限, 极限的性质, 无穷小与无穷大, 极限运算, 极限存在准则, 无穷小比阶与等价无穷小, 函数的连续性与间断点
@@ -283,7 +495,12 @@ ${teacherQuestionText ?
 多元函数积分学: 二重积分, 三重积分, 第一类曲线积分与第一类曲面积分, 点函数积分及应用, 第二类曲线积分与第二类曲面积分, 第二类曲线积分与格林公式, 平面曲线积分与路径无关性, 第二类曲面积分与高斯公式, 斯托克斯公式与旋度、势量场
 级数: 数项级数及收敛判别, 函数项级数与一致收敛, 幂级数及泰勒展开, 傅里叶级数
 含参量积分: 含参量的常义积分与反常积分, Γ函数与B函数
+`;
+}
 
+// JSON格式示例 - 公共部分
+function getJsonFormatSection(): string {
+  return `
 请严格参考以下JSON格式返回批改结果：
 {
   "score": 85,
@@ -343,16 +560,57 @@ ${teacherQuestionText ?
     "练习更复杂的复合函数求导"
   ]
 }
-
-关键要求：
-1. 准确统计题目数量和错题数量
-2. 精确识别涉及的微积分知识点
-3. 详细分析每个错误的类型、位置和改正方法
-4. 提供具体可操作的改进建议
-5. 客观评价学生的优点和不足
-6. 评分范围0-100，要基于答题的完整性和准确性
-7. 返回格式必须是有效的JSON，不包含任何其他文字
 `;
+}
+
+// 构建进一步提问的prompt
+function buildFollowUpPrompt(
+  originalQuestion: string | null,
+  studentAnswer: string,
+  previousFeedback: string,
+  previousSuggestions: string,
+  userQuestion: string
+): string {
+  const questionSection = originalQuestion ? `
+原题目内容：
+${originalQuestion}
+` : '';
+
+  return `
+你是一位资深的微积分教师，学生基于之前的批改结果向你提出了进一步的问题。请结合题目、学生解答和之前的批改意见，给出清晰、有帮助的回答。
+
+${questionSection}
+学生的解答：
+${studentAnswer}
+
+之前的批改反馈：
+${previousFeedback}
+
+之前的改进建议：
+${previousSuggestions}
+
+学生的问题：
+${userQuestion}
+
+请回答学生的问题，要求：
+1. 回答要准确、清晰、有针对性
+2. 结合具体的数学概念和公式进行解释
+3. 如果涉及计算错误，请给出正确的步骤
+4. 鼓励学生继续思考和学习
+5. 语言要通俗易懂，适合学生理解
+
+请直接回答问题，不需要特殊格式。
+`;
+}
+
+// 调用Deepseek API进行问答
+async function callDeepseekFollowUpAPI(prompt: string): Promise<{ answer: string }> {
+  try {
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('Deepseek API密钥未配置');
+    }
 
     const response = await axios.post('https://api.deepseek.com/chat/completions', {
       model: 'deepseek-chat',
@@ -362,8 +620,8 @@ ${teacherQuestionText ?
           content: prompt
         }
       ],
-      response_format: { type: 'json_object' },
-      temperature: 0.3
+      temperature: 0.7,
+      max_tokens: 1000
     }, {
       headers: {
         'Content-Type': 'application/json',
@@ -371,44 +629,17 @@ ${teacherQuestionText ?
       }
     });
 
-    const result = JSON.parse(response.data.choices[0].message.content);
+    const answer = response.data.choices[0].message.content;
 
     return {
-      score: result.score || 0,
-      maxScore: result.maxScore || 100,
-      feedback: result.feedback || '批改完成',
-      errors: result.errors || result.detailedErrors || [],
-      suggestions: result.suggestions || [],
-      strengths: result.strengths || [],
-      questionCount: result.questionCount || 0,
-      incorrectCount: result.incorrectCount || 0,
-      correctCount: result.correctCount || 0,
-      knowledgePoints: result.knowledgePoints || [],
-      detailedErrors: result.detailedErrors || [],
-      improvementAreas: result.improvementAreas || [],
-      nextStepRecommendations: result.nextStepRecommendations || [],
-      raw: response.data
+      answer: answer || '抱歉，无法生成回答，请重试。'
     };
 
   } catch (error) {
-    console.error('Deepseek API调用失败:', error);
+    console.error('Deepseek 问答API调用失败:', error);
     
-    // 返回默认批改结果
     return {
-      score: 75,
-      maxScore: 100,
-      feedback: 'AI批改服务暂时不可用，请稍后重试。',
-      errors: [],
-      suggestions: ['请稍后重试AI批改功能'],
-      strengths: ['成功提交了作业'],
-      questionCount: 1,
-      incorrectCount: 0,
-      correctCount: 1,
-      knowledgePoints: ['待分析'],
-      detailedErrors: [],
-      improvementAreas: ['暂无分析'],
-      nextStepRecommendations: ['请稍后重试'],
-      raw: { error: error instanceof Error ? error.message : '未知错误' }
+      answer: '抱歉，AI助手暂时不可用，请稍后重试。如果问题持续存在，请联系老师获得帮助。'
     };
   }
 }

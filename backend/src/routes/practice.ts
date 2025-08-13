@@ -50,7 +50,8 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
               suggestions: true,
               strengths: true,
               processingTime: true,
-              createdAt: true
+              createdAt: true,
+              rawResult: true
             }
           }
         },

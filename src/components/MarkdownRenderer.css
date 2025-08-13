@@ -123,6 +123,53 @@
   text-align: center;
 }
 
+/* 增强的LaTeX公式样式 */
+.markdown-renderer .math-inline,
+.markdown-renderer .latex-inline {
+  font-family: 'Computer Modern', 'KaTeX_Main', 'Times New Roman', serif;
+  font-style: italic;
+  background: rgba(59, 130, 246, 0.05);
+  border-radius: 3px;
+  padding: 0.1em 0.2em;
+  color: #1d4ed8;
+  white-space: nowrap;
+}
+
+.markdown-renderer .math-block,
+.markdown-renderer .latex-display {
+  font-family: 'Computer Modern', 'KaTeX_Main', 'Times New Roman', serif;
+  background: rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 6px;
+  padding: 0.8em 1em;
+  margin: 1em 0;
+  text-align: center;
+  overflow-x: auto;
+  color: #1d4ed8;
+  font-size: 1.05em;
+}
+
+.markdown-renderer .math-complex,
+.markdown-renderer .latex-complex {
+  font-family: 'Computer Modern', 'KaTeX_Main', 'Times New Roman', serif;
+  font-style: italic;
+  background: rgba(168, 85, 247, 0.05);
+  border-radius: 4px;
+  padding: 0.2em 0.3em;
+  color: #7c3aed;
+  display: inline-block;
+  white-space: nowrap;
+  border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.markdown-renderer .latex-symbol {
+  font-family: 'Computer Modern', 'KaTeX_Main', 'Times New Roman', serif;
+  font-style: normal;
+  color: #059669;
+  font-weight: 500;
+  padding: 0 0.1em;
+}
+
 /* 截断指示器 */
 .md-truncated-indicator {
   text-align: center;
@@ -257,4 +304,29 @@
 
 .main-layout.dark .markdown-renderer .md-truncated-indicator {
   color: #6b7280;
+}
+
+/* 深色模式下的数学公式样式 */
+.main-layout.dark .markdown-renderer .math-inline,
+.main-layout.dark .markdown-renderer .latex-inline {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+.main-layout.dark .markdown-renderer .math-block,
+.main-layout.dark .markdown-renderer .latex-display {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+}
+
+.main-layout.dark .markdown-renderer .math-complex,
+.main-layout.dark .markdown-renderer .latex-complex {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: rgba(168, 85, 247, 0.3);
+  color: #a78bfa;
+}
+
+.main-layout.dark .markdown-renderer .latex-symbol {
+  color: #34d399;
 }
