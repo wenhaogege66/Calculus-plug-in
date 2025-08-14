@@ -29,9 +29,10 @@ interface Member {
 
 interface ClassroomsPageProps {
   authState: AuthState;
+  onPageChange?: (page: string, params?: any) => void;
 }
 
-export const ClassroomsPage: React.FC<ClassroomsPageProps> = ({ authState }) => {
+export const ClassroomsPage: React.FC<ClassroomsPageProps> = ({ authState, onPageChange }) => {
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedClassroom, setSelectedClassroom] = useState<Classroom | null>(null);
@@ -312,7 +313,10 @@ export const ClassroomsPage: React.FC<ClassroomsPageProps> = ({ authState }) => 
                     </>
                   ) : (
                     <>
-                      <button className="btn-secondary small">
+                      <button 
+                        className="btn-secondary small"
+                        onClick={() => onPageChange?.('assignments', { classroomId: classroom.id, classroomName: classroom.name })}
+                      >
                         <span className="btn-icon">📝</span>
                         <span>查看作业</span>
                       </button>

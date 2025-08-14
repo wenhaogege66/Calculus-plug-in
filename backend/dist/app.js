@@ -123,6 +123,8 @@ async function registerRoutes() {
     await fastify.register(practice_1.default, { prefix: '/api' });
     const { dashboardRoutes } = await Promise.resolve().then(() => __importStar(require('./routes/dashboard')));
     await fastify.register(dashboardRoutes, { prefix: '/api' });
+    const { knowledgeRoutes } = await Promise.resolve().then(() => __importStar(require('./routes/knowledge')));
+    await fastify.register(knowledgeRoutes, { prefix: '/api' });
     fastify.get('/api/health', async (request, reply) => {
         try {
             let dbStatus = 'healthy';

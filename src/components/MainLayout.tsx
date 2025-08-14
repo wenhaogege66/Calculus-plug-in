@@ -3,7 +3,10 @@ import { Navigation } from './Navigation';
 import { AssignmentsPage } from './AssignmentsPage';
 import { ClassroomsPage } from './ClassroomsPage';
 import { PracticePage } from './PracticePage';
+import { MistakesPage } from './MistakesPage';
 import { KnowledgeGraph } from './KnowledgeGraph';
+import { NotificationContainer, useNotifications } from './Notification';
+import { NotificationProvider } from '../contexts/NotificationContext';
 import { Storage } from '@plasmohq/storage';
 import type { AuthState } from '../common/config/supabase';
 
@@ -12,6 +15,8 @@ import './MainLayout.css';
 import './AssignmentsPage.css';
 import './ClassroomsPage.css';
 import './PracticePage.css';
+import './MistakesPage.css';
+import './Notification.css';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -27,8 +32,17 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   initialPage = 'home'
 }) => {
   const [currentPage, setCurrentPage] = useState(initialPage);
+  const [pageParams, setPageParams] = useState<any>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const storage = new Storage();
+  const {
+    notifications,
+    removeNotification,
+    showSuccess,
+    showError,
+    showWarning,
+    showInfo
+  } = useNotifications();
 
   // 初始化主题
   useEffect(() => {
@@ -58,8 +72,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   };
 
   // 页面切换处理
-  const handlePageChange = (page: string) => {
+  const handlePageChange = (page: string, params?: any) => {
     setCurrentPage(page);
+    setPageParams(params);
     // 这里可以添加页面切换的逻辑，比如路由跳转或状态更新
   };
 
@@ -71,7 +86,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           onPageChange: handlePageChange 
         }); // HomePage component
       case 'assignments':
-        return <AssignmentsPage authState={authState} />;
+        return <AssignmentsPage authState={authState} params={pageParams} />;
       case 'grading':
         return (
           <div className="placeholder-page">
@@ -85,17 +100,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
       case 'practice':
         return <PracticePage authState={authState} />;
       case 'classrooms':
-        return <ClassroomsPage authState={authState} />;
+        return <ClassroomsPage authState={authState} onPageChange={handlePageChange} />;
       case 'mistakes':
-        return (
-          <div className="placeholder-page">
-            <div className="placeholder-content">
-              <div className="placeholder-icon">📚</div>
-              <h2>错题本</h2>
-              <p>错题本功能正在开发中...</p>
-            </div>
-          </div>
-        );
+        return <MistakesPage authState={authState} />;
       case 'knowledge':
       case 'knowledge-graph':
         return <KnowledgeGraph authState={authState} isDarkMode={isDarkMode} />;
@@ -125,22 +132,30 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   };
 
   return (
-    <div className={`main-layout ${isDarkMode ? 'dark' : 'light'}`}>
-      <Navigation
-        authState={authState}
-        currentPage={currentPage}
-        onPageChange={handlePageChange}
-        onLogout={onLogout}
-        isDarkMode={isDarkMode}
-        onToggleDarkMode={toggleDarkMode}
-      />
-      
-      <main className="main-content">
-        <div className="content-body">
-          {renderPageContent()}
-        </div>
-      </main>
-    </div>
+    <NotificationProvider value={{ showSuccess, showError, showWarning, showInfo }}>
+      <div className={`main-layout ${isDarkMode ? 'dark' : 'light'}`}>
+        <Navigation
+          authState={authState}
+          currentPage={currentPage}
+          onPageChange={handlePageChange}
+          onLogout={onLogout}
+          isDarkMode={isDarkMode}
+          onToggleDarkMode={toggleDarkMode}
+        />
+        
+        <main className="main-content">
+          <div className="content-body">
+            {renderPageContent()}
+          </div>
+        </main>
+        
+        {/* 通知容器 */}
+        <NotificationContainer
+          notifications={notifications}
+          onRemove={removeNotification}
+        />
+      </div>
+    </NotificationProvider>
   );
 };
 

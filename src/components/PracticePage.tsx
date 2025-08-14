@@ -22,6 +22,8 @@ interface PracticeSession {
   detailedErrors?: any[];
   improvementAreas?: string[];
   nextStepRecommendations?: string[];
+  // 错题本相关
+  isInErrorBook?: boolean;
 }
 
 interface PracticePageProps {
@@ -37,6 +39,10 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
   const [dragOver, setDragOver] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
+  const [showErrorBookModal, setShowErrorBookModal] = useState<string | null>(null);
+  const [errorBookCategories, setErrorBookCategories] = useState<string[]>(['微分基础', '积分计算', '极限问题', '应用题']);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [newCategory, setNewCategory] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -281,6 +287,50 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
     setShowDeleteDialog(null);
   };
 
+  const showAddToErrorBookModal = (sessionId: string) => {
+    setShowErrorBookModal(sessionId);
+    setSelectedCategory('');
+    setNewCategory('');
+  };
+
+  const handleAddToErrorBook = async () => {
+    if (!authState.token || !showErrorBookModal) {
+      showMessage('请先登录', 'error');
+      return;
+    }
+
+    const categoryToUse = newCategory.trim() || selectedCategory;
+    if (!categoryToUse) {
+      showMessage('请选择或输入分类', 'error');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // 这里后续需要实现API调用
+      showMessage(`已添加到错题本"${categoryToUse}"分类`, 'success');
+      
+      // 更新本地状态
+      setPracticeHistory(prev => prev.map(session => 
+        session.id === showErrorBookModal 
+          ? { ...session, isInErrorBook: true }
+          : session
+      ));
+      
+      // 添加新分类到分类列表
+      if (newCategory.trim() && !errorBookCategories.includes(newCategory.trim())) {
+        setErrorBookCategories(prev => [...prev, newCategory.trim()]);
+      }
+      
+      setShowErrorBookModal(null);
+    } catch (error) {
+      console.error('添加到错题本失败:', error);
+      showMessage('添加到错题本失败', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderPracticeSession = (session: PracticeSession) => (
     <div 
       key={session.id} 
@@ -304,6 +354,21 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
               {getDifficultyLabel(session.difficulty)}
             </span>
           )}
+          {session.status === 'COMPLETED' && (
+            <button
+              className={`error-book-btn ${session.isInErrorBook ? 'added' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!session.isInErrorBook) {
+                  showAddToErrorBookModal(session.id);
+                }
+              }}
+              title={session.isInErrorBook ? '已添加到错题本' : '添加到错题本'}
+            >
+              <span className="btn-icon">{session.isInErrorBook ? '📚✓' : '📚+'}</span>
+              <span className="btn-text">{session.isInErrorBook ? '已在错题本' : '加入错题本'}</span>
+            </button>
+          )}
           <button
             className="delete-btn"
             onClick={(e) => {
@@ -312,7 +377,8 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
             }}
             title="删除练习记录"
           >
-            🗑️
+            <span className="btn-icon">🗑️</span>
+            <span className="btn-text">删除练习</span>
           </button>
         </div>
       </div>
@@ -330,10 +396,13 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
               <span className="score-label">分</span>
             </div>
             <div className="score-level">
-              {session.score >= 90 ? '优秀' : 
-               session.score >= 80 ? '良好' : 
-               session.score >= 70 ? '中等' : 
-               session.score >= 60 ? '及格' : '待提升'}
+              <span className="level-label">作答评估:</span>
+              <span className="level-value">
+                {session.score >= 90 ? '优秀' : 
+                 session.score >= 80 ? '良好' : 
+                 session.score >= 70 ? '中等' : 
+                 session.score >= 60 ? '及格' : '待提升'}
+              </span>
             </div>
           </div>
 
@@ -587,6 +656,70 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
                   disabled={loading}
                 >
                   {loading ? '删除中...' : '确认删除'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 添加到错题本对话框 */}
+        {showErrorBookModal && (
+          <div className="delete-dialog-overlay">
+            <div className="delete-dialog error-book-dialog">
+              <div className="delete-dialog-header">
+                <h3>📚 添加到错题本</h3>
+                <button 
+                  className="close-btn"
+                  onClick={() => setShowErrorBookModal(null)}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="delete-dialog-body">
+                <p>选择错题分类或创建新分类：</p>
+                <div className="category-selection">
+                  <div className="existing-categories">
+                    <label>现有分类：</label>
+                    <select 
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="category-select"
+                    >
+                      <option value="">请选择分类</option>
+                      {errorBookCategories.map(category => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="or-divider">或</div>
+                  <div className="new-category">
+                    <label>新建分类：</label>
+                    <input
+                      type="text"
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      placeholder="输入新分类名称"
+                      className="category-input"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="delete-dialog-footer">
+                <button 
+                  className="cancel-btn"
+                  onClick={() => setShowErrorBookModal(null)}
+                  disabled={loading}
+                >
+                  取消
+                </button>
+                <button 
+                  className="confirm-add-btn"
+                  onClick={handleAddToErrorBook}
+                  disabled={loading || (!selectedCategory && !newCategory.trim())}
+                >
+                  {loading ? '添加中...' : '添加到错题本'}
                 </button>
               </div>
             </div>

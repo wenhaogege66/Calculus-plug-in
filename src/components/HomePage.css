@@ -727,75 +727,7 @@
   transform: scale(1.1);
 }
 
-/* 搜索卡片 */
-.search-content {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.search-box {
-  display: flex;
-  gap: 8px;
-}
-
-.search-input {
-  flex: 1;
-  padding: 12px 16px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  border-radius: 8px;
-  font-size: 14px;
-  background: rgba(248, 250, 252, 0.5);
-  transition: all 0.3s ease;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-  background: white;
-}
-
-.search-btn {
-  padding: 12px;
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-  border: none;
-  border-radius: 8px;
-  color: white;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  width: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.search-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-}
-
-.search-suggestions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.suggestion-tag {
-  padding: 6px 12px;
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
-  border-radius: 16px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.suggestion-tag:hover {
-  background: rgba(59, 130, 246, 0.2);
-  transform: scale(1.05);
-}
+/* 旧的搜索样式已移除，替换为AI智能搜索 */
 
 /* 响应式设计 */
 @media (max-width: 1200px) {
@@ -848,222 +780,11 @@
   }
 }
 
-/* 知识图谱卡片 */
-.knowledge-graph-card {
-  grid-column: span 2;
-}
+/* 知识图谱卡片样式已移除，现使用KnowledgeGraph.css */
 
-.knowledge-preview {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 20px;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  border-radius: 12px;
-  margin: 8px 0;
-  backdrop-filter: blur(10px);
-}
+/* 响应式样式已移除 - 知识图谱使用独立CSS */
 
-.knowledge-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  flex: 1;
-}
-
-.knowledge-stat {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.stat-circle {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  color: white;
-  font-size: 14px;
-}
-
-.stat-circle.mastered {
-  background: linear-gradient(135deg, #10b981, #047857);
-}
-
-.stat-circle.learning {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-}
-
-.stat-circle.weak {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-}
-
-.knowledge-stat .stat-label {
-  font-size: 14px;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.knowledge-progress-ring {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.progress-ring {
-  position: relative;
-}
-
-.progress-ring-svg {
-  transform: rotate(-90deg);
-}
-
-.progress-ring-circle {
-  transition: stroke-dasharray 0.6s ease-in-out;
-}
-
-.progress-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, calc(-50% + 2px));
-  text-align: center;
-  z-index: 1;
-}
-
-.progress-percentage {
-  display: block;
-  font-size: 20px;
-  font-weight: 700;
-  color: #1f2937;
-  line-height: 1.2;
-  text-align: center;
-}
-
-.progress-label {
-  display: block;
-  font-size: 11px;
-  color: #6b7280;
-  margin-top: 4px;
-  line-height: 1.2;
-  text-align: center;
-}
-
-.knowledge-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.knowledge-action-btn {
-  flex: 1;
-  padding: 10px 16px;
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.knowledge-action-btn.weak {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  color: white;
-}
-
-.knowledge-action-btn.weak:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-}
-
-.knowledge-action-btn.explore {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-}
-
-.knowledge-action-btn.explore:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-
-/* 响应式 - 知识图谱卡片 */
-@media (max-width: 1200px) {
-  .knowledge-graph-card {
-    grid-column: span 1;
-  }
-}
-
-@media (max-width: 768px) {
-  .knowledge-preview {
-    flex-direction: column;
-    gap: 16px;
-    align-items: flex-start;
-  }
-  
-  .knowledge-stats {
-    width: 100%;
-    flex-direction: row;
-    justify-content: space-around;
-  }
-  
-  .knowledge-actions {
-    flex-direction: column;
-    width: 100%;
-  }
-}
-
-/* 深色模式 - 知识图谱卡片 */
-@media (prefers-color-scheme: dark) {
-  .knowledge-graph-card {
-    background: #1f2937;
-    border-color: #374151;
-  }
-  
-  .knowledge-preview {
-    background: rgba(31, 41, 55, 0.8);
-    border-color: rgba(55, 65, 81, 0.8);
-  }
-  
-  .progress-percentage {
-    color: #f3f4f6;
-  }
-  
-  .progress-label, .knowledge-stat .stat-label {
-    color: #9ca3af;
-  }
-  
-  .progress-ring-circle-bg {
-    stroke: #374151 !important;
-  }
-}
-
-/* 确保进度环和文字在深色模式下可见 */
-.dark .knowledge-preview {
-  background: rgba(31, 41, 55, 0.8);
-  border-color: rgba(55, 65, 81, 0.8);
-}
-
-.dark .progress-percentage {
-  color: #f3f4f6;
-}
-
-.dark .progress-label, 
-.dark .knowledge-stat .stat-label {
-  color: #9ca3af;
-}
-
-.dark .progress-ring-circle-bg {
-  stroke: #374151 !important;
-}
+/* 深色模式知识图谱样式已移除 - 现使用独立CSS文件 */
 
 /* ===== 教师端专用样式 ===== */
 
@@ -1553,4 +1274,683 @@
 
 .main-layout.dark .mini-btn:hover {
   background: rgba(71, 85, 105, 0.5) !important;
+}
+
+/* ===== AI智能搜索条样式 ===== */
+.ai-search-bar-container {
+  grid-column: 1 / -1; /* 占满整行 */
+  margin: 0 0 24px 0; /* 不突破容器边距，避免横向滚动 */
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.ai-search-form {
+  width: 100%;
+}
+
+.ai-search-bar {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 20px;
+  padding: 4px;
+  box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-search-bar:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(102, 126, 234, 0.4);
+}
+
+.ai-search-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s;
+}
+
+.ai-search-bar:hover::before {
+  left: 100%;
+}
+
+.search-icon {
+  font-size: 20px;
+  margin: 0 16px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.ai-search-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.95);
+  border: none;
+  border-radius: 16px;
+  padding: 16px 20px;
+  font-size: 16px;
+  color: #1f2937;
+  outline: none;
+  transition: all 0.3s ease;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.ai-search-input::placeholder {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.ai-search-input:focus {
+  background: rgba(255, 255, 255, 1);
+  box-shadow: inset 0 2px 12px rgba(102, 126, 234, 0.2);
+  transform: none; /* 移除缩放避免布局问题 */
+}
+
+.ai-search-input:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.ai-search-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+  color: white;
+  border: none;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-left: 8px;
+  min-width: 120px;
+  justify-content: center;
+}
+
+.ai-search-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ee5a24, #e55039);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(238, 90, 36, 0.4);
+}
+
+.ai-search-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.ai-search-btn.searching {
+  background: linear-gradient(135deg, #74b9ff, #0984e3);
+}
+
+.loading-spinner-small {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* AI搜索结果面板 */
+.ai-search-results {
+  margin-top: 16px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.search-results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.close-results-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  transition: all 0.2s ease;
+}
+
+.close-results-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.search-results-content {
+  padding: 20px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.search-result-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.result-icon {
+  font-size: 16px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.result-text {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #374151;
+}
+
+.result-content {
+  flex: 1;
+}
+
+.search-result-markdown {
+  font-size: 14px;
+}
+
+.search-result-markdown h1,
+.search-result-markdown h2,
+.search-result-markdown h3,
+.search-result-markdown h4 {
+  margin-top: 0.5em;
+  margin-bottom: 0.3em;
+}
+
+.search-result-markdown h1 {
+  font-size: 1.2em;
+}
+
+.search-result-markdown h2 {
+  font-size: 1.1em;
+}
+
+.search-result-markdown h3,
+.search-result-markdown h4 {
+  font-size: 1.05em;
+}
+
+.search-result-markdown p {
+  margin: 0.4em 0;
+}
+
+.search-result-markdown .katex {
+  font-size: 0.95em;
+}
+
+.search-result-markdown .katex-display {
+  margin: 0.8em 0;
+}
+
+/* 快速建议 */
+.quick-suggestions {
+  padding: 16px 20px;
+  background: rgba(248, 250, 252, 0.8);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.suggestions-label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  margin-right: 8px;
+}
+
+.suggestion-btn {
+  padding: 6px 12px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.suggestion-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+  transform: translateY(-1px);
+}
+
+/* 深色模式适配 */
+.main-layout.dark .ai-search-input {
+  background: rgba(30, 41, 59, 0.9) !important;
+  color: #f1f5f9 !important;
+  border-color: rgba(71, 85, 105, 0.5) !important;
+}
+
+.main-layout.dark .ai-search-input::placeholder {
+  color: #94a3b8 !important;
+}
+
+.main-layout.dark .ai-search-results {
+  background: rgba(30, 41, 59, 0.95) !important;
+  border-color: rgba(71, 85, 105, 0.3) !important;
+}
+
+.main-layout.dark .result-text {
+  color: #e2e8f0 !important;
+}
+
+.main-layout.dark .quick-suggestions {
+  background: rgba(51, 65, 85, 0.8) !important;
+  border-color: rgba(71, 85, 105, 0.3) !important;
+}
+
+.main-layout.dark .suggestions-label {
+  color: #9ca3af !important;
+}
+
+.main-layout.dark .suggestion-btn {
+  background: rgba(59, 130, 246, 0.2) !important;
+  color: #60a5fa !important;
+  border-color: rgba(59, 130, 246, 0.4) !important;
+}
+
+.main-layout.dark .suggestion-btn:hover {
+  background: rgba(59, 130, 246, 0.3) !important;
+}
+
+/* ===== 学生端多班级展示样式 ===== */
+.student-classrooms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.classroom-card-item {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.classroom-card-item.compact {
+  padding: 12px;
+  min-height: auto;
+}
+
+.classroom-card-item.primary {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(99, 102, 241, 0.05));
+  border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.classroom-card-item.secondary {
+  background: rgba(248, 250, 252, 0.9);
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.classroom-card-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.classroom-card-item.primary:hover {
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.2);
+}
+
+.classroom-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.classroom-icon {
+  font-size: 24px;
+  padding: 8px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.primary-badge {
+  background: linear-gradient(135deg, #10b981, #047857);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.classroom-card-content {
+  margin-bottom: 12px;
+}
+
+.classroom-card-item.compact .classroom-card-content {
+  margin-bottom: 8px;
+}
+
+.classroom-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+  line-height: 1.3;
+}
+
+.classroom-description {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0 0 12px 0;
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.teacher-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background: rgba(59, 130, 246, 0.05);
+  border-radius: 8px;
+}
+
+.teacher-icon {
+  font-size: 14px;
+}
+
+.teacher-name {
+  font-size: 12px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.classroom-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.stat-divider {
+  color: #d1d5db;
+  font-size: 12px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-icon {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.stat-text {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.classroom-card-footer {
+  border-top: 1px solid rgba(226, 232, 240, 0.5);
+  padding-top: 12px;
+}
+
+.classroom-card-item.compact .classroom-card-footer {
+  padding-top: 8px;
+}
+
+.classroom-enter-btn {
+  width: 100%;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.classroom-enter-btn:hover {
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* 更多班级卡片 */
+.more-classrooms-card {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.05), rgba(139, 92, 246, 0.05));
+  border: 2px dashed rgba(168, 85, 247, 0.3);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 200px;
+  transition: all 0.3s ease;
+}
+
+.more-classrooms-card:hover {
+  border-color: rgba(168, 85, 247, 0.5);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(139, 92, 246, 0.08));
+}
+
+.more-content {
+  margin-bottom: 16px;
+}
+
+.more-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.more-count {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: #7c3aed;
+  margin-bottom: 4px;
+}
+
+.more-hint {
+  display: block;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.view-all-btn {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #a855f7, #8b5cf6);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.view-all-btn:hover {
+  background: linear-gradient(135deg, #9333ea, #7c3aed);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+}
+
+/* 空状态样式 */
+.empty-classroom-state {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 20px;
+  opacity: 0.7;
+}
+
+.empty-content h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 8px 0;
+}
+
+.empty-content p {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+}
+
+.join-class-btn.primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #10b981, #047857);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.join-class-btn.primary:hover {
+  background: linear-gradient(135deg, #059669, #065f46);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .student-classrooms-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .classroom-card-item {
+    padding: 16px;
+  }
+  
+  .classroom-stats {
+    gap: 12px;
+  }
+}
+
+/* 深色模式支持 */
+.main-layout.dark .classroom-card-item {
+  background: rgba(30, 41, 59, 0.9) !important;
+  border-color: rgba(71, 85, 105, 0.3) !important;
+}
+
+.main-layout.dark .classroom-card-item.primary {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(99, 102, 241, 0.15)) !important;
+  border-color: rgba(59, 130, 246, 0.4) !important;
+}
+
+.main-layout.dark .classroom-name {
+  color: #f1f5f9 !important;
+}
+
+.main-layout.dark .classroom-description {
+  color: #94a3b8 !important;
+}
+
+.main-layout.dark .teacher-info {
+  background: rgba(59, 130, 246, 0.15) !important;
+}
+
+.main-layout.dark .teacher-name {
+  color: #e2e8f0 !important;
+}
+
+.main-layout.dark .stat-text {
+  color: #94a3b8 !important;
+}
+
+.main-layout.dark .classroom-card-footer {
+  border-top-color: rgba(71, 85, 105, 0.3) !important;
+}
+
+.main-layout.dark .more-classrooms-card {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(139, 92, 246, 0.1)) !important;
+  border-color: rgba(168, 85, 247, 0.4) !important;
+}
+
+.main-layout.dark .more-count {
+  color: #a78bfa !important;
+}
+
+.main-layout.dark .empty-content h3 {
+  color: #f1f5f9 !important;
+}
+
+.main-layout.dark .empty-content p {
+  color: #94a3b8 !important;
 }

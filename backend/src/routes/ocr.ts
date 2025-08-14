@@ -220,6 +220,61 @@ export async function ocrRoutes(fastify: FastifyInstance) {
       });
     }
   });
+
+  // 下载DOCX文件 - 用户请求的功能
+  fastify.get('/ocr/download/docx/:submissionId', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const submissionId = parseInt((request.params as any).submissionId);
+      
+      // 验证提交记录是否属于当前用户
+      const submission = await prisma.submission.findFirst({
+        where: {
+          id: submissionId,
+          userId: request.currentUser!.id
+        },
+        include: {
+          mathpixResults: {
+            orderBy: { createdAt: 'desc' },
+            take: 1
+          }
+        }
+      });
+
+      if (!submission || submission.mathpixResults.length === 0) {
+        return reply.code(404).send({
+          success: false,
+          error: '未找到OCR结果'
+        });
+      }
+
+      const ocrResult = submission.mathpixResults[0];
+      const docxData = (ocrResult.rawResult as any)?.docxData;
+
+      if (!docxData) {
+        return reply.code(404).send({
+          success: false,
+          error: 'DOCX文件不可用'
+        });
+      }
+
+      // 转换base64回到buffer
+      const docxBuffer = Buffer.from(docxData, 'base64');
+      
+      // 设置适当的headers
+      reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      reply.header('Content-Disposition', `attachment; filename="ocr-result-${submissionId}.docx"`);
+      reply.header('Content-Length', docxBuffer.length);
+      
+      return reply.send(docxBuffer);
+
+    } catch (error) {
+      fastify.log.error('下载DOCX文件失败:', error);
+      return reply.code(500).send({
+        success: false,
+        error: '下载文件失败'
+      });
+    }
+  });
 }
 
 // 预处理函数已删除 - 直接使用Buffer处理文件
@@ -259,9 +314,9 @@ async function callMathPixAPI(fileBuffer: Buffer, fileType?: string): Promise<{
     // Step 1: 上传PDF到MathPix
     const form = new FormData();
     
-    // 配置选项 - 针对数学内容优化
+    // 配置选项 - 针对数学内容优化，确保公式不丢失
     form.append('options_json', JSON.stringify({
-      conversion_formats: { docx: false }, // 暂时不需要docx
+      formats: ["mmd", "docx"], // 请求mmd和docx格式，使用format=mmd保证公式完整性
       math_inline_delimiters: ['$', '$'],
       rm_spaces: true,
       numbers_default_to_math: true
@@ -317,7 +372,7 @@ async function callMathPixAPI(fileBuffer: Buffer, fileType?: string): Promise<{
       await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
     }
 
-    // Step 3: 获取识别结果
+    // Step 3: 获取识别结果 - 使用format=mmd确保数学公式完整性
     console.log('📥 下载识别结果...');
     const resultResponse = await axios.get(`${BASE}/pdf/${pdf_id}.mmd`, {
       ...AXIOS_DEFAULTS,
@@ -349,10 +404,24 @@ async function callMathPixAPI(fileBuffer: Buffer, fileType?: string): Promise<{
       console.log('📝 LaTeX格式不可用，使用Markdown格式');
     }
 
+    // 尝试获取DOCX格式 (可选) - 用户请求的下载功能
+    let docxBuffer: Buffer | null = null;
+    try {
+      const docxResponse = await axios.get(`${BASE}/pdf/${pdf_id}.docx`, {
+        ...AXIOS_DEFAULTS,
+        responseType: 'arraybuffer'
+      });
+      docxBuffer = Buffer.from(docxResponse.data);
+      console.log('✅ DOCX格式获取成功，大小:', Math.round(docxBuffer.length / 1024) + 'KB');
+    } catch (e) {
+      console.log('📄 DOCX格式不可用');
+    }
+
     console.log('✅ MathPix识别成功:', {
       originalLength: text.length,
       cleanedLength: cleanText.length,
       latexLength: latex.length,
+      docxSize: docxBuffer ? Math.round(docxBuffer.length / 1024) + 'KB' : '不可用',
       confidence: 0.95 // v3/pdf API不返回置信度，使用默认值
     });
 
@@ -364,7 +433,9 @@ async function callMathPixAPI(fileBuffer: Buffer, fileType?: string): Promise<{
         pdf_id,
         status: 'completed',
         progress: 100,
-        provider: 'MathPix_v3_PDF'
+        provider: 'MathPix_v3_PDF',
+        // 保存docx数据用于下载（如果可用）
+        docxData: docxBuffer ? docxBuffer.toString('base64') : null
       }
     };
 

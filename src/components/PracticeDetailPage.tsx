@@ -213,6 +213,33 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
     });
   };
 
+  // 下载DOCX文件功能
+  const downloadDocx = async () => {
+    if (!session || !authState.token) return;
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/ocr/download/docx/${session.submissionId}`, {
+        headers: { 'Authorization': `Bearer ${authState.token}` }
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ocr-result-${session.submissionId}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        console.error('下载DOCX失败:', response.statusText);
+      }
+    } catch (error) {
+      console.error('下载DOCX出错:', error);
+    }
+  };
+
   const submitSimilarQuestionAnswer = async (questionId: number) => {
     const userAnswer = questionAnswers[questionId];
     if (!userAnswer?.trim() || !authState.token) return;
@@ -330,42 +357,56 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
     if (!errors || errors.length === 0) return null;
 
     return (
-      <div className="error-details">
-        <h5>🔍 错误详情</h5>
-        {errors.map((error, index) => (
-          <div key={index} className="error-item">
-            <div className="error-header">
-              <span className="error-type">{error.errorType || '错误'}</span>
-              {error.severity && (
-                <span className={`error-severity ${error.severity}`}>
-                  {error.severity === 'major' ? '严重' : 
-                   error.severity === 'minor' ? '轻微' : '中等'}
-                </span>
-              )}
-            </div>
-            {error.content && (
+      <div className="error-details enhanced">
+        <div className="section-header">
+          <h4>🔍 错误详情分析</h4>
+          <span className="count-badge error">{errors.length}</span>
+        </div>
+        <div className="error-list">
+          {errors.map((error, index) => (
+            <div key={index} className="error-item enhanced">
+              <div className="error-icon">
+                {error.severity === 'major' ? '🔴' : 
+                 error.severity === 'minor' ? '🟢' : '🟡'}
+              </div>
               <div className="error-content">
-                <strong>问题内容：</strong>{error.content}
+                <div className="error-header">
+                  <span className="error-type">{error.errorType || '错误'}</span>
+                  {error.severity && (
+                    <span className={`error-severity ${error.severity}`}>
+                      {error.severity === 'major' ? '严重' : 
+                       error.severity === 'minor' ? '轻微' : '中等'}
+                    </span>
+                  )}
+                </div>
+                {error.content && (
+                  <div className="error-section">
+                    <span className="section-label">问题内容：</span>
+                    <span className="section-content">{error.content}</span>
+                  </div>
+                )}
+                {error.correction && (
+                  <div className="error-section correction">
+                    <span className="section-label">正确答案：</span>
+                    <span className="section-content">{error.correction}</span>
+                  </div>
+                )}
+                {error.explanation && (
+                  <div className="error-section explanation">
+                    <span className="section-label">解释：</span>
+                    <span className="section-content">{error.explanation}</span>
+                  </div>
+                )}
+                {error.knowledgePoint && (
+                  <div className="error-section knowledge">
+                    <span className="section-label">相关知识点：</span>
+                    <span className="knowledge-tag-inline enhanced">{error.knowledgePoint}</span>
+                  </div>
+                )}
               </div>
-            )}
-            {error.correction && (
-              <div className="error-correction">
-                <strong>正确答案：</strong>{error.correction}
-              </div>
-            )}
-            {error.explanation && (
-              <div className="error-explanation">
-                <strong>解释：</strong>{error.explanation}
-              </div>
-            )}
-            {error.knowledgePoint && (
-              <div className="error-knowledge">
-                <strong>知识点：</strong>
-                <span className="knowledge-tag-inline">{error.knowledgePoint}</span>
-              </div>
-            )}
-          </div>
-        ))}
+            </div>
+          ))}
+        </div>
       </div>
     );
   };
@@ -374,24 +415,35 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
     if (!suggestions || suggestions.length === 0) return null;
 
     return (
-      <div className="suggestions-details">
-        <h5>💡 改进建议</h5>
-        {suggestions.map((suggestion, index) => (
-          <div key={index} className="suggestion-item">
-            <div className="suggestion-aspect">
-              <strong>{suggestion.aspect || '建议'}</strong>
-              {suggestion.priority && (
-                <span className={`priority-badge ${suggestion.priority}`}>
-                  {suggestion.priority === 'high' ? '高优先级' : 
-                   suggestion.priority === 'medium' ? '中优先级' : '低优先级'}
-                </span>
-              )}
+      <div className="suggestions-details enhanced">
+        <div className="section-header">
+          <h4>💡 改进建议</h4>
+          <span className="count-badge suggestion">{suggestions.length}</span>
+        </div>
+        <div className="suggestion-list">
+          {suggestions.map((suggestion, index) => (
+            <div key={index} className="suggestion-item enhanced">
+              <div className="suggestion-icon">
+                {suggestion.priority === 'high' ? '🔥' : 
+                 suggestion.priority === 'medium' ? '⚡' : '💭'}
+              </div>
+              <div className="suggestion-content">
+                <div className="suggestion-header">
+                  <span className="suggestion-aspect">{suggestion.aspect || '建议'}</span>
+                  {suggestion.priority && (
+                    <span className={`priority-badge ${suggestion.priority}`}>
+                      {suggestion.priority === 'high' ? '高优先级' : 
+                       suggestion.priority === 'medium' ? '中优先级' : '低优先级'}
+                    </span>
+                  )}
+                </div>
+                <div className="suggestion-description">
+                  {suggestion.recommendation || suggestion.description || suggestion}
+                </div>
+              </div>
             </div>
-            <div className="suggestion-content">
-              {suggestion.recommendation || suggestion.description || suggestion}
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     );
   };
@@ -400,24 +452,35 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
     if (!strengths || strengths.length === 0) return null;
 
     return (
-      <div className="strengths-details">
-        <h5>🌟 优点分析</h5>
-        {strengths.map((strength, index) => (
-          <div key={index} className="strength-item">
-            <div className="strength-aspect">
-              <strong>{strength.aspect || '优点'}</strong>
-              {strength.importance && (
-                <span className={`importance-badge ${strength.importance}`}>
-                  {strength.importance === 'high' ? '非常重要' : 
-                   strength.importance === 'medium' ? '比较重要' : '一般重要'}
-                </span>
-              )}
+      <div className="strengths-details enhanced">
+        <div className="section-header">
+          <h4>🌟 优点分析</h4>
+          <span className="count-badge strength">{strengths.length}</span>
+        </div>
+        <div className="strength-list">
+          {strengths.map((strength, index) => (
+            <div key={index} className="strength-item enhanced">
+              <div className="strength-icon">
+                {strength.importance === 'high' ? '⭐' : 
+                 strength.importance === 'medium' ? '✨' : '💫'}
+              </div>
+              <div className="strength-content">
+                <div className="strength-header">
+                  <span className="strength-aspect">{strength.aspect || '优点'}</span>
+                  {strength.importance && (
+                    <span className={`importance-badge ${strength.importance}`}>
+                      {strength.importance === 'high' ? '非常重要' : 
+                       strength.importance === 'medium' ? '比较重要' : '一般重要'}
+                    </span>
+                  )}
+                </div>
+                <div className="strength-description">
+                  {strength.description || strength}
+                </div>
+              </div>
             </div>
-            <div className="strength-content">
-              {strength.description || strength}
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     );
   };
@@ -481,9 +544,19 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
         <div className="navbar-right">
           <div className="score-display">
             {session.gradingResult && (
-              <span className="score-badge">
-                {session.gradingResult.score}/{session.gradingResult.maxScore}分
-              </span>
+              <div className="score-card">
+                <div className="score-circle">
+                  <div className="score-number">{session.gradingResult.score}</div>
+                  <div className="score-divider">/</div>
+                  <div className="score-max">{session.gradingResult.maxScore}</div>
+                </div>
+                <div className="score-label">
+                  {session.gradingResult.score >= 90 ? '优秀' :
+                   session.gradingResult.score >= 80 ? '良好' :
+                   session.gradingResult.score >= 70 ? '中等' :
+                   session.gradingResult.score >= 60 ? '及格' : '需改进'}
+                </div>
+              </div>
             )}
           </div>
           <button 
@@ -519,6 +592,13 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
               <div className="ocr-result">
                 <div className="confidence-info">
                   <span>识别置信度: {(session.ocrResult.confidence * 100).toFixed(1)}%</span>
+                  <button 
+                    className="download-docx-btn"
+                    onClick={downloadDocx}
+                    title="下载Word格式文档"
+                  >
+                    📄 下载DOCX
+                  </button>
                 </div>
                 <div className="recognized-text">
                   <SimpleMarkdownRenderer 
@@ -570,23 +650,41 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
               <div className="grading-result">
                 {/* 知识点 */}
                 {session.gradingResult.knowledgePoints && session.gradingResult.knowledgePoints.length > 0 && (
-                  <div className="knowledge-points-section">
-                    <h4>📚 涉及知识点</h4>
-                    <div className="knowledge-tags">
+                  <div className="knowledge-points-section enhanced">
+                    <div className="section-header">
+                      <h4>📚 涉及知识点</h4>
+                      <span className="count-badge">{session.gradingResult.knowledgePoints.length}</span>
+                    </div>
+                    <div className="knowledge-tags enhanced">
                       {session.gradingResult.knowledgePoints.map((point, index) => (
-                        <span key={index} className="knowledge-tag">{point}</span>
+                        <span key={index} className="knowledge-tag enhanced">
+                          <span className="tag-icon">📖</span>
+                          <span className="tag-text">{point}</span>
+                        </span>
                       ))}
                     </div>
                   </div>
                 )}
 
                 {/* AI反馈 */}
-                <div className="feedback-section">
-                  <h4>📝 AI分析反馈</h4>
-                  <div className="feedback-text">
+                <div className="feedback-section enhanced">
+                  <div className="section-header">
+                    <h4>📝 AI分析反馈</h4>
+                    <div className="feedback-stats">
+                      <span className="stat-item">
+                        <span className="stat-icon">✅</span>
+                        <span>正确 {session.gradingResult.correctCount || 0}</span>
+                      </span>
+                      <span className="stat-item">
+                        <span className="stat-icon">❌</span>
+                        <span>错误 {session.gradingResult.incorrectCount || 0}</span>
+                      </span>
+                    </div>
+                  </div>
+                  <div className="feedback-content-wrapper">
                     <SimpleMarkdownRenderer 
                       content={session.gradingResult.feedback} 
-                      className="feedback-content"
+                      className="feedback-content enhanced"
                     />
                   </div>
                 </div>

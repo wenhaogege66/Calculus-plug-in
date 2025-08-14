@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
+import { useNotificationContext } from '../contexts/NotificationContext';
 
 interface Assignment {
   id: number;
@@ -25,6 +26,8 @@ interface Assignment {
   isOverdue?: boolean;
   isActive: boolean;
   createdAt: string;
+  submissionCount?: number; // 提交次数
+  latestSubmissionVersion?: number; // 最新提交版本
 }
 
 interface Classroom {
@@ -38,9 +41,14 @@ interface Classroom {
 
 interface AssignmentsPageProps {
   authState: AuthState;
+  params?: {
+    classroomId?: number;
+    classroomName?: string;
+  };
 }
 
-export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) => {
+export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, params }) => {
+  const { showSuccess, showError, showWarning, showInfo } = useNotificationContext();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [filteredAssignments, setFilteredAssignments] = useState<Assignment[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
@@ -60,6 +68,11 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
   });
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailAssignment, setDetailAssignment] = useState<Assignment | null>(null);
+  const [showGradingResultModal, setShowGradingResultModal] = useState(false);
+  const [gradingResultAssignment, setGradingResultAssignment] = useState<Assignment | null>(null);
+  const [gradingResults, setGradingResults] = useState<any>(null);
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -85,12 +98,24 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
     sortBy: 'dueDate' // dueDate, title, status
   });
   const [submitting, setSubmitting] = useState(false);
+  const [isResubmission, setIsResubmission] = useState(false);
+  const [submissionHistory, setSubmissionHistory] = useState<any[]>([]);
 
   const isTeacher = authState.user?.role === 'TEACHER';
 
   useEffect(() => {
     loadData();
   }, [authState.token]);
+
+  // 根据页面参数设置初始筛选条件
+  useEffect(() => {
+    if (params?.classroomId) {
+      setFilters(prev => ({
+        ...prev,
+        classroom: params.classroomId.toString()
+      }));
+    }
+  }, [params]);
 
   // 应用过滤和排序
   useEffect(() => {
@@ -284,7 +309,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
         if (uploadResponse.ok) {
           const uploadData = await uploadResponse.json();
           if (uploadData.success) {
-            fileUploadId = uploadData.data.id;
+            fileUploadId = uploadData.data.fileId;
           }
         }
       }
@@ -375,11 +400,21 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
 
       const fileIds = await Promise.all(uploadPromises);
 
+      // 计算版本号（基于历史提交记录）
+      const currentVersion = isResubmission 
+        ? Math.max(...submissionHistory.map(s => s.metadata?.version || 1), 0) + 1
+        : 1;
+
       // 创建提交记录
       const submissionData = {
         assignmentId: selectedAssignment.id,
         fileUploadIds: fileIds,
-        note: submitForm.note
+        note: submitForm.note,
+        metadata: {
+          version: currentVersion,
+          isResubmission: isResubmission,
+          resubmissionNote: isResubmission ? `第${currentVersion}次提交` : undefined
+        }
       };
 
       const response = await fetch(`${API_BASE_URL}/submissions`, {
@@ -393,9 +428,14 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
 
       const data = await response.json();
       if (data.success) {
+        const actionText = isResubmission ? '重新提交' : '提交';
+        showSuccess(`${actionText}成功！${isResubmission ? `（版本 ${currentVersion}）` : ''}`);
+        
         setShowSubmitModal(false);
         setSelectedAssignment(null);
         setSubmitForm({ files: [], note: '' });
+        setIsResubmission(false);
+        setSubmissionHistory([]);
         await loadData(); // 重新加载数据
       } else {
         setError(data.error || '提交作业失败');
@@ -406,6 +446,36 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // 获取作业的提交历史
+  const loadSubmissionHistory = async (assignmentId: number) => {
+    if (!authState.token) return [];
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/submissions?assignmentId=${assignmentId}`, {
+        headers: { 'Authorization': `Bearer ${authState.token}` }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        return data.data.submissions || [];
+      }
+      return [];
+    } catch (error) {
+      console.error('获取提交历史失败:', error);
+      return [];
+    }
+  };
+
+  // 处理重新提交
+  const handleResubmitAssignment = async (assignment: Assignment) => {
+    const history = await loadSubmissionHistory(assignment.id);
+    setSubmissionHistory(history);
+    setIsResubmission(true);
+    setSelectedAssignment(assignment);
+    setSubmitForm({ files: [], note: '' });
+    setShowSubmitModal(true);
   };
 
   const getStatusBadge = (assignment: Assignment) => {
@@ -438,6 +508,49 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
     setShowEditModal(true);
   };
 
+  const handleShowAssignmentDetail = (assignment: Assignment) => {
+    setDetailAssignment(assignment);
+    setShowDetailModal(true);
+  };
+
+  const handleShowGradingResult = async (assignment: Assignment) => {
+    if (!authState.token) return;
+
+    try {
+      setLoading(true);
+      setGradingResultAssignment(assignment);
+
+      // 获取该作业的提交记录和批改结果
+      const response = await fetch(`${API_BASE_URL}/submissions?assignmentId=${assignment.id}`, {
+        headers: { 'Authorization': `Bearer ${authState.token}` }
+      });
+
+      const data = await response.json();
+      if (data.success && data.data.submissions && data.data.submissions.length > 0) {
+        // 获取最新的提交记录的详细批改结果
+        const latestSubmission = data.data.submissions[0];
+        const statusResponse = await fetch(`${API_BASE_URL}/submissions/${latestSubmission.id}/status`, {
+          headers: { 'Authorization': `Bearer ${authState.token}` }
+        });
+
+        const statusData = await statusResponse.json();
+        if (statusData.success) {
+          setGradingResults(statusData.data);
+          setShowGradingResultModal(true);
+        } else {
+          showError('获取批改结果失败');
+        }
+      } else {
+        showError('未找到提交记录');
+      }
+    } catch (error) {
+      console.error('获取批改结果失败:', error);
+      showError('获取批改结果失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updateAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!authState.token || !isTeacher || !editingAssignment) return;
@@ -462,7 +575,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
         if (uploadResponse.ok) {
           const uploadData = await uploadResponse.json();
           if (uploadData.success) {
-            fileUploadId = uploadData.data.id;
+            fileUploadId = uploadData.data.fileId;
           }
         }
       }
@@ -528,12 +641,13 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
       const data = await response.json();
       if (data.success) {
         await loadData(); // 重新加载数据
+        showSuccess(`作业状态已更新为${!assignment.isActive ? '开启' : '结束'}`);
       } else {
-        setError(data.error || '更新作业状态失败');
+        showError(data.error || '更新作业状态失败');
       }
     } catch (err) {
       console.error('更新作业状态失败:', err);
-      setError('更新作业状态失败');
+      showError('更新作业状态失败');
     }
   };
 
@@ -556,12 +670,47 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
       const data = await response.json();
       if (data.success) {
         await loadData(); // 重新加载数据
+        showSuccess(`作业截止时间已延长${days}天`);
       } else {
-        setError(data.error || '延期失败');
+        showError(data.error || '延期失败');
       }
     } catch (err) {
       console.error('延期失败:', err);
-      setError('延期失败');
+      showError('延期失败');
+    }
+  };
+
+  const handleDownloadFile = async (fileId: number, fileName: string) => {
+    if (!authState.token) {
+      showError('请先登录');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/files/${fileId}/download`, {
+        headers: {
+          'Authorization': `Bearer ${authState.token}`
+        }
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showSuccess(`文件 ${fileName} 下载成功`);
+      } else {
+        const errorData = await response.json();
+        showError(errorData.error || '文件下载失败');
+      }
+    } catch (err) {
+      console.error('下载失败:', err);
+      showError('文件下载失败，请稍后重试');
     }
   };
 
@@ -630,7 +779,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
               >
                 <option value="all">全部班级</option>
                 {classrooms.map(classroom => (
-                  <option key={classroom.id} value={classroom.id}>
+                  <option key={classroom.id} value={classroom.id.toString()}>
                     {classroom.name}
                   </option>
                 ))}
@@ -713,7 +862,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
               >
                 <option value="all">全部班级</option>
                 {getUniqueClassrooms().map(classroom => (
-                  <option key={classroom.id} value={classroom.id}>
+                  <option key={classroom.id} value={classroom.id.toString()}>
                     {classroom.name}
                   </option>
                 ))}
@@ -753,11 +902,27 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
         </div>
       )}
 
-      {assignments.length === 0 && !loading && classrooms.length > 0 ? (
+      {(assignments.length === 0 || filteredAssignments.length === 0) && !loading && classrooms.length > 0 ? (
         <div className="empty-state">
           <div className="empty-icon">📝</div>
-          <h3>{isTeacher ? '还没有布置任何作业' : '暂无作业'}</h3>
-          <p>{isTeacher ? '点击"布置作业"按钮开始创建第一个作业' : '老师还没有布置作业，请耐心等待'}</p>
+          {filteredAssignments.length === 0 && assignments.length > 0 ? (
+            // 有作业但筛选后没有结果
+            <>
+              <h3>当前筛选条件下没有作业</h3>
+              <p>
+                {params?.classroomName ? 
+                  `当前班级"${params.classroomName}"尚未布置作业` : 
+                  '尝试调整筛选条件查看其他作业'
+                }
+              </p>
+            </>
+          ) : (
+            // 完全没有作业
+            <>
+              <h3>{isTeacher ? '还没有布置任何作业' : '暂无作业'}</h3>
+              <p>{isTeacher ? '点击"布置作业"按钮开始创建第一个作业' : '老师还没有布置作业，请耐心等待'}</p>
+            </>
+          )}
         </div>
       ) : (
         <div className="assignments-grid">
@@ -805,17 +970,17 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
 
               {assignment.questionFile && (
                 <div className="question-file">
-                  <a 
-                    href={`${API_BASE_URL}/files/${assignment.questionFile.id}/download`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button 
                     className="file-download-link"
-                    onClick={(e) => e.stopPropagation()} // 防止触发卡片点击
+                    onClick={(e) => {
+                      e.stopPropagation(); // 防止触发卡片点击
+                      handleDownloadFile(assignment.questionFile!.id, assignment.questionFile!.originalName);
+                    }}
                   >
                     <span className="file-icon">📎</span>
                     <span className="file-name">{assignment.questionFile.originalName}</span>
                     <span className="download-hint">点击下载</span>
-                  </a>
+                  </button>
                 </div>
               )}
 
@@ -870,12 +1035,18 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
                       </button>
                     )}
                     {assignment.isSubmitted && (
-                      <button className="btn-secondary small">
+                      <button 
+                        className="btn-secondary small"
+                        onClick={() => handleShowGradingResult(assignment)}
+                      >
                         <span className="btn-icon">👀</span>
                         <span>查看结果</span>
                       </button>
                     )}
-                    <button className="btn-secondary small">
+                    <button 
+                      className="btn-secondary small"
+                      onClick={() => handleShowAssignmentDetail(assignment)}
+                    >
                       <span className="btn-icon">📋</span>
                       <span>详情</span>
                     </button>
@@ -999,8 +1170,12 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
         <div className="modal-overlay" onClick={() => setShowSubmitModal(false)}>
           <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>提交作业：{selectedAssignment.title}</h2>
-              <button className="close-btn" onClick={() => setShowSubmitModal(false)}>✕</button>
+              <h2>{isResubmission ? '重新提交作业' : '提交作业'}：{selectedAssignment.title}</h2>
+              <button className="close-btn" onClick={() => {
+                setShowSubmitModal(false);
+                setIsResubmission(false);
+                setSubmissionHistory([]);
+              }}>✕</button>
             </div>
             
             <div className="assignment-info">
@@ -1023,18 +1198,45 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
               {selectedAssignment.questionFile && (
                 <div className="info-item">
                   <span className="info-label">题目文件：</span>
-                  <a 
-                    href={`${API_BASE_URL}/files/${selectedAssignment.questionFile.id}/download`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button 
                     className="file-download-link"
+                    onClick={() => handleDownloadFile(selectedAssignment.questionFile!.id, selectedAssignment.questionFile!.originalName)}
                   >
                     <span className="file-icon">📎</span>
                     {selectedAssignment.questionFile.originalName}
-                  </a>
+                  </button>
                 </div>
               )}
             </div>
+            
+            {/* 提交历史 */}
+            {isResubmission && submissionHistory.length > 0 && (
+              <div className="submission-history">
+                <h3 className="history-title">📋 提交历史</h3>
+                <div className="history-list">
+                  {submissionHistory.map((submission, index) => (
+                    <div key={submission.id} className="history-item">
+                      <div className="history-info">
+                        <span className="version-badge">v{submission.metadata?.version || index + 1}</span>
+                        <span className="submission-date">
+                          {new Date(submission.submittedAt).toLocaleString('zh-CN')}
+                        </span>
+                        <span className={`status-badge ${submission.status.toLowerCase()}`}>
+                          {submission.status === 'COMPLETED' ? '已批改' : 
+                           submission.status === 'PROCESSING' ? '批改中' : '已上传'}
+                        </span>
+                      </div>
+                      {submission.metadata?.note && (
+                        <div className="submission-note">备注：{submission.metadata.note}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="next-version-info">
+                  <span className="next-version">即将提交：v{Math.max(...submissionHistory.map(s => s.metadata?.version || 1), 0) + 1}</span>
+                </div>
+              </div>
+            )}
             
             <form onSubmit={submitAssignment} className="modal-form">
               <div className="form-group">
@@ -1090,7 +1292,10 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
                   className="btn-primary"
                   disabled={submitting || submitForm.files.length === 0}
                 >
-                  {submitting ? '提交中...' : '提交作业'}
+                  {submitting ? 
+                    (isResubmission ? '重新提交中...' : '提交中...') : 
+                    (isResubmission ? '重新提交作业' : '提交作业')
+                  }
                 </button>
               </div>
             </form>
@@ -1114,7 +1319,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
                   id="editAssignmentTitle"
                   type="text"
                   value={editForm.title}
-                  onChange={(e) => setEditForm({...editForm, title: e.target.value})}
+                  onChange={(e) => setEditForm(prev => ({...prev, title: e.target.value}))}
                   placeholder="如：第三章积分计算练习"
                   required
                 />
@@ -1125,7 +1330,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
                 <select
                   id="editAssignmentClassroom"
                   value={editForm.classroomId}
-                  onChange={(e) => setEditForm({...editForm, classroomId: e.target.value})}
+                  onChange={(e) => setEditForm(prev => ({...prev, classroomId: e.target.value}))}
                   required
                 >
                   <option value="">请选择班级</option>
@@ -1144,7 +1349,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
                     id="editAssignmentStartDate"
                     type="datetime-local"
                     value={editForm.startDate}
-                    onChange={(e) => setEditForm({...editForm, startDate: e.target.value})}
+                    onChange={(e) => setEditForm(prev => ({...prev, startDate: e.target.value}))}
                     required
                   />
                 </div>
@@ -1155,7 +1360,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
                     id="editAssignmentDueDate"
                     type="datetime-local"
                     value={editForm.dueDate}
-                    onChange={(e) => setEditForm({...editForm, dueDate: e.target.value})}
+                    onChange={(e) => setEditForm(prev => ({...prev, dueDate: e.target.value}))}
                     required
                   />
                 </div>
@@ -1166,7 +1371,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
                 <textarea
                   id="editAssignmentDescription"
                   value={editForm.description}
-                  onChange={(e) => setEditForm({...editForm, description: e.target.value})}
+                  onChange={(e) => setEditForm(prev => ({...prev, description: e.target.value}))}
                   placeholder="详细描述作业要求..."
                   rows={3}
                 />
@@ -1178,7 +1383,13 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
                   id="editAssignmentFile"
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => setEditForm({...editForm, fileUpload: e.target.files?.[0] || null})}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setEditForm(prev => ({
+                      ...prev,
+                      fileUpload: file
+                    }));
+                  }}
                 />
                 <small className="form-help">
                   {editingAssignment.questionFile 
@@ -1193,7 +1404,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
                   <input
                     type="checkbox"
                     checked={editForm.isActive}
-                    onChange={(e) => setEditForm({...editForm, isActive: e.target.checked})}
+                    onChange={(e) => setEditForm(prev => ({...prev, isActive: e.target.checked}))}
                   />
                   <span className="checkbox-text">启用该作业（学生可见）</span>
                 </label>
@@ -1211,12 +1422,445 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
                 <button 
                   type="submit" 
                   className="btn-primary"
-                  disabled={submitting || !editForm.title.trim() || !editForm.classroomId}
+                  disabled={submitting || !editForm.title?.trim() || !editForm.classroomId}
                 >
                   {submitting ? '更新中...' : '保存更改'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 作业详情模态框 */}
+      {showDetailModal && detailAssignment && (
+        <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
+          <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>作业详情：{detailAssignment.title}</h2>
+              <button className="close-btn" onClick={() => setShowDetailModal(false)}>✕</button>
+            </div>
+            
+            <div className="assignment-detail">
+              {/* 基本信息 */}
+              <div className="detail-section">
+                <h3 className="section-title">📋 基本信息</h3>
+                <div className="detail-grid">
+                  <div className="detail-item">
+                    <span className="detail-label">作业标题：</span>
+                    <span className="detail-value">{detailAssignment.title}</span>
+                  </div>
+                  {detailAssignment.classroom && (
+                    <div className="detail-item">
+                      <span className="detail-label">所属班级：</span>
+                      <span className="detail-value">{detailAssignment.classroom.name}</span>
+                    </div>
+                  )}
+                  <div className="detail-item">
+                    <span className="detail-label">开始时间：</span>
+                    <span className="detail-value">{formatDate(detailAssignment.startDate)}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">截止时间：</span>
+                    <span className={`detail-value ${detailAssignment.isOverdue ? 'overdue' : ''}`}>
+                      {formatDate(detailAssignment.dueDate)}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">作业状态：</span>
+                    <span className="detail-value">
+                      {detailAssignment.isSubmitted ? (
+                        <span className="status-tag submitted">✅ 已提交</span>
+                      ) : detailAssignment.isOverdue ? (
+                        <span className="status-tag overdue">⏰ 已过期</span>
+                      ) : (
+                        <span className="status-tag pending">⏳ 待提交</span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 作业描述 */}
+              {detailAssignment.description && (
+                <div className="detail-section">
+                  <h3 className="section-title">📝 作业要求</h3>
+                  <div className="detail-description">
+                    <p>{detailAssignment.description}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* 题目文件 */}
+              {detailAssignment.questionFile && (
+                <div className="detail-section">
+                  <h3 className="section-title">📎 题目文件</h3>
+                  <div className="file-display">
+                    <button
+                      className="file-download-btn"
+                      onClick={() => {
+                        handleDownloadFile(detailAssignment.questionFile!.id, detailAssignment.questionFile!.originalName);
+                      }}
+                    >
+                      <span className="file-icon">📄</span>
+                      <span className="file-name">{detailAssignment.questionFile.originalName}</span>
+                      <span className="download-text">点击下载</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 提交状态 */}
+              {!isTeacher && (
+                <div className="detail-section">
+                  <h3 className="section-title">📤 提交状态</h3>
+                  <div className="submission-status">
+                    {detailAssignment.isSubmitted ? (
+                      <div className="status-card submitted">
+                        <div className="status-icon">✅</div>
+                        <div className="status-content">
+                          <p className="status-title">作业已提交</p>
+                          <p className="status-desc">
+                            您的作业已成功提交，等待批改结果
+                            {detailAssignment.submissionCount && detailAssignment.submissionCount > 1 && (
+                              <span className="version-info">（已提交 {detailAssignment.submissionCount} 次）</span>
+                            )}
+                          </p>
+                          <div className="status-actions">
+                            {!detailAssignment.isOverdue && (
+                              <button 
+                                className="btn-secondary small"
+                                onClick={() => {
+                                  setShowDetailModal(false);
+                                  handleResubmitAssignment(detailAssignment);
+                                }}
+                              >
+                                <span className="btn-icon">🔄</span>
+                                <span>重新提交</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : detailAssignment.isOverdue ? (
+                      <div className="status-card overdue">
+                        <div className="status-icon">⏰</div>
+                        <div className="status-content">
+                          <p className="status-title">作业已过期</p>
+                          <p className="status-desc">作业已超过截止时间，无法再提交</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="status-card pending">
+                        <div className="status-icon">⏳</div>
+                        <div className="status-content">
+                          <p className="status-title">待提交作业</p>
+                          <p className="status-desc">请在截止时间前完成并提交作业</p>
+                          <button 
+                            className="btn-primary small"
+                            onClick={() => {
+                              setShowDetailModal(false);
+                              handleSubmitAssignment(detailAssignment);
+                            }}
+                          >
+                            <span className="btn-icon">📝</span>
+                            <span>立即提交</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="modal-actions">
+              <button 
+                className="btn-secondary"
+                onClick={() => setShowDetailModal(false)}
+              >
+                关闭
+              </button>
+              {!isTeacher && !detailAssignment.isSubmitted && !detailAssignment.isOverdue && (
+                <button 
+                  className="btn-primary"
+                  onClick={() => {
+                    setShowDetailModal(false);
+                    handleSubmitAssignment(detailAssignment);
+                  }}
+                >
+                  <span className="btn-icon">📝</span>
+                  <span>提交作业</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI批改结果模态框 */}
+      {showGradingResultModal && gradingResultAssignment && gradingResults && (
+        <div className="modal-overlay" onClick={() => setShowGradingResultModal(false)}>
+          <div className="modal-content grading-results-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>AI批改结果：{gradingResultAssignment.title}</h2>
+              <button className="close-btn" onClick={() => setShowGradingResultModal(false)}>✕</button>
+            </div>
+            
+            {/* 作业批改三部分展示 */}
+            <div className="assignment-grading-layout">
+              {/* 左侧：题目识别 */}
+              <div className="question-recognition-panel">
+                <div className="panel-header">
+                  <h3>📝 题目识别</h3>
+                  <div className="progress-indicator">
+                    {gradingResultAssignment.ocrStatus === 'PROCESSING' ? (
+                      <span className="status-badge processing">识别中...</span>
+                    ) : gradingResultAssignment.ocrStatus === 'COMPLETED' ? (
+                      <span className="status-badge completed">已完成</span>
+                    ) : gradingResultAssignment.ocrStatus === 'FAILED' ? (
+                      <span className="status-badge failed">识别失败</span>
+                    ) : (
+                      <span className="status-badge pending">等待中...</span>
+                    )}
+                  </div>
+                </div>
+                <div className="recognition-content">
+                  {gradingResultAssignment.ocrStatus === 'PROCESSING' && (
+                    <div className="processing-indicator">
+                      <div className="loading-spinner"></div>
+                      <p>正在识别教师题目...</p>
+                    </div>
+                  )}
+                  
+                  {gradingResultAssignment.ocrText ? (
+                    <div className="question-content">
+                      <div className="content-header">
+                        <span className="content-type">识别的题目内容：</span>
+                      </div>
+                      <div className="recognized-text">
+                        {gradingResultAssignment.ocrText}
+                      </div>
+                      {gradingResultAssignment.ocrLatex && (
+                        <div className="latex-content">
+                          <div className="content-header">
+                            <span className="content-type">LaTeX格式：</span>
+                          </div>
+                          <div className="latex-text">
+                            {gradingResultAssignment.ocrLatex}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : gradingResultAssignment.ocrStatus === 'COMPLETED' || gradingResultAssignment.ocrStatus === 'FAILED' ? (
+                    <div className="error-content">
+                      <div className="error-icon">⚠️</div>
+                      <h4>题目识别失败</h4>
+                      <p>教师上传的题目文件识别过程中出现问题。</p>
+                    </div>
+                  ) : (
+                    <div className="empty-content">
+                      <p>📄 题目识别结果将在此显示</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 中间：学生作业识别 */}
+              <div className="answer-recognition-panel">
+                <div className="panel-header">
+                  <h3>🔍 作业识别</h3>
+                  <div className="progress-indicator">
+                    {gradingResults.progress?.stage === 'ocr' ? (
+                      <span className="status-badge processing">识别中...</span>
+                    ) : gradingResults.mathpixResults && gradingResults.mathpixResults.length > 0 ? (
+                      <span className="status-badge completed">已完成</span>
+                    ) : gradingResults.progress?.stage === 'completed' ? (
+                      <span className="status-badge failed">识别失败</span>
+                    ) : (
+                      <span className="status-badge pending">等待中...</span>
+                    )}
+                  </div>
+                </div>
+                <div className="recognition-content">
+                  {gradingResults.progress?.stage === 'ocr' && (
+                    <div className="processing-indicator">
+                      <div className="loading-spinner"></div>
+                      <p>正在识别学生作业...</p>
+                    </div>
+                  )}
+                  
+                  {gradingResults.mathpixResults && gradingResults.mathpixResults.length > 0 ? (
+                    <div className="answer-content">
+                      <div className="confidence-info">
+                        <span>识别置信度: {(gradingResults.mathpixResults[0].confidence * 100).toFixed(1)}%</span>
+                      </div>
+                      <div className="recognized-text">
+                        {gradingResults.mathpixResults[0].recognizedText || '暂无识别内容'}
+                      </div>
+                      {gradingResults.mathpixResults[0].mathLatex && (
+                        <div className="latex-content">
+                          <div className="content-header">
+                            <span className="content-type">LaTeX公式：</span>
+                          </div>
+                          <div className="latex-text">
+                            {gradingResults.mathpixResults[0].mathLatex}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : gradingResults.status === 'COMPLETED' || gradingResults.status === 'FAILED' ? (
+                    <div className="error-content">
+                      <div className="error-icon">⚠️</div>
+                      <h4>作业识别失败</h4>
+                      <p>学生作业识别过程中出现问题，可能是文件格式不支持。</p>
+                    </div>
+                  ) : (
+                    <div className="empty-content">
+                      <p>📄 学生作业识别结果将在此显示</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 右侧：AI批改解答 */}
+              <div className="ai-grading-panel">
+                <div className="panel-header">
+                  <h3>🤖 AI批改解答</h3>
+                  <div className="progress-indicator">
+                    {gradingResults.progress?.stage === 'grading' ? (
+                      <span className="status-badge processing">批改中...</span>
+                    ) : gradingResults.deepseekResults && gradingResults.deepseekResults.length > 0 ? (
+                      <span className="status-badge completed">已完成</span>
+                    ) : gradingResults.progress?.stage === 'completed' ? (
+                      <span className="status-badge failed">批改失败</span>
+                    ) : (
+                      <span className="status-badge pending">等待中...</span>
+                    )}
+                  </div>
+                </div>
+                <div className="grading-content">
+                  {gradingResults.progress?.stage === 'grading' && (
+                    <div className="processing-indicator">
+                      <div className="loading-spinner"></div>
+                      <p>AI正在智能批改...</p>
+                    </div>
+                  )}
+                  
+                  {gradingResults.deepseekResults && gradingResults.deepseekResults.length > 0 ? (
+                    <div className="grading-result">
+                      {/* 评分结果 */}
+                      <div className="score-display">
+                        <div className="score-circle">
+                          <div className="score-number">
+                            {gradingResults.deepseekResults[0].score || 0}
+                          </div>
+                          <div className="score-total">/ {gradingResults.deepseekResults[0].maxScore || 100}</div>
+                        </div>
+                        <div className="score-level">
+                          <span className="level-value">
+                            {(() => {
+                              const score = gradingResults.deepseekResults[0].score || 0;
+                              return score >= 90 ? '优秀' : 
+                                     score >= 80 ? '良好' : 
+                                     score >= 70 ? '中等' : 
+                                     score >= 60 ? '及格' : '需要改进';
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* AI反馈 */}
+                      {gradingResults.deepseekResults[0].feedback && (
+                        <div className="feedback-section">
+                          <h4>💬 AI反馈</h4>
+                          <p>{gradingResults.deepseekResults[0].feedback}</p>
+                        </div>
+                      )}
+
+                      {/* 错误分析 */}
+                      {gradingResults.deepseekResults[0].errors && 
+                       Array.isArray(gradingResults.deepseekResults[0].errors) && 
+                       gradingResults.deepseekResults[0].errors.length > 0 && (
+                        <div className="errors-section">
+                          <h4>❌ 问题分析</h4>
+                          <div className="errors-list">
+                            {gradingResults.deepseekResults[0].errors.map((error: string, index: number) => (
+                              <div key={index} className="error-item">
+                                <span className="error-icon">⚠️</span>
+                                <span className="error-text">{error}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 改进建议 */}
+                      {gradingResults.deepseekResults[0].suggestions && 
+                       Array.isArray(gradingResults.deepseekResults[0].suggestions) && 
+                       gradingResults.deepseekResults[0].suggestions.length > 0 && (
+                        <div className="suggestions-section">
+                          <h4>💡 改进建议</h4>
+                          <div className="suggestions-list">
+                            {gradingResults.deepseekResults[0].suggestions.map((suggestion: string, index: number) => (
+                              <div key={index} className="suggestion-item">
+                                <span className="suggestion-icon">💡</span>
+                                <span className="suggestion-text">{suggestion}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : gradingResults.status === 'COMPLETED' || gradingResults.status === 'FAILED' ? (
+                    <div className="error-content">
+                      <div className="error-icon">⚠️</div>
+                      <h4>AI批改失败</h4>
+                      <p>由于作业识别失败，无法进行AI批改。</p>
+                    </div>
+                  ) : (
+                    <div className="empty-content">
+                      <p>🤖 AI批改结果将在此显示</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 全页面底部进度指示器 - 只在处理中显示 */}
+            {gradingResults.progress && gradingResults.progress.percent < 100 && (
+              <div className="bottom-progress-bar">
+                <div className="progress-info">
+                  <span className="progress-text">{gradingResults.progress.message}</span>
+                  <span className="progress-percentage">{gradingResults.progress.percent}%</span>
+                </div>
+                <div className="progress-bar-full">
+                  <div 
+                    className="progress-fill-animated"
+                    style={{ width: `${gradingResults.progress.percent}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
+            
+            <div className="modal-actions">
+              <button 
+                className="btn-secondary"
+                onClick={() => setShowGradingResultModal(false)}
+              >
+                关闭
+              </button>
+              <button 
+                className="btn-primary"
+                onClick={() => {
+                  setShowGradingResultModal(false);
+                  // 可以添加导出或分享功能
+                }}
+              >
+                <span className="btn-icon">📄</span>
+                <span>导出结果</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

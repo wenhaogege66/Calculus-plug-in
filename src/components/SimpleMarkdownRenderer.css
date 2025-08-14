@@ -1,4 +1,4 @@
-/* MarkdownRenderer.css - Markdown渲染组件样式 */
+/* SimpleMarkdownRenderer.css - 简单Markdown渲染组件样式 */
 
 .markdown-renderer {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -6,7 +6,8 @@
   color: #374151;
 }
 
-/* 标题样式 */
+/* 标题样式 - 兼容react-markdown生成的标准HTML */
+.markdown-renderer h1,
 .markdown-renderer .md-h1 {
   font-size: 1.5em;
   font-weight: 700;
@@ -16,6 +17,7 @@
   padding-bottom: 0.3em;
 }
 
+.markdown-renderer h2,
 .markdown-renderer .md-h2 {
   font-size: 1.3em;
   font-weight: 600;
@@ -23,6 +25,7 @@
   margin: 0.8em 0 0.4em 0;
 }
 
+.markdown-renderer h3,
 .markdown-renderer .md-h3 {
   font-size: 1.2em;
   font-weight: 600;
@@ -30,6 +33,7 @@
   margin: 0.6em 0 0.3em 0;
 }
 
+.markdown-renderer h4,
 .markdown-renderer .md-h4 {
   font-size: 1.1em;
   font-weight: 600;
@@ -37,24 +41,29 @@
   margin: 0.5em 0 0.25em 0;
 }
 
-/* 段落样式 */
+/* 段落样式 - 兼容react-markdown */
+.markdown-renderer p,
 .markdown-renderer .md-p {
   margin: 0.8em 0;
   line-height: 1.6;
 }
 
-/* 列表样式 */
+/* 列表样式 - 兼容react-markdown */
+.markdown-renderer ul,
+.markdown-renderer ol,
 .markdown-renderer .md-ul,
 .markdown-renderer .md-ol {
   margin: 0.8em 0;
   padding-left: 1.5em;
 }
 
+.markdown-renderer li,
 .markdown-renderer .md-li {
   margin: 0.3em 0;
 }
 
-/* 代码样式 */
+/* 代码样式 - 兼容react-markdown */
+.markdown-renderer code,
 .markdown-renderer .md-code-inline {
   background: #f3f4f6;
   border: 1px solid #e5e7eb;
@@ -79,7 +88,8 @@
   margin: 1em 0;
 }
 
-/* 引用样式 */
+/* 引用样式 - 兼容react-markdown */
+.markdown-renderer blockquote,
 .markdown-renderer .md-blockquote {
   border-left: 4px solid #3b82f6;
   background: #f0f9ff;
@@ -88,11 +98,13 @@
   border-radius: 0 8px 8px 0;
 }
 
+.markdown-renderer blockquote p,
 .markdown-renderer .md-blockquote p {
   margin: 0.5em 0;
 }
 
-/* 表格样式 */
+/* 表格样式 - 兼容react-markdown */
+.markdown-renderer table,
 .markdown-renderer .md-table {
   border-collapse: collapse;
   width: 100%;
@@ -100,6 +112,8 @@
   font-size: 0.9em;
 }
 
+.markdown-renderer th,
+.markdown-renderer td,
 .markdown-renderer .md-th,
 .markdown-renderer .md-td {
   border: 1px solid #d1d5db;
@@ -107,6 +121,7 @@
   text-align: left;
 }
 
+.markdown-renderer th,
 .markdown-renderer .md-th {
   background: #f9fafb;
   font-weight: 600;
@@ -258,23 +273,28 @@
   color: #e5e7eb;
 }
 
+.main-layout.dark .markdown-renderer h1,
 .main-layout.dark .markdown-renderer .md-h1 {
   color: #f1f5f9;
   border-bottom-color: #374151;
 }
 
+.main-layout.dark .markdown-renderer h2,
 .main-layout.dark .markdown-renderer .md-h2 {
   color: #e5e7eb;
 }
 
+.main-layout.dark .markdown-renderer h3,
 .main-layout.dark .markdown-renderer .md-h3 {
   color: #d1d5db;
 }
 
+.main-layout.dark .markdown-renderer h4,
 .main-layout.dark .markdown-renderer .md-h4 {
   color: #9ca3af;
 }
 
+.main-layout.dark .markdown-renderer code,
 .main-layout.dark .markdown-renderer .md-code-inline {
   background: #374151;
   border-color: #4b5563;
@@ -287,16 +307,20 @@
   color: #e5e7eb;
 }
 
+.main-layout.dark .markdown-renderer blockquote,
 .main-layout.dark .markdown-renderer .md-blockquote {
   background: rgba(59, 130, 246, 0.1);
   border-left-color: #3b82f6;
 }
 
+.main-layout.dark .markdown-renderer th,
 .main-layout.dark .markdown-renderer .md-th {
   background: #374151;
   color: #e5e7eb;
 }
 
+.main-layout.dark .markdown-renderer th,
+.main-layout.dark .markdown-renderer td,
 .main-layout.dark .markdown-renderer .md-th,
 .main-layout.dark .markdown-renderer .md-td {
   border-color: #4b5563;
@@ -329,4 +353,47 @@
 
 .main-layout.dark .markdown-renderer .latex-symbol {
   color: #34d399;
+}
+
+/* 空内容和错误状态样式 */
+.markdown-renderer.empty {
+  text-align: center;
+  padding: 1em;
+  opacity: 0.6;
+}
+
+.empty-placeholder {
+  color: #9ca3af;
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+.markdown-renderer.error {
+  border: 1px solid #fbbf24;
+  background: #fffbeb;
+  border-radius: 6px;
+  padding: 0.5em;
+}
+
+.fallback-content {
+  margin: 0;
+  font-family: inherit;
+  font-size: 0.9em;
+  color: #374151;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* 深色模式下的错误状态 */
+.main-layout.dark .markdown-renderer.error {
+  border-color: #d97706;
+  background: rgba(217, 119, 6, 0.1);
+}
+
+.main-layout.dark .fallback-content {
+  color: #e5e7eb;
+}
+
+.main-layout.dark .empty-placeholder {
+  color: #6b7280;
 }

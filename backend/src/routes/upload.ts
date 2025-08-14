@@ -508,8 +508,9 @@ export async function uploadRoutes(fastify: FastifyInstance) {
         }
       }
 
-      // 从Supabase Storage获取文件
-      const { data, error } = await supabase.storage
+      // 从Supabase Storage获取文件 - 使用admin客户端访问私有bucket
+      const storageClient = supabaseAdmin || supabase;
+      const { data, error } = await storageClient.storage
         .from(STORAGE_BUCKETS.ASSIGNMENTS)
         .download(file.filePath);
 

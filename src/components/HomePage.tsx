@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Storage } from '@plasmohq/storage';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
+import { SimpleMarkdownRenderer } from './SimpleMarkdownRenderer';
 import './HomePage.css';
 
 interface HomePageProps {
@@ -74,6 +75,12 @@ export const HomePage: React.FC<HomePageProps> = ({ authState, isDarkMode, onPag
     unread: 0
   });
   const [dashboardData, setDashboardData] = useState<any>(null);
+  
+  // AI搜索功能状态
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<string[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   const isTeacher = authState.user?.role?.toLowerCase() === 'teacher';
 
@@ -391,6 +398,53 @@ export const HomePage: React.FC<HomePageProps> = ({ authState, isDarkMode, onPag
     }
   };
 
+  // AI智能搜索功能
+  const handleAISearch = async (query: string) => {
+    if (!query.trim() || !authState.token) return;
+    
+    setIsSearching(true);
+    setShowSearchResults(true);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/ai/follow-up`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authState.token}`
+        },
+        body: JSON.stringify({
+          submissionId: 0, // 占位ID，用于智能搜索
+          question: `基于微积分学习，请回答或解释：${query}`
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data?.answer) {
+          // 保持完整的AI回答，不要分割
+          setSearchResults([result.data.answer]);
+        } else {
+          setSearchResults(['AI搜索暂时不可用，请稍后重试']);
+        }
+      } else {
+        setSearchResults(['搜索失败，请稍后重试']);
+      }
+    } catch (error) {
+      console.error('AI搜索出错:', error);
+      setSearchResults(['搜索遇到问题，请检查网络连接']);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // 处理搜索输入
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      handleAISearch(searchQuery.trim());
+    }
+  };
+
   if (loading) {
     return (
       <div className="homepage">
@@ -547,33 +601,63 @@ export const HomePage: React.FC<HomePageProps> = ({ authState, isDarkMode, onPag
             </div>
             <div className="classroom-content">
               {classrooms.length > 0 ? (
-                <div className="classroom-banner">
-                  <div className="classroom-info">
-                    <h3>{classrooms[0].name}</h3>
-                    <p>{classrooms[0].description || '班级描述'}</p>
-                    {classrooms[0].teacher && (
-                      <small>教师: {classrooms[0].teacher.username}</small>
-                    )}
-                  </div>
-                  {classrooms.length > 1 && (
-                    <div className="more-classrooms">
-                      <span>+{classrooms.length - 1} 个其他班级</span>
+                <div className="student-classrooms-grid">
+                  {classrooms.slice(0, 3).map((classroom, index) => (
+                    <div key={classroom.id} className="classroom-card-item compact">
+                      <div className="classroom-card-content">
+                        <h4 className="classroom-name">{classroom.name}</h4>
+                        {classroom.teacher && (
+                          <p className="teacher-name">{classroom.teacher.username}</p>
+                        )}
+                        <div className="classroom-stats">
+                          <span className="stat-text">{(classroom.memberCount || 0) + 1}名同学</span>
+                          <span className="stat-divider">•</span>
+                          <span className="stat-text">{classroom.assignmentCount || 0}个作业</span>
+                        </div>
+                      </div>
+                      <div className="classroom-card-footer">
+                        <button 
+                          className="classroom-enter-btn"
+                          onClick={() => onPageChange?.('classrooms')}
+                        >
+                          进入
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {classrooms.length > 3 && (
+                    <div className="more-classrooms-card">
+                      <div className="more-content">
+                        <div className="more-icon">⭐</div>
+                        <div className="more-text">
+                          <span className="more-count">还有 {classrooms.length - 3} 个班级</span>
+                          <span className="more-hint">点击查看全部</span>
+                        </div>
+                      </div>
+                      <button 
+                        className="view-all-btn"
+                        onClick={() => onPageChange?.('classrooms')}
+                      >
+                        查看全部
+                      </button>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="classroom-banner">
-                  <div className="classroom-info">
-                    <h3>未加入班级</h3>
-                    <p>请联系教师获取邀请码</p>
+                <div className="empty-classroom-state">
+                  <div className="empty-icon">🏫</div>
+                  <div className="empty-content">
+                    <h3>尚未加入班级</h3>
+                    <p>请联系教师获取邀请码，开始您的学习之旅</p>
+                    <button 
+                      className="join-class-btn primary"
+                      onClick={() => onPageChange?.('classrooms')}
+                    >
+                      <span>➕</span>
+                      加入班级
+                    </button>
                   </div>
-                  <button 
-                    className="join-class-btn"
-                    onClick={() => onPageChange?.('classrooms')}
-                  >
-                    <span>➕</span>
-                    加入班级
-                  </button>
                 </div>
               )}
             </div>
@@ -889,115 +973,97 @@ export const HomePage: React.FC<HomePageProps> = ({ authState, isDarkMode, onPag
           </div>
         </div>
 
-        {/* 知识图谱导航 */}
-        <div className="content-card knowledge-graph-card">
-          <div className="card-header">
-            <div className="card-title">
-              <span className="card-icon">🌐</span>
-              知识图谱
-            </div>
-            <button 
-              className="card-action-btn"
-              onClick={() => onPageChange?.('knowledge-graph')}
-            >
-              <span>📊</span>
-              查看完整图谱
-            </button>
-          </div>
-          <div className="knowledge-preview">
-            <div className="knowledge-stats">
-              <div className="knowledge-stat">
-                <div className="stat-circle mastered">
-                  <span className="stat-number">12</span>
-                </div>
-                <span className="stat-label">已掌握</span>
-              </div>
-              <div className="knowledge-stat">
-                <div className="stat-circle learning">
-                  <span className="stat-number">8</span>
-                </div>
-                <span className="stat-label">学习中</span>
-              </div>
-              <div className="knowledge-stat">
-                <div className="stat-circle weak">
-                  <span className="stat-number">3</span>
-                </div>
-                <span className="stat-label">需加强</span>
-              </div>
-            </div>
-            <div className="knowledge-progress-ring">
-              <div className="progress-ring">
-                <svg className="progress-ring-svg" width="120" height="120">
-                  <circle
-                    className="progress-ring-circle-bg"
-                    cx="60"
-                    cy="60"
-                    r="50"
-                    strokeWidth="8"
-                    fill="transparent"
-                    stroke="#e5e7eb"
-                  />
-                  <circle
-                    className="progress-ring-circle"
-                    cx="60"
-                    cy="60"
-                    r="50"
-                    strokeWidth="8"
-                    fill="transparent"
-                    stroke="#10b981"
-                    strokeLinecap="round"
-                    strokeDasharray={`${(12 / 23) * 314} 314`}
-                    strokeDashoffset="78.5"
-                  />
-                </svg>
-                <div className="progress-text">
-                  <span className="progress-percentage">52%</span>
-                  <span className="progress-label">总体掌握度</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="knowledge-actions">
-            <button 
-              className="knowledge-action-btn weak"
-              onClick={() => onPageChange?.('practice')}
-            >
-              🎯 专项练习弱项
-            </button>
-            <button 
-              className="knowledge-action-btn explore"
-              onClick={() => onPageChange?.('knowledge-graph')}
-            >
-              🔍 探索知识关联
-            </button>
-          </div>
-        </div>
 
-        {/* 快速搜索 */}
-        <div className="content-card search-card">
-          <div className="card-header">
-            <div className="card-title">
-              <span className="card-icon">🔍</span>
-              快速搜索
-            </div>
-          </div>
-          <div className="search-content">
-            <div className="search-box">
+        {/* AI智能搜索 - 长条样式 */}
+        <div className="ai-search-bar-container">
+          <form onSubmit={handleSearchSubmit} className="ai-search-form">
+            <div className="ai-search-bar">
               <input
                 type="text"
-                placeholder="搜索作业、题目、知识点..."
-                className="search-input"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="问我任何微积分问题... 我会使用AI为您解答"
+                className="ai-search-input"
+                disabled={isSearching}
               />
-              <button className="search-btn">
-                <span>🔍</span>
+              <button 
+                type="submit" 
+                className={`ai-search-btn ${isSearching ? 'searching' : ''}`}
+                disabled={isSearching || !searchQuery.trim()}
+              >
+                {isSearching ? (
+                  <>
+                    <span className="loading-spinner-small"></span>
+                    AI思考中...
+                  </>
+                ) : (
+                  <>
+                    <span>🚀</span>
+                    AI搜索
+                  </>
+                )}
               </button>
             </div>
-            <div className="search-suggestions">
-              <span className="suggestion-tag">极限计算</span>
-              <span className="suggestion-tag">导数应用</span>
-              <span className="suggestion-tag">积分技巧</span>
+          </form>
+          
+          {/* AI搜索结果 */}
+          {showSearchResults && (
+            <div className="ai-search-results">
+              <div className="search-results-header">
+                <span>🧠 AI助手回答</span>
+                <button 
+                  className="close-results-btn"
+                  onClick={() => setShowSearchResults(false)}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="search-results-content">
+                {searchResults.length > 0 ? (
+                  searchResults.map((result, index) => (
+                    <div key={index} className="search-result-item">
+                      <span className="result-icon">💡</span>
+                      <div className="result-content">
+                        <SimpleMarkdownRenderer 
+                          content={result} 
+                          className="search-result-markdown"
+                          maxLength={2000}
+                        />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="search-result-item">
+                    <span className="result-icon">🔍</span>
+                    <span className="result-text">正在搜索中...</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* 快速建议 */}
+              <div className="quick-suggestions">
+                <span className="suggestions-label">试试这些:</span>
+                <button 
+                  className="suggestion-btn" 
+                  onClick={() => {setSearchQuery('什么是极限？'); handleAISearch('什么是极限？')}}
+                >
+                  什么是极限？
+                </button>
+                <button 
+                  className="suggestion-btn"
+                  onClick={() => {setSearchQuery('导数的几何意义'); handleAISearch('导数的几何意义')}}
+                >
+                  导数的几何意义
+                </button>
+                <button 
+                  className="suggestion-btn"
+                  onClick={() => {setSearchQuery('积分的应用'); handleAISearch('积分的应用')}}
+                >
+                  积分的应用
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

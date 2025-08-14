@@ -212,7 +212,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
         orderBy: { dueDate: 'asc' }
       });
 
-      // 检查学生是否已提交作业
+      // 获取学生的详细提交统计信息
       const submissionCounts = await prisma.submission.groupBy({
         by: ['assignmentId'],
         where: {
@@ -222,9 +222,31 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
         _count: { id: true }
       });
 
+      // 获取最新提交版本信息
+      const latestSubmissions = await prisma.submission.findMany({
+        where: {
+          userId: request.currentUser!.id,
+          assignmentId: { in: assignments.map(a => a.id) }
+        },
+        select: {
+          assignmentId: true,
+          metadata: true,
+          submittedAt: true
+        },
+        orderBy: { submittedAt: 'desc' }
+      });
+
       const submissionMap = new Map(
-        submissionCounts.map(s => [s.assignmentId, s._count.id > 0])
+        submissionCounts.map(s => [s.assignmentId, s._count.id])
       );
+
+      const versionMap = new Map();
+      for (const submission of latestSubmissions) {
+        if (!versionMap.has(submission.assignmentId)) {
+          const metadata = submission.metadata as any;
+          versionMap.set(submission.assignmentId, metadata?.version || 1);
+        }
+      }
 
       reply.send({
         success: true,
@@ -238,8 +260,10 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
           questionFile: assignment.questionFile,
           startDate: assignment.startDate,
           dueDate: assignment.dueDate,
-          isSubmitted: submissionMap.get(assignment.id) || false,
-          isOverdue: new Date() > assignment.dueDate
+          isSubmitted: (submissionMap.get(assignment.id) || 0) > 0,
+          isOverdue: new Date() > assignment.dueDate,
+          submissionCount: submissionMap.get(assignment.id) || 0,
+          latestSubmissionVersion: versionMap.get(assignment.id) || 1
         }))
       });
     } catch (error) {
@@ -312,6 +336,189 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
     } catch (error) {
       console.error('获取班级作业列表失败:', error);
       reply.code(500).send({ success: false, error: '获取作业列表失败' });
+    }
+  });
+
+  // 更新作业信息
+  fastify.put('/assignments/:id', {
+    preHandler: async (request, reply) => {
+      await requireAuth(request, reply);
+      if (request.currentUser!.role.toLowerCase() !== 'teacher') {
+        reply.code(403).send({ success: false, error: '只有教师可以更新作业' });
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const assignmentId = parseInt(id);
+      
+      const updateData = request.body as {
+        title?: string;
+        description?: string;
+        classroomId?: number;
+        fileUploadId?: number;
+        startDate?: string;
+        dueDate?: string;
+        isActive?: boolean;
+      };
+
+      // 验证作业是否存在且属于当前教师
+      const existingAssignment = await prisma.assignment.findFirst({
+        where: {
+          id: assignmentId,
+          teacherId: request.currentUser!.id
+        }
+      });
+
+      if (!existingAssignment) {
+        return reply.code(404).send({ success: false, error: '作业不存在或无权限' });
+      }
+
+      // 构建更新数据
+      const updatePayload: any = {};
+      
+      if (updateData.title !== undefined) {
+        if (!updateData.title || updateData.title.trim().length === 0) {
+          return reply.code(400).send({ success: false, error: '作业标题不能为空' });
+        }
+        updatePayload.title = updateData.title.trim();
+      }
+      
+      if (updateData.description !== undefined) {
+        updatePayload.description = updateData.description?.trim() || null;
+      }
+      
+      if (updateData.classroomId !== undefined) {
+        // 验证教师是否拥有该班级
+        const classroom = await prisma.classroom.findFirst({
+          where: {
+            id: updateData.classroomId,
+            teacherId: request.currentUser!.id,
+            isActive: true
+          }
+        });
+        
+        if (!classroom) {
+          return reply.code(404).send({ success: false, error: '班级不存在或无权限' });
+        }
+        
+        updatePayload.classroomId = updateData.classroomId;
+      }
+      
+      if (updateData.fileUploadId !== undefined) {
+        updatePayload.fileUploadId = updateData.fileUploadId || null;
+      }
+      
+      if (updateData.startDate !== undefined) {
+        updatePayload.startDate = new Date(updateData.startDate);
+      }
+      
+      if (updateData.dueDate !== undefined) {
+        updatePayload.dueDate = new Date(updateData.dueDate);
+        
+        // 如果只更新了dueDate，验证时间关系
+        const startDate = updatePayload.startDate || existingAssignment.startDate;
+        if (startDate >= updatePayload.dueDate) {
+          return reply.code(400).send({ success: false, error: '开始时间必须早于截止时间' });
+        }
+      }
+      
+      if (updateData.isActive !== undefined) {
+        updatePayload.isActive = updateData.isActive;
+      }
+
+      // 更新作业
+      const updatedAssignment = await prisma.assignment.update({
+        where: { id: assignmentId },
+        data: updatePayload,
+        include: {
+          classroom: { select: { id: true, name: true } },
+          questionFile: {
+            select: {
+              id: true,
+              filename: true,
+              originalName: true
+            }
+          }
+        }
+      });
+
+      reply.send({
+        success: true,
+        data: {
+          id: updatedAssignment.id,
+          title: updatedAssignment.title,
+          description: updatedAssignment.description,
+          classroom: updatedAssignment.classroom,
+          questionFile: updatedAssignment.questionFile,
+          startDate: updatedAssignment.startDate,
+          dueDate: updatedAssignment.dueDate,
+          isActive: updatedAssignment.isActive,
+          updatedAt: updatedAssignment.updatedAt
+        }
+      });
+      
+    } catch (error) {
+      console.error('更新作业失败:', error);
+      reply.code(500).send({ success: false, error: '更新作业失败' });
+    }
+  });
+
+  // 切换作业状态（开启/结束）
+  fastify.patch('/assignments/:id/toggle', {
+    preHandler: async (request, reply) => {
+      await requireAuth(request, reply);
+      if (request.currentUser!.role.toLowerCase() !== 'teacher') {
+        reply.code(403).send({ success: false, error: '只有教师可以切换作业状态' });
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const assignmentId = parseInt(id);
+      const { isActive } = request.body as { isActive: boolean };
+
+      // 验证作业是否存在且属于当前教师
+      const existingAssignment = await prisma.assignment.findFirst({
+        where: {
+          id: assignmentId,
+          teacherId: request.currentUser!.id
+        }
+      });
+
+      if (!existingAssignment) {
+        return reply.code(404).send({ success: false, error: '作业不存在或无权限' });
+      }
+
+      // 切换状态
+      const updatedAssignment = await prisma.assignment.update({
+        where: { id: assignmentId },
+        data: { isActive: isActive },
+        include: {
+          classroom: { select: { id: true, name: true } },
+          questionFile: {
+            select: {
+              id: true,
+              filename: true,
+              originalName: true
+            }
+          }
+        }
+      });
+
+      reply.send({
+        success: true,
+        data: {
+          id: updatedAssignment.id,
+          title: updatedAssignment.title,
+          isActive: updatedAssignment.isActive,
+          message: `作业已${isActive ? '开启' : '结束'}`
+        }
+      });
+      
+    } catch (error) {
+      console.error('切换作业状态失败:', error);
+      reply.code(500).send({ success: false, error: '切换作业状态失败' });
     }
   });
 };

@@ -173,19 +173,36 @@ export async function aiRoutes(fastify: FastifyInstance) {
     return await processAIGrading(request, reply, fastify);
   });
 
-  // 进一步提问功能
+  // 进一步提问功能 + 通用AI搜索
   fastify.post('/ai/follow-up', { preHandler: requireAuth }, async (request, reply) => {
     try {
       const { submissionId, question } = request.body as any;
       
-      if (!submissionId || !question || question.trim().length === 0) {
+      if (!question || question.trim().length === 0) {
         return reply.code(400).send({
           success: false,
-          error: '缺少提交ID或问题内容'
+          error: '缺少问题内容'
         });
       }
 
-      // 获取提交记录及相关数据
+      // 支持通用AI搜索（submissionId为0或null）
+      if (!submissionId || submissionId === 0) {
+        // 通用AI搜索模式
+        const generalPrompt = buildGeneralSearchPrompt(question.trim());
+        const response = await callDeepseekFollowUpAPI(generalPrompt);
+
+        return {
+          success: true,
+          data: {
+            question: question.trim(),
+            answer: response.answer,
+            timestamp: new Date(),
+            mode: 'general_search'
+          }
+        };
+      }
+
+      // 基于提交记录的进一步提问模式
       const submission = await prisma.submission.findFirst({
         where: {
           id: submissionId,
@@ -249,7 +266,8 @@ export async function aiRoutes(fastify: FastifyInstance) {
         data: {
           question: question.trim(),
           answer: response.answer,
-          timestamp: new Date()
+          timestamp: new Date(),
+          mode: 'submission_based'
         }
       };
 
@@ -560,6 +578,58 @@ function getJsonFormatSection(): string {
     "练习更复杂的复合函数求导"
   ]
 }
+`;
+}
+
+// 构建通用AI搜索的prompt
+function buildGeneralSearchPrompt(userQuestion: string): string {
+  // 检测用户问题的类型
+  const casualGreetings = ['你好', '您好', 'hello', 'hi', '嗨', '谢谢', '感谢', '再见', 'bye'];
+  const isSimpleCasualMessage = casualGreetings.some(greeting => 
+    userQuestion.toLowerCase().trim().includes(greeting.toLowerCase())
+  ) && userQuestion.trim().length <= 10;
+
+  // 检测是否包含数学相关词汇
+  const mathKeywords = ['公式', '定理', '微积分', '极限', '导数', '积分', '函数', '求导', '计算', '解法', '方法', '为什么', '怎么', '如何'];
+  const isMathRelated = mathKeywords.some(keyword => userQuestion.includes(keyword));
+
+  // 如果是简单的问候或感谢，不需要大量上下文
+  if (isSimpleCasualMessage && !isMathRelated) {
+    return `
+你是一位友善的微积分教师，学生向你说了："${userQuestion}"
+
+请给出自然、友善的回应，保持简短和亲切。如果学生需要数学帮助，可以鼓励他们具体提问。
+
+要求：
+1. 回应要自然、亲切
+2. 不要主动解释数学问题
+3. 保持简短，1-2句话即可`;
+  }
+
+  // 对于数学相关问题，提供专业的微积分教学指导
+  return `
+你是一位资深的微积分教师和AI学习助手，学生向你提出了以下问题：
+
+学生的问题：
+${userQuestion}
+
+请基于微积分教学知识为学生提供准确、详细、易懂的回答。要求：
+
+1. 回答要准确、清晰、有针对性
+2. 如果涉及数学概念，请结合具体的公式和例子进行解释
+3. 如果是计算问题，请给出详细的解题步骤
+4. 语言要通俗易懂，适合学生理解
+5. 可以适当拓展相关知识点，但不要偏离主题
+6. 如果问题不明确，可以要求学生提供更多信息
+
+知识范围包括但不限于：
+- 函数与极限：极限的概念、计算、连续性
+- 导数：导数定义、求导法则、导数应用
+- 积分：不定积分、定积分、积分应用
+- 微分方程：一阶微分方程、高阶线性微分方程
+- 多元函数：偏导数、多重积分、场论初步
+
+请直接回答问题，不需要特殊格式。
 `;
 }
 

@@ -7,6 +7,7 @@
 ### 前端技术栈
 - **Chrome插件**: Plasmo框架 + React 18 + TypeScript
 - **UI组件**: 科技风设计 + 夜间模式 + 响应式布局
+- **Markdown渲染**: react-markdown + remark-math + rehype-katex (支持复杂LaTeX公式)
 - **状态管理**: React Hooks + Chrome Storage API
 - **认证方式**: GitHub OAuth 2.0
 - **构建工具**: Plasmo内置构建系统
@@ -163,10 +164,11 @@ Calculus/
 │       ├── MainLayout.tsx          # 主布局组件 (导航+内容区域)
 │       ├── Navigation.tsx          # 侧边栏导航 (角色自适应)
 │       ├── CompactPopup.tsx        # 紧凑型popup界面
-│       ├── HomePage.tsx            # 首页仪表板 (角色自适应)
+│       ├── HomePage.tsx            # 首页仪表板 (角色自适应+AI搜索)
 │       ├── AssignmentsPage.tsx     # 作业页面 (创建/管理/提交)
 │       ├── ClassroomsPage.tsx      # 班级页面 (创建/管理/加入)
-│       ├── PracticePage.tsx        # 练习页面 (学生自主练习)
+│       ├── PracticePage.tsx        # 练习页面 (学生自主练习+水平布局)
+│       ├── SimpleMarkdownRenderer.tsx # LaTeX数学公式渲染器
 │       ├── *.css                   # 对应组件样式文件
 │       └── [未来扩展组件...]
 ├── backend/                  # Fastify后端服务
@@ -420,11 +422,16 @@ npm run db:studio     # 打开Prisma Studio
 ## 🔄 版本历史
 
 - **v1.0.0**: 基础功能完成，支持文件上传和AI批改
-- **v1.1.0**: 添加GitHub OAuth登录和用户管理
+- **v1.1.0**: 添加GitHub OAuth登录和用户管理  
 - **v1.2.0**: 重构为Prisma ORM架构，支持类型安全的数据库操作
 - **v1.3.0**: 新增多模式学习系统，支持刷题模式和作业模式
 - **v1.4.0**: 实现角色动态切换，添加教师功能模块
 - **v1.5.0**: 优化登录状态持久化，提升用户体验
+- **v1.6.0**: 重大更新
+  - 🔧 **首页搜索增强**: 修复AI搜索结果显示，支持完整markdown格式化内容
+  - 🎨 **练习页面优化**: 操作按钮从垂直排列改为水平排列，提升界面美观度
+  - ⚡ **Markdown渲染器重构**: 使用react-markdown替代正则表达式，支持复杂LaTeX数学公式
+  - 📦 **依赖管理**: 添加react-markdown生态支持，修复构建兼容性问题
 
 ## 🧪 开发建议
 

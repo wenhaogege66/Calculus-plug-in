@@ -14,6 +14,7 @@ AI微积分助教 (AI Calculus Assistant) - A Chrome extension built with Plasmo
 - **Authentication**: GitHub OAuth via Supabase
 - **State Management**: React Hooks + Chrome Storage API
 - **UI Design**: Modern tech-styled interface with dark mode support and responsive design
+- **Markdown & LaTeX Rendering**: react-markdown + remark-math + rehype-katex for professional mathematical content display
 - **Architecture**: Component-based modular design with page routing and role-based UI
 - **Entry Points**: 
   - `popup.tsx` - Main popup interface (compact mode)
@@ -133,10 +134,13 @@ Note: Storage endpoints are handled automatically by Supabase client - no additi
 - `src/components/CompactPopup.tsx` - Compact popup interface for quick access
 
 **Page Components:**
-- `src/components/HomePage.tsx` - Role-specific dashboard with widgets, stats, and quick actions
+- `src/components/HomePage.tsx` - Role-specific dashboard with widgets, stats, and AI-powered search with markdown rendering
 - `src/components/AssignmentsPage.tsx` - Full-featured assignment management with filtering, creation, and submission
 - `src/components/ClassroomsPage.tsx` - Classroom management, member administration, and invite system
-- `src/components/PracticePage.tsx` - Self-practice mode with file upload and AI grading
+- `src/components/PracticePage.tsx` - Self-practice mode with file upload, AI grading, and horizontal layout for operation buttons
+
+**Utility Components:**
+- `src/components/SimpleMarkdownRenderer.tsx` - Professional LaTeX and markdown renderer using react-markdown + KaTeX
 
 **Authentication:**
 - `src/components/AuthSection.tsx` - GitHub OAuth authentication flow
@@ -356,12 +360,32 @@ supabase-storage/
 └── embeddings/         # Vector representations (if stored)
 ```
 
+## Recent Updates (Version 1.1.0)
+
+**🔧 Bug Fixes & Improvements:**
+1. **Homepage Search Enhancement** - Fixed display of AI search results from raw JSON to properly formatted markdown content with LaTeX support
+2. **Practice Page Layout Fix** - Changed three operation buttons (difficulty, add to error book, delete) from vertical stacking to horizontal alignment for better UX
+3. **Markdown Renderer Overhaul** - Replaced fragile regex-based SimpleMarkdownRenderer with industry-standard react-markdown + remark-math + rehype-katex stack
+
+**📦 Dependencies Added:**
+- `react-markdown@^9.1.0` - Standard markdown rendering
+- `remark-math@^5.1.1` - Math syntax support in markdown
+- `rehype-katex@^6.0.3` - LaTeX rendering via KaTeX
+- `vfile@^5.3.7` - Version override to fix build compatibility issues
+
+**💡 Technical Highlights:**
+- Full LaTeX support for complex mathematical expressions (matrices, integrals, limits, piecewise functions)
+- Improved CSS compatibility with both legacy and new markdown HTML structures
+- Enhanced search experience with complete AI responses instead of fragmented suggestions
+- Better responsive design for practice interface with horizontal button layout
+
 ## Key Constraints
 
-- Uses pnpm workspace configuration
+- Uses pnpm workspace configuration with overrides for build compatibility
 - Supabase for authentication and file storage
-- MyScript API for handwriting OCR recognition
+- MathPix API for mathematical OCR recognition (not MyScript)
 - No test files should be committed - delete after testing
 - Follow existing TypeScript and React patterns
 - Maintain Prisma migration history
 - Consider network connectivity issues for Supabase (timeout handling, retry mechanisms)
+- LaTeX rendering requires compatible markdown packages (see dependencies above)
