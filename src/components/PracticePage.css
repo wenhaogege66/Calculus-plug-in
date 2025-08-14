@@ -5,7 +5,16 @@
   max-width: 1200px;
   margin: 0 auto;
   min-height: calc(100vh - 60px);
+  transition: all 0.3s ease;
+}
+
+/* 主题支持 */
+.main-layout.light .practice-page {
   background: #fafbfc;
+}
+
+.main-layout.dark .practice-page {
+  background: #0f172a;
 }
 
 /* 页面头部 */
@@ -32,9 +41,17 @@
 
 .page-header p {
   font-size: 16px;
-  color: #64748b;
   margin: 0;
   opacity: 0.9;
+  transition: color 0.3s ease;
+}
+
+.main-layout.light .page-header p {
+  color: #64748b;
+}
+
+.main-layout.dark .page-header p {
+  color: #94a3b8;
 }
 
 /* 消息提示 */
@@ -62,32 +79,72 @@
 }
 
 .message-success {
+  transition: all 0.3s ease;
+}
+
+.main-layout.light .message-success {
   background: #d1fae5;
   border: 1px solid #10b981;
   color: #065f46;
 }
 
+.main-layout.dark .message-success {
+  background: #064e3b;
+  border: 1px solid #10b981;
+  color: #a7f3d0;
+}
+
 .message-error {
+  transition: all 0.3s ease;
+}
+
+.main-layout.light .message-error {
   background: #fee2e2;
   border: 1px solid #ef4444;
   color: #991b1b;
 }
 
+.main-layout.dark .message-error {
+  background: #7f1d1d;
+  border: 1px solid #ef4444;
+  color: #fca5a5;
+}
+
 .message-info {
+  transition: all 0.3s ease;
+}
+
+.main-layout.light .message-info {
   background: #dbeafe;
   border: 1px solid #3b82f6;
   color: #1e40af;
 }
 
+.main-layout.dark .message-info {
+  background: #1e3a8a;
+  border: 1px solid #3b82f6;
+  color: #93c5fd;
+}
+
 /* 标签页导航 */
 .practice-tabs {
   display: flex;
-  background: white;
   border-radius: 12px;
   padding: 4px;
   margin-bottom: 24px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.main-layout.light .practice-tabs {
+  background: white;
   border: 1px solid #e5e7eb;
+}
+
+.main-layout.dark .practice-tabs {
+  background: #1e293b;
+  border: 1px solid #374151;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .tab {
@@ -95,7 +152,6 @@
   padding: 12px 16px;
   border: none;
   background: transparent;
-  color: #64748b;
   font-size: 14px;
   font-weight: 500;
   border-radius: 8px;
@@ -107,9 +163,22 @@
   gap: 8px;
 }
 
-.tab:hover {
+.main-layout.light .tab {
+  color: #64748b;
+}
+
+.main-layout.dark .tab {
+  color: #94a3b8;
+}
+
+.main-layout.light .tab:hover {
   background: #f1f5f9;
   color: #475569;
+}
+
+.main-layout.dark .tab:hover {
+  background: #374151;
+  color: #e2e8f0;
 }
 
 .tab.active {
@@ -120,17 +189,26 @@
 
 /* 标签页内容 */
 .tab-content {
-  background: white;
   border-radius: 16px;
   padding: 32px;
+  min-height: 500px;
+  transition: all 0.3s ease;
+}
+
+.main-layout.light .tab-content {
+  background: white;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   border: 1px solid #e5e7eb;
-  min-height: 500px;
+}
+
+.main-layout.dark .tab-content {
+  background: #1e293b;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border: 1px solid #374151;
 }
 
 /* 上传区域 */
 .upload-area {
-  border: 2px dashed #cbd5e1;
   border-radius: 16px;
   padding: 48px 32px;
   text-align: center;
@@ -140,6 +218,14 @@
   position: relative;
   overflow: hidden;
   margin-bottom: 32px;
+}
+
+.main-layout.light .upload-area {
+  border: 2px dashed #cbd5e1;
+}
+
+.main-layout.dark .upload-area {
+  border: 2px dashed #4b5563;
 }
 
 .upload-area::before {

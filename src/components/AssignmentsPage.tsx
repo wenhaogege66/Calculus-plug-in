@@ -1036,13 +1036,25 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                       </button>
                     )}
                     {assignment.isSubmitted && (
-                      <button 
-                        className="btn-secondary small"
-                        onClick={() => handleShowGradingResult(assignment)}
-                      >
-                        <span className="btn-icon">👀</span>
-                        <span>查看结果</span>
-                      </button>
+                      <>
+                        <button 
+                          className="btn-secondary small"
+                          onClick={() => handleShowGradingResult(assignment)}
+                        >
+                          <span className="btn-icon">👀</span>
+                          <span>查看结果</span>
+                        </button>
+                        {!assignment.isOverdue && (
+                          <button 
+                            className="btn-primary small"
+                            onClick={() => handleResubmitAssignment(assignment)}
+                            title="重新提交作业"
+                          >
+                            <span className="btn-icon">🔄</span>
+                            <span>重新提交</span>
+                          </button>
+                        )}
+                      </>
                     )}
                     <button 
                       className="btn-secondary small"

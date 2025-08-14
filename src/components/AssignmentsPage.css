@@ -5,7 +5,15 @@
   max-width: 1200px;
   margin: 0 auto;
   min-height: calc(100vh - 60px);
+  transition: background 0.3s ease;
+}
+
+.main-layout.light .assignments-page {
   background: #fafbfc;
+}
+
+.main-layout.dark .assignments-page {
+  background: #0f172a;
 }
 
 /* 页面头部 */
@@ -30,9 +38,17 @@
 
 .page-description {
   font-size: 16px;
-  color: #6b7280;
   margin: 0;
   line-height: 1.5;
+  transition: color 0.3s ease;
+}
+
+.main-layout.light .page-description {
+  color: #6b7280;
+}
+
+.main-layout.dark .page-description {
+  color: #9ca3af;
 }
 
 .header-actions {
@@ -341,13 +357,22 @@
 
 /* 作业卡片 */
 .assignment-card {
-  background: #ffffff;
   border: 2px solid #e5e7eb;
   border-radius: 16px;
   padding: 24px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
+}
+
+.main-layout.light .assignment-card {
+  background: #ffffff;
+  border-color: #e5e7eb;
+}
+
+.main-layout.dark .assignment-card {
+  background: #1e293b;
+  border-color: #374151;
 }
 
 .assignment-card::before {

@@ -6,6 +6,7 @@ import { HomePage } from '../components/HomePage';
 import { AuthSection } from '../components/AuthSection';
 
 import '../popup.css';
+import '../components/MainLayout.css';
 
 const storage = new Storage();
 
@@ -22,6 +23,25 @@ function FullApp() {
     progress: 0,
     message: ''
   });
+
+  // 添加主题状态管理
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // 初始化主题
+  useEffect(() => {
+    const initTheme = async () => {
+      try {
+        const savedTheme = await storage.get('darkMode');
+        if (savedTheme !== undefined) {
+          setIsDarkMode(savedTheme);
+        }
+      } catch (error) {
+        console.error('读取主题设置失败:', error);
+      }
+    };
+    
+    initTheme();
+  }, []);
 
   // 获取URL hash来确定初始页面
   const [initialPage, setInitialPage] = useState('home');
@@ -204,10 +224,12 @@ function FullApp() {
   // 加载状态
   if (authState.loading) {
     return (
-      <div className="fullapp-container">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>正在加载...</p>
+      <div className={`main-layout ${isDarkMode ? 'dark' : 'light'}`}>
+        <div className="fullapp-container">
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p>正在加载...</p>
+          </div>
         </div>
       </div>
     );
@@ -216,31 +238,33 @@ function FullApp() {
   // 未认证状态 - 显示登录界面
   if (!authState.isAuthenticated) {
     return (
-      <div className="fullapp-container auth-container">
-        <div className="auth-header">
-          <div className="logo-section">
-            <div className="logo-icon">🔬</div>
-            <div className="logo-content">
-              <h1 className="app-title">AI微积分助教</h1>
-              <p className="app-subtitle">智能学习助手</p>
+      <div className={`main-layout ${isDarkMode ? 'dark' : 'light'}`}>
+        <div className="fullapp-container auth-container">
+          <div className="auth-header">
+            <div className="logo-section">
+              <div className="logo-icon">🔬</div>
+              <div className="logo-content">
+                <h1 className="app-title">AI微积分助教</h1>
+                <p className="app-subtitle">智能学习助手</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="auth-content">
-          <AuthSection
-            authState={authState}
-            uploadStatus={uploadStatus}
-            onGitHubLogin={handleGitHubLogin}
-            onLogout={handleLogout}
-          />
-        </div>
+          <div className="auth-content">
+            <AuthSection
+              authState={authState}
+              uploadStatus={uploadStatus}
+              onGitHubLogin={handleGitHubLogin}
+              onLogout={handleLogout}
+            />
+          </div>
 
-        <div className="auth-footer">
-          <div className="version-info">
-            <span>版本 2.0.0</span>
-            <span>•</span>
-            <span>Powered by MathPix</span>
+          <div className="auth-footer">
+            <div className="version-info">
+              <span>版本 2.0.0</span>
+              <span>•</span>
+              <span>Powered by MathPix</span>
+            </div>
           </div>
         </div>
       </div>
@@ -249,18 +273,16 @@ function FullApp() {
 
   // 已认证状态 - 显示主应用界面
   return (
-    <div className="fullapp-container main-app">
-      <MainLayout 
-        authState={authState} 
-        onLogout={handleLogout}
-        initialPage={initialPage}
-      >
-        <HomePage 
-          authState={authState}
-          isDarkMode={false} // 这将由MainLayout管理
-        />
-      </MainLayout>
-    </div>
+    <MainLayout 
+      authState={authState} 
+      onLogout={handleLogout}
+      initialPage={initialPage}
+    >
+      <HomePage 
+        authState={authState}
+        isDarkMode={isDarkMode} // 传递主题状态
+      />
+    </MainLayout>
   );
 }
 

@@ -294,6 +294,130 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
   });
+
+  // 重新提交作业 (需要认证) - 学生专用
+  fastify.post('/submissions/:submissionId/resubmit', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const submissionId = parseInt((request.params as any).submissionId);
+      const { fileUploadId, note } = request.body as any;
+      
+      if (!submissionId || !fileUploadId) {
+        return reply.code(400).send({
+          success: false,
+          error: '缺少提交ID或文件ID'
+        });
+      }
+
+      // 获取原始提交记录，确保用户有权限
+      const originalSubmission = await prisma.submission.findFirst({
+        where: {
+          id: submissionId,
+          userId: request.currentUser!.id
+        }
+      });
+
+      if (!originalSubmission) {
+        return reply.code(404).send({
+          success: false,
+          error: '原始提交记录不存在或无权限'
+        });
+      }
+
+      // 如果是作业模式，验证作业是否仍然可以提交（未过期）
+      if (originalSubmission.workMode === 'homework' && originalSubmission.assignmentId) {
+        const assignment = await prisma.assignment.findFirst({
+          where: {
+            id: originalSubmission.assignmentId,
+            isActive: true,
+            dueDate: { gte: new Date() } // 检查是否还在截止日期前
+          }
+        });
+        
+        if (!assignment) {
+          return reply.code(400).send({
+            success: false,
+            error: '作业已过期或不存在，无法重新提交'
+          });
+        }
+      }
+
+      // 验证新文件是否属于当前用户
+      const fileUpload = await prisma.fileUpload.findFirst({
+        where: {
+          id: fileUploadId,
+          userId: request.currentUser!.id
+        }
+      });
+
+      if (!fileUpload) {
+        return reply.code(404).send({
+          success: false,
+          error: '文件不存在或无权限'
+        });
+      }
+
+      // 获取当前最高版本号
+      const existingSubmissions = await prisma.submission.findMany({
+        where: {
+          userId: request.currentUser!.id,
+          assignmentId: originalSubmission.assignmentId,
+          workMode: originalSubmission.workMode
+        },
+        select: { metadata: true }
+      });
+
+      let maxVersion = 1;
+      for (const sub of existingSubmissions) {
+        const metadata = sub.metadata as any;
+        const version = metadata?.version || 1;
+        if (version > maxVersion) {
+          maxVersion = version;
+        }
+      }
+      const newVersion = maxVersion + 1;
+
+      // 创建新的提交记录（重新提交）
+      const newSubmission = await prisma.submission.create({
+        data: {
+          userId: request.currentUser!.id,
+          fileUploadId: fileUploadId,
+          assignmentId: originalSubmission.assignmentId,
+          workMode: originalSubmission.workMode,
+          status: 'UPLOADED',
+          metadata: {
+            note: note || null,
+            version: newVersion,
+            isResubmission: true,
+            originalSubmissionId: submissionId,
+            resubmittedAt: new Date().toISOString()
+          }
+        }
+      });
+
+      // 启动批改流程
+      const userRole = request.currentUser!.role?.toLowerCase();
+      if (userRole === 'student') {
+        startGradingProcess(newSubmission.id, fastify).catch(error => {
+          fastify.log.error(`重新提交的自动批改流程启动失败 - 提交ID: ${newSubmission.id}`, error);
+        });
+      }
+
+      return {
+        success: true,
+        data: {
+          submissionId: newSubmission.id,
+          version: newVersion,
+          message: `成功重新提交，这是第${newVersion}版`
+        }
+      };
+    } catch (error) {
+      fastify.log.error('重新提交失败:', error);
+      return reply.code(500).send({
+        success: false,
+        error: '重新提交失败'
+      });
+    }
+  });
 };
 
 // 自动化批改流程 - 使用统一的处理服务

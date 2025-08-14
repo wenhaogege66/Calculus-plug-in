@@ -5,7 +5,15 @@
   max-width: 1400px;
   margin: 0 auto;
   min-height: calc(100vh - 60px);
+  transition: background 0.3s ease;
+}
+
+.main-layout.light .mistakes-page {
   background: #fafbfc;
+}
+
+.main-layout.dark .mistakes-page {
+  background: #0f172a;
 }
 
 /* 页面头部 */
@@ -30,8 +38,16 @@
 
 .header-content p {
   font-size: 16px;
-  color: #6b7280;
   margin: 0;
+  transition: color 0.3s ease;
+}
+
+.main-layout.light .header-content p {
+  color: #6b7280;
+}
+
+.main-layout.dark .header-content p {
+  color: #9ca3af;
 }
 
 .header-actions {
@@ -45,9 +61,23 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
+  border: 1px solid #d1d5db;
+  transition: all 0.3s ease;
+}
+
+.main-layout.light .btn-secondary {
   background: white;
   color: #374151;
-  border: 1px solid #d1d5db;
+  border-color: #d1d5db;
+}
+
+.main-layout.dark .btn-secondary {
+  background: #374151;
+  color: #f1f5f9;
+  border-color: #4b5563;
+}
+
+.btn-secondary {
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
@@ -55,9 +85,14 @@
   transition: all 0.2s ease;
 }
 
-.btn-secondary:hover {
+.main-layout.light .btn-secondary:hover {
   background: #f9fafb;
   border-color: #9ca3af;
+}
+
+.main-layout.dark .btn-secondary:hover {
+  background: #4b5563;
+  border-color: #6b7280;
 }
 
 .view-mode-toggle {
@@ -69,11 +104,19 @@
 
 .mode-btn {
   padding: 8px 12px;
-  background: white;
   border: none;
   font-size: 16px;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.main-layout.light .mode-btn {
+  background: white;
+}
+
+.main-layout.dark .mode-btn {
+  background: #374151;
+  color: #f1f5f9;
 }
 
 .mode-btn.active {
@@ -81,8 +124,12 @@
   color: white;
 }
 
-.mode-btn:not(.active):hover {
+.main-layout.light .mode-btn:not(.active):hover {
   background: #f3f4f6;
+}
+
+.main-layout.dark .mode-btn:not(.active):hover {
+  background: #4b5563;
 }
 
 /* 错误消息 */
@@ -107,9 +154,20 @@
 
 /* 侧边栏 */
 .sidebar {
-  background: white;
   border-radius: 12px;
   padding: 24px;
+  transition: all 0.3s ease;
+}
+
+.main-layout.light .sidebar {
+  background: white;
+}
+
+.main-layout.dark .sidebar {
+  background: #1e293b;
+}
+
+.sidebar {
   height: fit-content;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
@@ -218,9 +276,20 @@
 
 /* 主内容区域 */
 .main-content {
-  background: white;
   border-radius: 12px;
   padding: 24px;
+  transition: all 0.3s ease;
+}
+
+.main-layout.light .main-content {
+  background: white;
+}
+
+.main-layout.dark .main-content {
+  background: #1e293b;
+}
+
+.main-content {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -471,9 +540,20 @@
 }
 
 .modal-content {
-  background: white;
   border-radius: 12px;
   padding: 0;
+  transition: all 0.3s ease;
+}
+
+.main-layout.light .modal-content {
+  background: white;
+}
+
+.main-layout.dark .modal-content {
+  background: #1e293b;
+}
+
+.modal-content {
   width: 90%;
   max-width: 400px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
