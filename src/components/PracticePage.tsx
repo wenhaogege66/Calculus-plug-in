@@ -63,6 +63,16 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
         const result = await response.json();
         if (result.success) {
           setPracticeHistory(result.data || []);
+        } else {
+          showMessage(result.error || '获取练习记录失败', 'error');
+        }
+      } else {
+        // 尝试解析错误响应
+        try {
+          const errorResult = await response.json();
+          showMessage(errorResult.error || `HTTP ${response.status}: 获取练习记录失败`, 'error');
+        } catch {
+          showMessage(`HTTP ${response.status}: 获取练习记录失败`, 'error');
         }
       }
     } catch (error) {

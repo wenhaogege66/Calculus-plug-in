@@ -192,7 +192,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
                 select: { id: true, username: true }
               },
               _count: {
-                select: { assignments: true }
+                select: { assignments: true, members: true }
               }
             }
           }
@@ -208,6 +208,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
           description: membership.classroom.description,
           teacher: membership.classroom.teacher,
           assignmentCount: membership.classroom._count.assignments,
+          memberCount: membership.classroom._count.members,
           joinedAt: membership.joinedAt
         }))
       });

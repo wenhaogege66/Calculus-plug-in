@@ -112,7 +112,13 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
           setError(result.error || '获取练习详情失败');
         }
       } else {
-        setError('获取练习详情失败');
+        // 尝试解析错误响应
+        try {
+          const errorResult = await response.json();
+          setError(errorResult.error || `HTTP ${response.status}: 获取练习详情失败`);
+        } catch {
+          setError(`HTTP ${response.status}: 获取练习详情失败`);
+        }
       }
     } catch (err) {
       console.error('加载练习详情失败:', err);
@@ -602,7 +608,7 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                 </div>
                 <div className="recognized-text">
                   <SimpleMarkdownRenderer 
-                    content={session.ocrResult.recognizedText} 
+                    content={session.ocrResult?.recognizedText || ''} 
                     className="ocr-content"
                   />
                 </div>
@@ -683,7 +689,7 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                   </div>
                   <div className="feedback-content-wrapper">
                     <SimpleMarkdownRenderer 
-                      content={session.gradingResult.feedback} 
+                      content={session.gradingResult?.feedback || ''} 
                       className="feedback-content enhanced"
                     />
                   </div>
@@ -777,7 +783,7 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                           
                           <div className="question-content">
                             <SimpleMarkdownRenderer 
-                              content={question.content} 
+                              content={question.content || ''} 
                               className="question-text"
                             />
                           </div>
@@ -815,7 +821,7 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                             <div className="standard-answer">
                               <h6>📚 标准答案：</h6>
                               <SimpleMarkdownRenderer 
-                                content={question.standardAnswer} 
+                                content={question.standardAnswer || ''} 
                                 className="answer-content"
                               />
                             </div>
@@ -829,7 +835,7 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                               </div>
                               <div className="feedback-text">
                                 <SimpleMarkdownRenderer 
-                                  content={question.aiGradingResult.feedback} 
+                                  content={question.aiGradingResult?.feedback || ''} 
                                   className="feedback-content"
                                 />
                               </div>

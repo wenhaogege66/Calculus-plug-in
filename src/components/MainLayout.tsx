@@ -86,7 +86,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           onPageChange: handlePageChange 
         }); // HomePage component
       case 'assignments':
-        return <AssignmentsPage authState={authState} params={pageParams} />;
+        return <AssignmentsPage authState={authState} onPageChange={handlePageChange} params={pageParams} />;
       case 'grading':
         return (
           <div className="placeholder-page">

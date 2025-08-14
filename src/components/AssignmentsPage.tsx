@@ -41,13 +41,14 @@ interface Classroom {
 
 interface AssignmentsPageProps {
   authState: AuthState;
+  onPageChange?: (page: string) => void;
   params?: {
     classroomId?: number;
     classroomName?: string;
   };
 }
 
-export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, params }) => {
+export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onPageChange, params }) => {
   const { showSuccess, showError, showWarning, showInfo } = useNotificationContext();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [filteredAssignments, setFilteredAssignments] = useState<Assignment[]>([]);
@@ -140,7 +141,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, par
     // 班级过滤
     if (filters.classroom !== 'all') {
       filtered = filtered.filter(assignment => 
-        assignment.classroomId === parseInt(filters.classroom)
+        assignment.classroom?.id === parseInt(filters.classroom)
       );
     }
 
@@ -176,7 +177,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, par
     // 班级过滤
     if (teacherFilters.classroom !== 'all') {
       filtered = filtered.filter(assignment => 
-        assignment.classroomId === parseInt(teacherFilters.classroom)
+        assignment.classroom?.id === parseInt(teacherFilters.classroom)
       );
     }
 
@@ -499,7 +500,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, par
     setEditForm({
       title: assignment.title,
       description: assignment.description || '',
-      classroomId: assignment.classroomId?.toString() || '',
+      classroomId: assignment.classroom?.id?.toString() || '',
       startDate: assignment.startDate.slice(0, 16), // 格式化为datetime-local
       dueDate: assignment.dueDate.slice(0, 16),
       fileUpload: null,
@@ -896,7 +897,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, par
           <div className="empty-icon">🏫</div>
           <h3>还没有创建班级</h3>
           <p>请先创建班级才能布置作业</p>
-          <button className="btn-secondary">
+          <button className="btn-secondary" onClick={() => onPageChange?.('classrooms')}>
             <span>创建班级</span>
           </button>
         </div>

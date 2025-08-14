@@ -1002,8 +1002,8 @@ ${originalText}
       throw new Error(`AI API调用失败: ${response.status}`);
     }
 
-    const result = await response.json();
-    const parsed = JSON.parse(result.choices[0].message.content);
+    const result = await response.json() as any;
+    const parsed = JSON.parse(result.choices[0].message.content as string);
 
     // 为每个题目添加生成提示信息
     const questions = (parsed.questions || []).map((q: any) => ({
@@ -1093,8 +1093,8 @@ async function gradeSimilarQuestion(params: {
       throw new Error(`AI评分API调用失败: ${response.status}`);
     }
 
-    const result = await response.json();
-    return JSON.parse(result.choices[0].message.content);
+    const result = await response.json() as any;
+    return JSON.parse(result.choices[0].message.content as string);
   } catch (error) {
     console.error('AI评分失败:', error);
     // 返回默认评分

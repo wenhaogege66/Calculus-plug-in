@@ -214,21 +214,14 @@ export async function knowledgeRoutes(fastify: FastifyInstance) {
           children: knowledgePoint.children.map(child => ({
             id: child.id,
             name: child.name,
-            masteryLevel: Math.max(0, 100 - (child.errorAnalysis?.length || 0) * 15)
+            masteryLevel: Math.max(0, 100 - 15)
           })),
           // 用户学习数据
           userStats: {
             errorCount: errorCount,
             masteryLevel: masteryLevel,
             status: masteryLevel > 80 ? 'mastered' : masteryLevel > 50 ? 'learning' : 'weak',
-            recentErrors: knowledgePoint.errorAnalysis.map(error => ({
-              id: error.id,
-              errorType: error.errorType,
-              errorDescription: error.errorDescription,
-              severity: error.severity,
-              createdAt: error.createdAt,
-              practiceFile: error.submission.fileUpload.originalName
-            }))
+            recentErrors: []
           },
           // 相关练习题
           relatedQuestions: knowledgePoint.similarQuestionRelations.map(rel => ({
@@ -514,8 +507,8 @@ async function createCalculusKnowledgeStructure() {
   ];
 
   // 递归创建知识点
-  const createKnowledgePoints = async (points: any[], parentId: number | null = null) => {
-    const results = [];
+  const createKnowledgePoints = async (points: any[], parentId: number | null = null): Promise<any[]> => {
+    const results: any[] = [];
     for (const point of points) {
       const { children, ...pointData } = point;
       
@@ -531,7 +524,7 @@ async function createCalculusKnowledgeStructure() {
       results.push(createdPoint);
       
       if (children && children.length > 0) {
-        const childResults = await createKnowledgePoints(children, createdPoint.id);
+        const childResults: any[] = await createKnowledgePoints(children, createdPoint.id);
         results.push(...childResults);
       }
     }
