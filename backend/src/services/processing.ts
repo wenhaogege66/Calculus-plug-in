@@ -63,6 +63,17 @@ export async function processSubmission(
           score: aiResult?.data?.score,
           maxScore: aiResult?.data?.maxScore
         });
+        
+        // 4. 自动添加错题（如果分数<75且模式是practice）
+        if (options.mode === 'practice' && aiResult?.success && aiResult.data?.score && aiResult.data.score < 75) {
+          try {
+            await autoAddToMistakeBook(submissionId, fastify);
+            fastify.log.info(`✅ 自动添加到错题本 - submissionId: ${submissionId}, score: ${aiResult.data.score}`);
+          } catch (error) {
+            fastify.log.error(`自动添加错题失败:`, error);
+            // 不影响主流程，只记录错误
+          }
+        }
       } catch (error) {
         fastify.log.error(`AI批改过程异常:`, error);
         aiResult = { success: false, error: 'AI批改失败' };
@@ -169,5 +180,92 @@ async function processAIGradingInternal(
   } catch (error) {
     fastify.log.error('内部AI调用失败:', error);
     throw new Error(`AI批改失败: ${error instanceof Error ? error.message : '未知错误'}`);
+  }
+}
+
+// 自动添加到错题本
+async function autoAddToMistakeBook(submissionId: number, fastify: FastifyInstance) {
+  try {
+    // 验证提交记录和分数
+    const submission = await prisma.submission.findFirst({
+      where: { id: submissionId },
+      include: {
+        user: { select: { id: true } },
+        fileUpload: { select: { originalName: true } },
+        deepseekResults: {
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: { score: true }
+        }
+      }
+    });
+    
+    if (!submission) {
+      throw new Error('提交记录不存在');
+    }
+    
+    const latestResult = submission.deepseekResults[0];
+    if (!latestResult || !latestResult.score || latestResult.score >= 75) {
+      fastify.log.info(`跳过自动添加错题 - 分数不满足条件: ${latestResult?.score}`);
+      return;
+    }
+    
+    // 检查是否已存在
+    const existingItem = await prisma.mistakeItem.findUnique({
+      where: {
+        userId_submissionId: {
+          userId: submission.userId,
+          submissionId
+        }
+      }
+    });
+    
+    if (existingItem) {
+      fastify.log.info('错题已存在，跳过添加');
+      return existingItem;
+    }
+    
+    // 获取或创建默认分类"需要加强"
+    let defaultCategory = await prisma.mistakeCategory.findFirst({
+      where: {
+        userId: submission.userId,
+        name: '需要加强',
+        parentId: null,
+        isActive: true
+      }
+    });
+    
+    if (!defaultCategory) {
+      defaultCategory = await prisma.mistakeCategory.create({
+        data: {
+          userId: submission.userId,
+          name: '需要加强',
+          description: '系统自动创建的分类，用于存放需要重点练习的题目',
+          level: 1,
+          color: '#ef4444',
+          icon: '🔴'
+        }
+      });
+    }
+    
+    // 创建错题记录
+    const mistakeItem = await prisma.mistakeItem.create({
+      data: {
+        userId: submission.userId,
+        submissionId,
+        categoryId: defaultCategory.id,
+        title: submission.fileUpload?.originalName || '系统自动添加',
+        notes: `系统检测到得分较低（${latestResult.score}分），自动添加到错题本`,
+        tags: ['自动添加', '低分题目'],
+        priority: latestResult.score < 50 ? 'high' : 'medium',
+        addedBy: 'auto'
+      }
+    });
+    
+    fastify.log.info(`✅ 自动添加错题成功 - 分数: ${latestResult.score}分`);
+    return mistakeItem;
+  } catch (error) {
+    fastify.log.error('自动添加错题异常:', error);
+    throw error;
   }
 }

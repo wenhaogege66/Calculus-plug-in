@@ -21,6 +21,7 @@ import classroomRoutes from './routes/classroom';
 import assignmentRoutes from './routes/assignment';
 import submissionRoutes from './routes/submissions';
 import practiceRoutes from './routes/practice';
+import mistakeRoutes from './routes/mistakes';
 import { requireAuth, optionalAuth } from './middleware/auth';
 
 // 加载环境变量
@@ -125,6 +126,9 @@ async function registerRoutes() {
   
   // 注册练习模式路由
   await fastify.register(practiceRoutes, { prefix: '/api' });
+  
+  // 注册错题本路由
+  await fastify.register(mistakeRoutes, { prefix: '/api' });
   
   // 注册dashboard路由
   const { dashboardRoutes } = await import('./routes/dashboard');

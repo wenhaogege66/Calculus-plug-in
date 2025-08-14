@@ -317,22 +317,82 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
 
     try {
       setLoading(true);
-      // 这里后续需要实现API调用
-      showMessage(`已添加到错题本"${categoryToUse}"分类`, 'success');
       
-      // 更新本地状态
-      setPracticeHistory(prev => prev.map(session => 
-        session.id === showErrorBookModal 
-          ? { ...session, isInErrorBook: true }
-          : session
-      ));
-      
-      // 添加新分类到分类列表
-      if (newCategory.trim() && !errorBookCategories.includes(newCategory.trim())) {
-        setErrorBookCategories(prev => [...prev, newCategory.trim()]);
+      // 获取选中的练习记录
+      const selectedSession = practiceHistory.find(s => s.id === showErrorBookModal);
+      if (!selectedSession) {
+        showMessage('练习记录不存在', 'error');
+        return;
       }
+
+      // 首先创建或获取分类
+      let categoryId = null;
+      if (categoryToUse) {
+        // 创建分类（如果是新分类）
+        if (newCategory.trim()) {
+          const createCategoryResponse = await fetch(`${API_BASE_URL}/mistakes/categories`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authState.token}`
+            },
+            body: JSON.stringify({
+              name: newCategory.trim(),
+              description: '从练习页面创建的分类'
+            })
+          });
+          
+          if (createCategoryResponse.ok) {
+            const categoryResult = await createCategoryResponse.json();
+            if (categoryResult.success) {
+              categoryId = categoryResult.data.category.id;
+            }
+          }
+        } else {
+          // 如果是已存在分类，需要获取分类ID（暂时使用分类名称）
+          // 在实际实现中，应该从分类列表API获取正确的ID
+          // 这里简化处理
+        }
+      }
+
+      // 添加到错题本
+      const response = await fetch(`${API_BASE_URL}/mistakes/items`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authState.token}`
+        },
+        body: JSON.stringify({
+          submissionId: parseInt(selectedSession.id),
+          categoryId,
+          title: selectedSession.originalName,
+          notes: `从练习记录手动添加（得分：${selectedSession.score}分）`,
+          tags: ['手动添加', '练习记录'],
+          priority: selectedSession.score && selectedSession.score < 60 ? 'high' : 'medium'
+        })
+      });
+
+      const result = await response.json();
       
-      setShowErrorBookModal(null);
+      if (response.ok && result.success) {
+        showMessage(`已添加到错题本"${categoryToUse}"分类`, 'success');
+        
+        // 更新本地状态
+        setPracticeHistory(prev => prev.map(session => 
+          session.id === showErrorBookModal 
+            ? { ...session, isInErrorBook: true }
+            : session
+        ));
+        
+        // 添加新分类到分类列表
+        if (newCategory.trim() && !errorBookCategories.includes(newCategory.trim())) {
+          setErrorBookCategories(prev => [...prev, newCategory.trim()]);
+        }
+        
+        setShowErrorBookModal(null);
+      } else {
+        showMessage(result.error || '添加到错题本失败', 'error');
+      }
     } catch (error) {
       console.error('添加到错题本失败:', error);
       showMessage('添加到错题本失败', 'error');

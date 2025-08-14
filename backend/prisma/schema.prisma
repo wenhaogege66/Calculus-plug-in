@@ -44,6 +44,10 @@ model User {
   classroomMemberships ClassroomMember[]
   learningRecommendations LearningRecommendation[]
   
+  // 错题本相关
+  mistakeCategories MistakeCategory[]
+  mistakeItems      MistakeItem[]
+  
   @@map("users")
 }
 
@@ -87,6 +91,7 @@ model Submission {
   deepseekResults DeepseekResult[]
   errorAnalysis ErrorAnalysis[]
   similarQuestions SimilarQuestion[]
+  mistakeItems MistakeItem[]
   
   @@map("submissions")
 }
@@ -319,4 +324,56 @@ model LearningRecommendation {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   @@map("learning_recommendations")
+}
+
+// 错题本分类表（支持多级分类）
+model MistakeCategory {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  parentId    Int?     @map("parent_id") // 父级分类，null表示根分类
+  level       Int      @default(1) // 分类层级：1=根分类，2=子分类，3=孙分类等
+  sortOrder   Int      @default(0) @map("sort_order") // 排序顺序
+  color       String?  @db.VarChar(20) // 分类颜色标识
+  icon        String?  @db.VarChar(50) // 分类图标
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // 关联
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent      MistakeCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    MistakeCategory[] @relation("CategoryHierarchy")
+  mistakes    MistakeItem[]
+  
+  @@map("mistake_categories")
+}
+
+// 错题本条目表
+model MistakeItem {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @map("user_id")
+  submissionId    Int      @map("submission_id") // 关联到原始提交
+  categoryId      Int?     @map("category_id") // 所属分类（可选）
+  title           String?  @db.VarChar(200) // 用户自定义标题
+  notes           String?  @db.Text // 用户笔记
+  tags            String[] // 自定义标签
+  priority        String   @default("medium") @db.VarChar(20) // 'low', 'medium', 'high'
+  reviewCount     Int      @default(0) @map("review_count") // 复习次数
+  masteryLevel    Int      @default(0) @map("mastery_level") // 掌握程度：0-5
+  lastReviewedAt  DateTime? @map("last_reviewed_at") // 最后复习时间
+  nextReviewAt    DateTime? @map("next_review_at") // 下次复习时间（间隔复习）
+  isResolved      Boolean  @default(false) @map("is_resolved") // 是否已解决
+  addedBy         String   @default("manual") @map("added_by") @db.VarChar(20) // 'manual'（手动） 或 'auto'（自动）
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  // 关联
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submission      Submission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  category        MistakeCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  
+  @@unique([userId, submissionId]) // 一个用户对同一个提交只能有一个错题记录
+  @@map("mistake_items")
 } 

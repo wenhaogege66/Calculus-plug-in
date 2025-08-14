@@ -52,40 +52,44 @@ export const MistakesPage: React.FC<MistakesPageProps> = ({ authState }) => {
 
     try {
       setLoading(true);
-      // 这里后续需要实现API调用
-      // 暂时使用模拟数据
-      const mockData: ErrorBookItem[] = [
-        {
-          id: '1',
-          practiceSessionId: 'session-1',
-          originalName: '极限计算练习.pdf',
-          category: '极限问题',
-          addedAt: '2024-01-15T10:30:00Z',
-          score: 65,
-          ocrText: '计算 $\\lim_{x \\to 0} \\frac{\\sin x}{x}$ 的值',
-          knowledgePoints: ['极限定义', '重要极限'],
-          difficulty: 'MEDIUM',
-          tags: ['三角函数', '基础极限'],
-          notes: '需要记住重要极限公式'
-        },
-        {
-          id: '2',
-          practiceSessionId: 'session-2',
-          originalName: '导数应用题.pdf',
-          category: '微分基础',
-          addedAt: '2024-01-16T14:20:00Z',
-          score: 45,
-          ocrText: '求函数 $f(x) = x^3 - 3x^2 + 2x$ 的单调区间',
-          knowledgePoints: ['导数计算', '函数单调性'],
-          difficulty: 'HARD',
-          tags: ['导数应用', '单调性'],
-          notes: '需要注意导数为0的点不一定是极值点'
+      setError('');
+      
+      // 加载错题列表
+      const response = await fetch(`${API_BASE_URL}/mistakes/items`, {
+        headers: {
+          'Authorization': `Bearer ${authState.token}`
         }
-      ];
-      setErrorBookItems(mockData);
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          // 转换API数据格式到组件期望的格式
+          const items: ErrorBookItem[] = result.data.items.map((item: any) => ({
+            id: item.id.toString(),
+            practiceSessionId: item.submission.id.toString(),
+            originalName: item.title || item.submission.fileUpload?.originalName || '未命名',
+            category: item.category?.name || '未分类',
+            addedAt: item.createdAt,
+            score: item.submission.deepseekResults?.[0]?.score,
+            ocrText: item.submission.mathpixResults?.[0]?.recognizedText,
+            knowledgePoints: [], // 暂时为空，后续可从AI结果中提取
+            difficulty: item.priority === 'high' ? 'HARD' : (item.priority === 'medium' ? 'MEDIUM' : 'EASY'),
+            tags: item.tags,
+            notes: item.notes
+          }));
+          
+          setErrorBookItems(items);
+        } else {
+          setError(result.error || '加载错题本失败');
+        }
+      } else {
+        const errorResult = await response.json();
+        setError(errorResult.error || '加载错题本失败');
+      }
     } catch (err) {
       console.error('加载错题本失败:', err);
-      setError('加载错题本失败');
+      setError('网络错误，请稍后重试');
     } finally {
       setLoading(false);
     }
@@ -157,31 +161,72 @@ export const MistakesPage: React.FC<MistakesPageProps> = ({ authState }) => {
   };
 
   const handleCreateCategory = async () => {
-    if (!newCategoryName.trim()) return;
+    if (!newCategoryName.trim() || !authState.token) return;
 
     try {
-      // 这里后续需要实现API调用
-      setShowCreateCategoryModal(false);
-      setNewCategoryName('');
+      const response = await fetch(`${API_BASE_URL}/mistakes/categories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authState.token}`
+        },
+        body: JSON.stringify({
+          name: newCategoryName.trim(),
+          description: '用户创建的错题分类'
+        })
+      });
+
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        setShowCreateCategoryModal(false);
+        setNewCategoryName('');
+        // 重新加载错题数据以更新分类
+        loadErrorBookItems();
+      } else {
+        setError(result.error || '创建分类失败');
+      }
     } catch (err) {
+      console.error('创建分类失败:', err);
       setError('创建分类失败');
     }
   };
 
   const handleDeleteCategory = async (categoryName: string) => {
+    if (!authState.token) return;
+    
     try {
-      // 这里后续需要实现API调用
+      // 首先需要获取分类ID（简化实现，实际应该在加载时存储ID映射）
+      // 这里暂时不实现删除分类，因为需要先获取分类列表来获得ID
+      setError('删除分类功能正在开发中');
       setShowDeleteCategoryModal('');
     } catch (err) {
+      console.error('删除分类失败:', err);
       setError('删除分类失败');
     }
   };
 
   const handleDeleteItem = async (itemId: string) => {
+    if (!authState.token) return;
+    
     try {
-      // 这里后续需要实现API调用
-      setErrorBookItems(prev => prev.filter(item => item.id !== itemId));
+      const response = await fetch(`${API_BASE_URL}/mistakes/items/${itemId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${authState.token}`
+        }
+      });
+
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        // 从本地状态中移除已删除的错题
+        setErrorBookItems(prev => prev.filter(item => item.id !== itemId));
+      } else {
+        setError(result.error || '删除错题失败');
+      }
     } catch (err) {
+      console.error('删除错题失败:', err);
       setError('删除错题失败');
     }
   };

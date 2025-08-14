@@ -4,8 +4,16 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f8fafc;
   overflow: hidden;
+  transition: background 0.3s ease;
+}
+
+.main-layout.light .practice-detail-fullpage {
+  background: #f8fafc;
+}
+
+.main-layout.dark .practice-detail-fullpage {
+  background: #0f172a;
 }
 
 /* 顶部导航栏 */
@@ -14,11 +22,22 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px 24px;
-  background: white;
   border-bottom: 1px solid #e5e7eb;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   min-height: 70px;
   z-index: 10;
+  transition: all 0.3s ease;
+}
+
+.main-layout.light .detail-navbar {
+  background: white;
+  border-bottom-color: #e5e7eb;
+}
+
+.main-layout.dark .detail-navbar {
+  background: #1e293b;
+  border-bottom-color: #374151;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .navbar-left {
@@ -33,19 +52,35 @@
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: #f1f5f9;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  color: #64748b;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
-.back-button:hover {
+.main-layout.light .back-button {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #64748b;
+}
+
+.main-layout.dark .back-button {
+  background: #374151;
+  border-color: #4b5563;
+  color: #9ca3af;
+}
+
+.main-layout.light .back-button:hover {
   background: #e2e8f0;
   color: #475569;
+  transform: translateX(-2px);
+}
+
+.main-layout.dark .back-button:hover {
+  background: #4b5563;
+  color: #e2e8f0;
   transform: translateX(-2px);
 }
 
@@ -59,12 +94,20 @@
 .file-title h2 {
   font-size: 18px;
   font-weight: 600;
-  color: #1e293b;
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 400px;
+  transition: color 0.3s ease;
+}
+
+.main-layout.light .file-title h2 {
+  color: #1e293b;
+}
+
+.main-layout.dark .file-title h2 {
+  color: #f1f5f9;
 }
 
 .status-icon {
@@ -160,14 +203,30 @@
   display: flex;
   gap: 12px;
   font-size: 12px;
+  transition: color 0.3s ease;
+}
+
+.main-layout.light .file-meta {
   color: #64748b;
+}
+
+.main-layout.dark .file-meta {
+  color: #94a3b8;
 }
 
 .grading-summary {
   display: flex;
   gap: 12px;
   font-size: 12px;
+  transition: color 0.3s ease;
+}
+
+.main-layout.light .grading-summary {
   color: #64748b;
+}
+
+.main-layout.dark .grading-summary {
+  color: #94a3b8;
 }
 
 /* 面板内容 */
@@ -190,9 +249,15 @@
   background: transparent;
 }
 
-.recognition-content::-webkit-scrollbar-thumb,
-.grading-content::-webkit-scrollbar-thumb {
+.main-layout.light .recognition-content::-webkit-scrollbar-thumb,
+.main-layout.light .grading-content::-webkit-scrollbar-thumb {
   background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.main-layout.dark .recognition-content::-webkit-scrollbar-thumb,
+.main-layout.dark .grading-content::-webkit-scrollbar-thumb {
+  background: #4b5563;
   border-radius: 3px;
 }
 
