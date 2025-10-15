@@ -444,7 +444,8 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                   )}
                 </div>
                 <div className="suggestion-description">
-                  {suggestion.recommendation || suggestion.description || suggestion}
+                  {suggestion.recommendation || suggestion.description ||
+                   (typeof suggestion === 'string' ? suggestion : '暂无建议')}
                 </div>
               </div>
             </div>
@@ -481,7 +482,8 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                   )}
                 </div>
                 <div className="strength-description">
-                  {strength.description || strength}
+                  {strength.description ||
+                   (typeof strength === 'string' ? strength : '暂无描述')}
                 </div>
               </div>
             </div>

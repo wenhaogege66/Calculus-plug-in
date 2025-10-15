@@ -1798,10 +1798,13 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                         <div className="errors-section">
                           <h4>❌ 问题分析</h4>
                           <div className="errors-list">
-                            {gradingResults.deepseekResults[0].errors.map((error: string, index: number) => (
+                            {gradingResults.deepseekResults[0].errors.map((error: any, index: number) => (
                               <div key={index} className="error-item">
                                 <span className="error-icon">⚠️</span>
-                                <span className="error-text">{error}</span>
+                                <span className="error-text">
+                                  {typeof error === 'string' ? error :
+                                   error.content || error.explanation || error.errorType || JSON.stringify(error)}
+                                </span>
                               </div>
                             ))}
                           </div>
@@ -1815,10 +1818,13 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                         <div className="suggestions-section">
                           <h4>💡 改进建议</h4>
                           <div className="suggestions-list">
-                            {gradingResults.deepseekResults[0].suggestions.map((suggestion: string, index: number) => (
+                            {gradingResults.deepseekResults[0].suggestions.map((suggestion: any, index: number) => (
                               <div key={index} className="suggestion-item">
                                 <span className="suggestion-icon">💡</span>
-                                <span className="suggestion-text">{suggestion}</span>
+                                <span className="suggestion-text">
+                                  {typeof suggestion === 'string' ? suggestion :
+                                   suggestion.recommendation || suggestion.description || JSON.stringify(suggestion)}
+                                </span>
                               </div>
                             ))}
                           </div>
