@@ -5,7 +5,7 @@ Every time you complete the modification of the code, you should determine wheth
 
 ## Project Overview
 
-AI微积分助教 (AI Calculus Assistant) - A Chrome extension built with Plasmo framework for intelligent calculus homework grading. The system provides OCR recognition using MathPix API and AI grading using Deepseek API, supporting both student practice mode and homework mode with teacher-student role management. Features a modern, tech-styled UI with dark mode support and responsive design.
+AI微积分助教 (AI Calculus Assistant) - A comprehensive Chrome extension built with Plasmo framework for intelligent calculus learning and homework grading. The system provides OCR recognition using MathPix API, AI grading using Deepseek API, and advanced features including mistake notebooks, knowledge graphs, and learning analytics. Supports both student practice mode and homework mode with teacher-student role management. Features a modern, tech-styled UI with dark mode support, LaTeX rendering, and D3.js interactive visualizations.
 
 ## Architecture
 
@@ -26,10 +26,14 @@ AI微积分助教 (AI Calculus Assistant) - A Chrome extension built with Plasmo
   - `Navigation.tsx` - Role-based sidebar navigation (teacher/student)
   - `CompactPopup.tsx` - Compact popup interface for quick actions
 - **Page Components** (Role-based routing):
-  - `HomePage.tsx` - Dashboard with role-specific widgets and stats
-  - `AssignmentsPage.tsx` - Assignment management (teacher) / assignment list (student)
+  - `HomePage.tsx` - Dashboard with role-specific widgets, stats, and AI-powered search
+  - `AssignmentsPage.tsx` - Assignment management (teacher) / assignment list (student) with resubmission support
   - `ClassroomsPage.tsx` - Classroom management and member administration
-  - `PracticePage.tsx` - Self-practice mode for students
+  - `PracticePage.tsx` - Self-practice mode for students with horizontal action buttons
+  - `PracticeDetailPage.tsx` - Detailed view of practice sessions with OCR results and AI feedback
+  - `MistakesPage.tsx` - Mistake notebook with multi-level categorization and spaced repetition
+  - `KnowledgeGraph.tsx` - Interactive D3.js force-directed graph visualization of knowledge points
+  - `KnowledgePointDetail.tsx` - Detailed modal view of knowledge points with navigation
 - **Authentication Components**:
   - `AuthSection.tsx` - GitHub OAuth login interface
 
@@ -41,7 +45,7 @@ AI微积分助教 (AI Calculus Assistant) - A Chrome extension built with Plasmo
 - **AI Services**: MathPix (mathematical OCR:https://docs.mathpix.com/#introduction)(https://mathpix.com/docs/convert/overview) + Deepseek (scoring, future: grading/annotation)
 
 ### Database Schema (Prisma)
-Key models: `User`, `FileUpload`, `Submission`, `MathPixResult`, `DeepseekResult`, `Classroom`, `Assignment`
+Key models: `User`, `FileUpload`, `Submission`, `MathPixResult`, `DeepseekResult`, `Classroom`, `Assignment`, `KnowledgePoint`, `ErrorAnalysis`, `SimilarQuestion`, `LearningRecommendation`, `MistakeCategory`, `MistakeItem`
 - Supports both GitHub OAuth and local authentication
 - Role-based access (STUDENT/TEACHER)
 - Submission tracking with status management
@@ -127,6 +131,7 @@ Note: Storage endpoints are handled automatically by Supabase client - no additi
 **Entry Points:**
 - `src/popup.tsx` - Main popup interface with authentication and role-based navigation
 - `src/sidepanel.tsx` - Side panel view with full application features
+- `src/tabs/fullapp.tsx` - Full-page tab view (future expansion)
 
 **Layout & Navigation:**
 - `src/components/MainLayout.tsx` - Main application layout with sidebar navigation and theme management
@@ -135,20 +140,27 @@ Note: Storage endpoints are handled automatically by Supabase client - no additi
 
 **Page Components:**
 - `src/components/HomePage.tsx` - Role-specific dashboard with widgets, stats, and AI-powered search with markdown rendering
-- `src/components/AssignmentsPage.tsx` - Full-featured assignment management with filtering, creation, and submission
+- `src/components/AssignmentsPage.tsx` - Full-featured assignment management with filtering, creation, submission, and resubmission
 - `src/components/ClassroomsPage.tsx` - Classroom management, member administration, and invite system
 - `src/components/PracticePage.tsx` - Self-practice mode with file upload, AI grading, and horizontal layout for operation buttons
+- `src/components/PracticeDetailPage.tsx` - Detailed practice session view with OCR results, AI feedback, and learning suggestions
+- `src/components/MistakesPage.tsx` - Mistake notebook with multi-level categorization, tagging, search, and spaced repetition
+- `src/components/KnowledgeGraph.tsx` - Interactive D3.js force-directed graph for visualizing knowledge point relationships and mastery
+- `src/components/KnowledgePointDetail.tsx` - Modal view for detailed knowledge point information, children navigation, and related questions
 
 **Utility Components:**
 - `src/components/SimpleMarkdownRenderer.tsx` - Professional LaTeX and markdown renderer using react-markdown + KaTeX
+- `src/components/Notification.tsx` - Global notification toast component
+- `src/contexts/NotificationContext.tsx` - Notification context provider
 
 **Authentication:**
 - `src/components/AuthSection.tsx` - GitHub OAuth authentication flow
 
 **Backend Core:**
 - `backend/src/app.ts` - Fastify server setup with route registration
-- `backend/src/routes/` - API route handlers (auth, assignments, classrooms, submissions, files, OCR, AI)
+- `backend/src/routes/` - API route handlers (auth, assignments, classrooms, submissions, files, OCR, AI, practice, mistakes, knowledge, dashboard)
 - `backend/src/middleware/auth.ts` - JWT authentication middleware
+- `backend/src/services/processing.ts` - Unified AI processing workflow (OCR + grading)
 
 ### API Endpoints
 
@@ -183,7 +195,32 @@ Note: Storage endpoints are handled automatically by Supabase client - no additi
 **Submission Management:**
 - `GET /api/submissions` - Get user submissions
 - `POST /api/submissions` - Create submission with auto-grading workflow
+- `PUT /api/submissions/:id/resubmit` - Resubmit assignment before deadline
 - `GET /api/submissions/:id/status` - Get submission processing status
+
+**Practice Mode:**
+- `GET /api/practice/sessions` - Get practice history
+- `GET /api/practice/sessions/:id` - Get practice session details
+- `DELETE /api/practice/sessions/:id` - Delete practice session
+- `PATCH /api/practice/sessions/:id/difficulty` - Mark question difficulty
+
+**Mistake Notebook:**
+- `GET /api/mistakes/categories` - Get mistake categories
+- `POST /api/mistakes/categories` - Create mistake category
+- `GET /api/mistakes/items` - Get mistake items with filtering
+- `POST /api/mistakes/items` - Add mistake item (manual or auto)
+- `DELETE /api/mistakes/items/:id` - Delete mistake item
+- `PATCH /api/mistakes/items/:id` - Update mistake item
+
+**Knowledge Graph:**
+- `GET /api/knowledge/graph` - Get knowledge graph data (nodes, links, stats)
+- `POST /api/knowledge/initialize` - Initialize calculus knowledge structure (teacher only)
+- `GET /api/knowledge/:id` - Get knowledge point details
+- `GET /api/knowledge/:id/children` - Get child knowledge points
+- `GET /api/knowledge/:id/related-questions` - Get related practice questions
+
+**Dashboard:**
+- `GET /api/dashboard/stats` - Get user learning statistics and analytics
 
 **AI Processing:**
 - `/api/ocr/mathpix` - OCR processing (internal)
@@ -382,10 +419,15 @@ supabase-storage/
 ## Key Constraints
 
 - Uses pnpm workspace configuration with overrides for build compatibility
-- Supabase for authentication and file storage
-- MathPix API for mathematical OCR recognition (not MyScript)
+- Supabase for authentication, file storage, and PostgreSQL database
+- MathPix API for mathematical OCR recognition (replaced MyScript)
+- D3.js for interactive knowledge graph visualizations
+- react-markdown + remark-math + rehype-katex for LaTeX rendering
 - No test files should be committed - delete after testing
 - Follow existing TypeScript and React patterns
-- Maintain Prisma migration history
+- Maintain Prisma migration history and use migrations for schema changes
 - Consider network connectivity issues for Supabase (timeout handling, retry mechanisms)
 - LaTeX rendering requires compatible markdown packages (see dependencies above)
+- Knowledge graph requires D3.js force simulation understanding
+- Mistake notebook supports multi-level hierarchical categories
+- Practice sessions automatically add to mistake notebook when score < 60

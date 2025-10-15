@@ -16,7 +16,7 @@
 - **API服务**: Node.js + Fastify + TypeScript
 - **数据库**: Supabase PostgreSQL (云数据库) + Prisma ORM
 - **认证**: JWT + GitHub OAuth
-- **AI服务**: MathPix (数学OCR) + Deepseek (智能批改)
+- **AI服务**: MathPix (数学OCR识别) + Deepseek (智能批改评分)
 
 ### 数据流架构
 ```
@@ -103,10 +103,9 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# MyScript配置
-MYSCRIPT_API_ENDPOINT=https://cloud.myscript.com/api/v4.0/iink
-MYSCRIPT_APPLICATION_KEY=your-app-key
-MYSCRIPT_HMAC_KEY=your-hmac-key
+# MathPix配置 (替代MyScript进行OCR识别)
+MATHPIX_APP_ID=your-mathpix-app-id
+MATHPIX_APP_KEY=your-mathpix-app-key
 
 # 文件上传配置  
 MAX_FILE_SIZE=104857600  # 100MB
@@ -159,6 +158,8 @@ Calculus/
 │   ├── common/              # 公共配置
 │   │   └── config/
 │   │       └── supabase.ts  # Supabase客户端配置
+│   ├── contexts/            # React Context
+│   │   └── NotificationContext.tsx # 全局通知系统
 │   └── components/          # React组件
 │       ├── AuthSection.tsx         # GitHub OAuth登录组件
 │       ├── MainLayout.tsx          # 主布局组件 (导航+内容区域)
@@ -168,9 +169,13 @@ Calculus/
 │       ├── AssignmentsPage.tsx     # 作业页面 (创建/管理/提交)
 │       ├── ClassroomsPage.tsx      # 班级页面 (创建/管理/加入)
 │       ├── PracticePage.tsx        # 练习页面 (学生自主练习+水平布局)
+│       ├── PracticeDetailPage.tsx  # 练习详情页 (查看练习结果和AI反馈)
+│       ├── MistakesPage.tsx        # 错题本页面 (分类管理、搜索、复习)
+│       ├── KnowledgeGraph.tsx      # 知识图谱可视化 (D3.js力导向图)
+│       ├── KnowledgePointDetail.tsx # 知识点详情模态框
 │       ├── SimpleMarkdownRenderer.tsx # LaTeX数学公式渲染器
-│       ├── *.css                   # 对应组件样式文件
-│       └── [未来扩展组件...]
+│       ├── Notification.tsx        # 通知组件
+│       └── *.css                   # 对应组件样式文件
 ├── backend/                  # Fastify后端服务
 │   ├── src/
 │   │   ├── app.ts           # Fastify应用主文件
@@ -178,14 +183,20 @@ Calculus/
 │   │   │   └── supabase.ts  # Supabase配置
 │   │   ├── middleware/
 │   │   │   └── auth.ts      # JWT认证中间件
+│   │   ├── services/
+│   │   │   └── processing.ts # AI处理服务 (OCR + 批改工作流)
 │   │   └── routes/          # API路由模块
 │   │       ├── auth.ts      # 认证路由 (GitHub OAuth)
 │   │       ├── assignment.ts # 作业管理路由
 │   │       ├── classroom.ts # 班级管理路由
 │   │       ├── submissions.ts # 提交管理路由
 │   │       ├── upload.ts    # 文件上传路由
-│   │       ├── ocr.ts       # OCR识别路由
-│   │       └── ai.ts        # AI批改路由
+│   │       ├── ocr.ts       # OCR识别路由 (MathPix)
+│   │       ├── ai.ts        # AI批改路由 (Deepseek)
+│   │       ├── practice.ts  # 练习模式路由
+│   │       ├── mistakes.ts  # 错题本路由
+│   │       ├── knowledge.ts # 知识图谱路由
+│   │       └── dashboard.ts # 仪表板统计路由
 │   ├── prisma/              # Prisma数据库配置
 │   │   ├── schema.prisma    # 数据库模型定义
 │   │   └── migrations/      # 数据库迁移文件
@@ -212,31 +223,50 @@ Calculus/
 - `CompactPopup.tsx` - 紧凑模式的快捷操作界面
 
 **功能页面组件:**
-- `HomePage.tsx` - 角色自适应的仪表板(展示统计信息、快捷操作)
-- `AssignmentsPage.tsx` - 作业管理页面(教师创建作业，学生查看提交)
-- `ClassroomsPage.tsx` - 班级管理页面(教师管理班级，学生加入班级)
-- `PracticePage.tsx` - 学生练习页面(自主练习模式，即时AI反馈)
+- `HomePage.tsx` - 角色自适应的仪表板 (展示统计信息、快捷操作、AI智能搜索)
+- `AssignmentsPage.tsx` - 作业管理页面 (教师创建作业，学生查看提交，支持文件重新提交)
+- `ClassroomsPage.tsx` - 班级管理页面 (教师管理班级，学生加入班级)
+- `PracticePage.tsx` - 学生练习页面 (自主练习模式，即时AI反馈，水平操作按钮)
+- `PracticeDetailPage.tsx` - 练习详情页 (查看OCR结果、AI评分、学习建议)
+- `MistakesPage.tsx` - 错题本页面 (分类管理、搜索筛选、复习跟踪)
+- `KnowledgeGraph.tsx` - 知识图谱 (D3.js可视化，交互式探索知识点关系)
 
 **后端API模块:**
 - `routes/auth.ts` - GitHub OAuth认证流程处理
-- `routes/assignment.ts` - 作业CRUD操作、权限验证
+- `routes/assignment.ts` - 作业CRUD操作、权限验证、OCR题目识别
 - `routes/classroom.ts` - 班级管理、成员管理、邀请码系统
-- `routes/submissions.ts` - 作业提交、自动批改工作流
+- `routes/submissions.ts` - 作业提交、自动批改工作流、重新提交功能
 - `routes/upload.ts` - 文件上传、Supabase Storage集成
-- `routes/ocr.ts` - MathPix OCR识别服务
-- `routes/ai.ts` - Deepseek AI批改服务
+- `routes/ocr.ts` - MathPix OCR识别服务 (替代MyScript)
+- `routes/ai.ts` - Deepseek AI批改服务 (评分、反馈、建议)
+- `routes/practice.ts` - 练习模式管理、历史记录、详情查询
+- `routes/mistakes.ts` - 错题本CRUD、分类管理、自动添加
+- `routes/knowledge.ts` - 知识图谱数据、节点关系、初始化
+- `routes/dashboard.ts` - 仪表板统计数据、学习分析
+- `services/processing.ts` - AI处理服务 (统一OCR和批改工作流)
 
 ## 🗄️ 数据库架构 (Prisma)
 
 ### 核心模型
-- **User**: 用户信息 (支持GitHub OAuth + 本地认证)
-- **Classroom**: 班级信息 (教师创建，学生加入)
-- **ClassroomMember**: 班级成员关系
-- **Assignment**: 作业信息 (教师发布，关联班级)
-- **FileUpload**: 文件上传记录 (支持多种用途)
-- **Submission**: 作业提交 (关联作业和文件)
-- **MathPixResult**: MathPix OCR识别结果
-- **DeepseekResult**: Deepseek AI批改结果
+- **User**: 用户信息 (支持GitHub OAuth + 本地认证，角色管理)
+- **Classroom**: 班级信息 (教师创建，学生加入，邀请码系统)
+- **ClassroomMember**: 班级成员关系 (多对多关联)
+- **Assignment**: 作业信息 (教师发布，关联班级，支持OCR题目识别)
+- **FileUpload**: 文件上传记录 (支持多种用途，Supabase Storage集成)
+- **Submission**: 作业提交 (关联作业和文件，支持练习和作业模式)
+- **MathPixResult**: MathPix OCR识别结果 (数学公式识别)
+- **DeepseekResult**: Deepseek AI批改结果 (评分、反馈、建议)
+
+### 知识图谱与学习分析模型
+- **KnowledgePoint**: 知识点表 (支持层级结构，章节分类，掌握度跟踪)
+- **ErrorAnalysis**: 错题分析表 (错误类型分类，严重程度评估，AI建议)
+- **SimilarQuestion**: 类似题生成记录 (基于错题自动生成，用户评分)
+- **SimilarQuestionKnowledgePoint**: 类似题与知识点多对多关联
+- **LearningRecommendation**: AI学习建议表 (个性化学习路径，优先级管理)
+
+### 错题本功能模型
+- **MistakeCategory**: 错题分类表 (支持多级分类，自定义图标颜色)
+- **MistakeItem**: 错题条目表 (标签系统，笔记管理，间隔复习，掌握度跟踪)
 
 ### 关系设计
 ```prisma
@@ -256,6 +286,21 @@ FileUpload (1:N) Submission (文件用于提交)
 FileUpload (1:1) Assignment (作业题目文件)
 Submission (1:N) MathPixResult (OCR识别)
 Submission (1:N) DeepseekResult (AI批改)
+
+# 知识图谱和学习分析
+KnowledgePoint (1:N) KnowledgePoint (层级关系: 父-子)
+Submission (1:N) ErrorAnalysis (错题分析)
+ErrorAnalysis (N:1) KnowledgePoint (关联知识点)
+Submission (1:N) SimilarQuestion (生成类似题)
+SimilarQuestion (N:M) KnowledgePoint (多对多)
+User (1:N) LearningRecommendation (学习建议)
+
+# 错题本系统
+User (1:N) MistakeCategory (用户的分类)
+MistakeCategory (1:N) MistakeCategory (层级分类)
+User (1:N) MistakeItem (用户的错题)
+MistakeItem (N:1) Submission (关联原始提交)
+MistakeItem (N:1) MistakeCategory (所属分类)
 ```
 
 ## 🔧 Chrome扩展加载
@@ -332,10 +377,34 @@ Submission (1:N) DeepseekResult (AI批改)
 - `POST /api/files` - 文件上传 (支持多种用途标识)
 - `GET /api/files/:id/download` - 文件下载
 
+### 练习模式 (学生功能)
+- `GET /api/practice/sessions` - 获取练习历史记录
+- `GET /api/practice/sessions/:id` - 获取练习详情
+- `DELETE /api/practice/sessions/:id` - 删除练习记录
+- `PATCH /api/practice/sessions/:id/difficulty` - 标记题目难度
+
+### 错题本管理
+- `GET /api/mistakes/categories` - 获取错题分类列表
+- `POST /api/mistakes/categories` - 创建错题分类
+- `GET /api/mistakes/items` - 获取错题列表 (支持分类筛选)
+- `POST /api/mistakes/items` - 手动添加错题
+- `DELETE /api/mistakes/items/:id` - 删除错题
+- `PATCH /api/mistakes/items/:id` - 更新错题信息
+
+### 知识图谱与学习分析
+- `GET /api/knowledge/graph` - 获取知识图谱数据 (节点、链接、统计)
+- `POST /api/knowledge/initialize` - 初始化微积分知识点结构 (教师权限)
+- `GET /api/knowledge/:id` - 获取知识点详情
+- `GET /api/knowledge/:id/children` - 获取子知识点
+- `GET /api/knowledge/:id/related-questions` - 获取相关练习题
+
+### 仪表板统计
+- `GET /api/dashboard/stats` - 获取用户学习统计数据
+
 ### AI处理 (内部调用)
-- `POST /api/internal/ocr/mathpix` - MathPix OCR识别
-- `POST /api/internal/ai/grade` - Deepseek AI批改
-- `POST /api/internal/ocr/assignment` - 作业题目OCR处理
+- `POST /api/ocr/mathpix` - MathPix OCR识别 (内部)
+- `POST /api/ai/deepseek/grade` - Deepseek AI批改 (内部)
+- `POST /api/ai/deepseek/score` - Deepseek AI评分 (内部)
 
 ### 示例请求
 ```javascript
@@ -407,9 +476,12 @@ npm run db:studio     # 打开Prisma Studio
 - [Plasmo框架文档](https://docs.plasmo.com/)
 - [Fastify文档](https://www.fastify.io/)
 - [Prisma文档](https://www.prisma.io/docs)
+- [Supabase文档](https://supabase.com/docs)
 - [GitHub OAuth Apps](https://docs.github.com/en/developers/apps/building-oauth-apps)
-- [MyScript API](https://developer.myscript.com/)
+- [MathPix API](https://docs.mathpix.com/)
 - [Deepseek API](https://platform.deepseek.com/)
+- [D3.js文档](https://d3js.org/)
+- [KaTeX文档](https://katex.org/)
 
 ## 📝 开发说明
 
@@ -417,7 +489,8 @@ npm run db:studio     # 打开Prisma Studio
 - **后端**: 使用Fastify+Prisma，类型安全的ORM操作
 - **数据库**: Supabase PostgreSQL，使用Prisma进行迁移管理
 - **认证**: JWT + GitHub OAuth，支持无状态认证
-- **AI服务**: 集成MyScript和Deepseek，提供OCR和批改功能
+- **AI服务**: 集成MathPix (OCR) 和Deepseek (批改)，提供智能识别和批改功能
+- **可视化**: 使用D3.js实现交互式知识图谱，支持力导向布局和节点交互
 
 ## 🔄 版本历史
 
@@ -427,11 +500,20 @@ npm run db:studio     # 打开Prisma Studio
 - **v1.3.0**: 新增多模式学习系统，支持刷题模式和作业模式
 - **v1.4.0**: 实现角色动态切换，添加教师功能模块
 - **v1.5.0**: 优化登录状态持久化，提升用户体验
-- **v1.6.0**: 重大更新
+- **v1.6.0**: Markdown渲染增强
   - 🔧 **首页搜索增强**: 修复AI搜索结果显示，支持完整markdown格式化内容
   - 🎨 **练习页面优化**: 操作按钮从垂直排列改为水平排列，提升界面美观度
   - ⚡ **Markdown渲染器重构**: 使用react-markdown替代正则表达式，支持复杂LaTeX数学公式
   - 📦 **依赖管理**: 添加react-markdown生态支持，修复构建兼容性问题
+- **v1.7.0**: 错题本与知识图谱系统 (当前版本)
+  - 📚 **错题本功能**: 支持多级分类、标签管理、间隔复习、掌握度跟踪
+  - 🌐 **知识图谱**: D3.js力导向图可视化，交互式探索知识点关系和掌握情况
+  - 🔍 **知识点详情**: 详细的知识点信息、子节点导航、相关练习题推荐
+  - 📊 **学习分析**: 错题分析、学习建议、类似题生成
+  - 🔄 **作业重新提交**: 支持学生在截止日期前重新提交作业
+  - 🎯 **练习详情页**: 查看完整的OCR结果、AI评分和学习建议
+  - 🔔 **全局通知系统**: 统一的消息提示机制
+  - 🏠 **仪表板统计**: 个性化学习数据统计和可视化展示
 
 ## 🧪 开发建议
 
