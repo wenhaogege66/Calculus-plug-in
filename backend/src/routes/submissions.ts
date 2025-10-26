@@ -135,11 +135,30 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
           // 教师上传：只进行OCR识别，存储到题库
           startQuestionProcessing(submission.id, fastify).catch(error => {
             fastify.log.error(`题目处理流程启动失败 - 提交ID: ${submission.id}`, error);
+            // 更新提交状态为失败
+            prisma.submission.update({
+              where: { id: submission.id },
+              data: { status: 'FAILED' }
+            }).catch(updateError => {
+              fastify.log.error(`更新失败状态失败 - 提交ID: ${submission.id}`, updateError);
+            });
           });
         } else {
           // 学生提交：完整的批改流程
           startGradingProcess(submission.id, fastify).catch(error => {
             fastify.log.error(`自动批改流程启动失败 - 提交ID: ${submission.id}`, error);
+            fastify.log.error(`错误详情:`, {
+              message: error.message,
+              stack: error.stack,
+              submissionId: submission.id
+            });
+            // 更新提交状态为失败
+            prisma.submission.update({
+              where: { id: submission.id },
+              data: { status: 'FAILED' }
+            }).catch(updateError => {
+              fastify.log.error(`更新失败状态失败 - 提交ID: ${submission.id}`, updateError);
+            });
           });
         }
       }

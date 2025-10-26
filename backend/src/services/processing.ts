@@ -106,13 +106,20 @@ export async function processSubmission(
 
   } catch (error) {
     fastify.log.error(`❌ 处理流程失败 - submissionId: ${submissionId}`, error);
-    
+    fastify.log.error(`❌ 错误详情:`, {
+      message: error instanceof Error ? error.message : '未知错误',
+      stack: error instanceof Error ? error.stack : undefined,
+      type: error instanceof Error ? error.constructor.name : typeof error,
+      submissionId
+    });
+
     // 更新提交状态为失败
     try {
       await prisma.submission.update({
         where: { id: submissionId },
         data: { status: 'FAILED' }
       });
+      fastify.log.info(`📝 已将提交状态更新为FAILED - submissionId: ${submissionId}`);
     } catch (updateError) {
       fastify.log.error(`❌ 更新提交状态失败 - submissionId: ${submissionId}`, updateError);
     }

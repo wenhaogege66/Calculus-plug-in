@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
 import { useNotificationContext } from '../contexts/NotificationContext';
+import { SimpleMarkdownRenderer } from './SimpleMarkdownRenderer';
 
 interface Assignment {
   id: number;
@@ -1652,7 +1653,10 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                         <span className="content-type">识别的题目内容：</span>
                       </div>
                       <div className="recognized-text">
-                        {gradingResultAssignment.ocrText}
+                        <SimpleMarkdownRenderer
+                          content={gradingResultAssignment.ocrText || ''}
+                          className="question-ocr-content"
+                        />
                       </div>
                       {gradingResultAssignment.ocrLatex && (
                         <div className="latex-content">
@@ -1660,7 +1664,10 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                             <span className="content-type">LaTeX格式：</span>
                           </div>
                           <div className="latex-text">
-                            {gradingResultAssignment.ocrLatex}
+                            <SimpleMarkdownRenderer
+                              content={gradingResultAssignment.ocrLatex || ''}
+                              className="question-latex-content"
+                            />
                           </div>
                         </div>
                       )}
@@ -1709,7 +1716,10 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                         <span>识别置信度: {(gradingResults.mathpixResults[0].confidence * 100).toFixed(1)}%</span>
                       </div>
                       <div className="recognized-text">
-                        {gradingResults.mathpixResults[0].recognizedText || '暂无识别内容'}
+                        <SimpleMarkdownRenderer
+                          content={gradingResults.mathpixResults[0].recognizedText || '暂无识别内容'}
+                          className="answer-ocr-content"
+                        />
                       </div>
                       {gradingResults.mathpixResults[0].mathLatex && (
                         <div className="latex-content">
@@ -1717,7 +1727,10 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                             <span className="content-type">LaTeX公式：</span>
                           </div>
                           <div className="latex-text">
-                            {gradingResults.mathpixResults[0].mathLatex}
+                            <SimpleMarkdownRenderer
+                              content={gradingResults.mathpixResults[0].mathLatex || ''}
+                              className="answer-latex-content"
+                            />
                           </div>
                         </div>
                       )}
