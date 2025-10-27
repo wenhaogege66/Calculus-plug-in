@@ -128,14 +128,58 @@
   color: #374151;
 }
 
-/* 数学公式样式 */
+/* ==================== KaTeX数学公式样式 ==================== */
+/* 工业界标准：依赖katex.min.css提供基础样式，这里只做微调 */
+
+/* 行内数学公式 */
+.markdown-renderer .math.math-inline {
+  /* remark-math自动添加的class */
+  display: inline;
+  margin: 0;
+}
+
 .markdown-renderer .katex {
-  font-size: 1em;
+  font-size: 1.05em;
+  line-height: 1;
+}
+
+/* 块级数学公式 */
+.markdown-renderer .math.math-display {
+  /* remark-math自动添加的class */
+  display: block;
+  margin: 1.2em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .markdown-renderer .katex-display {
-  margin: 1em 0;
+  /* katex自动添加的class */
+  margin: 0;
   text-align: center;
+  padding: 0.5em 0;
+}
+
+/* 大型数学公式自动滚动 */
+.markdown-renderer .katex-display > .katex {
+  display: inline-block;
+  text-align: left;
+  max-width: 100%;
+}
+
+/* 只包含数学公式的段落（去除多余边距） */
+.markdown-renderer p.math-only-paragraph {
+  margin: 0;
+}
+
+/* 数学公式错误提示样式 */
+.markdown-renderer .katex-error {
+  color: #dc2626;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  padding: 0.2em 0.4em;
+  font-family: monospace;
+  font-size: 0.9em;
 }
 
 /* 增强的LaTeX公式样式 */
@@ -330,29 +374,22 @@
   color: #6b7280;
 }
 
-/* 深色模式下的数学公式样式 */
-.main-layout.dark .markdown-renderer .math-inline,
-.main-layout.dark .markdown-renderer .latex-inline {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+/* 深色模式下的KaTeX样式 */
+.main-layout.dark .markdown-renderer .katex {
+  color: #e5e7eb;
 }
 
-.main-layout.dark .markdown-renderer .math-block,
-.main-layout.dark .markdown-renderer .latex-display {
-  background: rgba(59, 130, 246, 0.1);
-  border-color: rgba(59, 130, 246, 0.3);
-  color: #60a5fa;
+.main-layout.dark .markdown-renderer .katex-error {
+  color: #f87171;
+  background: rgba(220, 38, 38, 0.1);
+  border-color: #dc2626;
 }
 
-.main-layout.dark .markdown-renderer .math-complex,
-.main-layout.dark .markdown-renderer .latex-complex {
-  background: rgba(168, 85, 247, 0.15);
-  border-color: rgba(168, 85, 247, 0.3);
-  color: #a78bfa;
-}
-
-.main-layout.dark .markdown-renderer .latex-symbol {
-  color: #34d399;
+/* 深色模式下的数学公式背景优化 */
+.main-layout.dark .markdown-renderer .math.math-display {
+  background: rgba(59, 130, 246, 0.05);
+  border-radius: 8px;
+  padding: 0.5em;
 }
 
 /* 空内容和错误状态样式 */

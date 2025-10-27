@@ -39,56 +39,31 @@ class MarkdownErrorBoundary extends React.Component<
   }
 }
 
+/**
+ * 最小化预处理Markdown内容 - 只修复MathPix OCR的特殊格式问题
+ *
+ * 工业界标准：直接使用 remark-math + rehype-katex，无需复杂处理
+ * 这里只做MathPix OCR特有格式的标准化转换
+ */
 function preprocessMmd(raw: string) {
-  if (!raw) return { text: "", hadUnbalancedDollar: false };
+  if (!raw) return raw;
 
-  let s = raw
+  // 只做必要的清理：移除控制字符和零宽字符
+  let text = raw
     .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
     .replace(/[\u200B-\u200F\u2028-\u202F\u205F-\u206F]/g, "");
 
-  const blocks: string[] = [];
-  s = s.replace(/\$\$([\s\S]*?)\$\$/g, (_, inner) => {
-    const id = blocks.length;
-    blocks.push(inner);
-    return `@@__MATH_BLOCK_${id}__@@`;
-  });
-  s = s.replace(/\\\[([\s\S]*?)\\\]/g, (_, inner) => {
-    const id = blocks.length;
-    blocks.push(inner);
-    return `@@__MATH_BLOCK_${id}__@@`;
-  });
-
-  const chars = s.split("");
-  const singleDollarIdx: number[] = [];
-  for (let i = 0; i < chars.length; i++) {
-    if (chars[i] !== "$") continue;
-    const prev = i > 0 ? chars[i - 1] : "";
-    const next = i + 1 < chars.length ? chars[i + 1] : "";
-    const isEscaped = prev === "\\";
-    const isDouble = prev === "$" || next === "$";
-    if (!isEscaped && !isDouble) {
-      singleDollarIdx.push(i);
+  // MathPix OCR特殊处理：将单$包裹的大型LaTeX环境转为块级公式
+  // 这是MathPix OCR的已知问题，它会用单$包裹本应为块级的array等环境
+  text = text.replace(
+    /\$\\begin\{(array|matrix|pmatrix|bmatrix|vmatrix|cases|align|aligned|equation|gather|split)\}([\s\S]*?)\\end\{\1\}\$/g,
+    (match, env, content) => {
+      // 转为标准的块级数学公式格式
+      return `\n$$\n\\begin{${env}}${content}\\end{${env}}\n$$\n`;
     }
-  }
-  let hadUnbalancedDollar = false;
-  if (singleDollarIdx.length % 2 === 1) {
-    const j = singleDollarIdx[singleDollarIdx.length - 1];
-    chars.splice(j, 1, "\\$");
-    hadUnbalancedDollar = true;
-  }
-  s = chars.join("");
+  );
 
-  // 还原块级数学（空内容直接删除）
-  s = s.replace(/@@__MATH_BLOCK_(\d+)__@@/g, (_, n) => {
-    const inner = blocks[Number(n)]?.trim();
-    if (!inner) return "";
-    return `$$${inner}$$`;
-  });
-
-  // 删除空行内公式
-  s = s.replace(/\$\s*\$/g, "");
-
-  return { text: s, hadUnbalancedDollar };
+  return text;
 }
 
 function looksLikeMath(s: string) {
@@ -112,12 +87,15 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
   className = "",
   maxLength
 }) => {
-  const { text: cleaned, hadUnbalancedDollar } = preprocessMmd(
+  // 预处理：只做MathPix OCR格式标准化
+  const preprocessed = preprocessMmd(
     typeof content === "string" ? content : String(content ?? "")
   );
-  const processed = safeTruncate(cleaned, maxLength);
 
-  if (!processed.trim()) {
+  // 可选的截断处理（但数学内容不截断）
+  const finalContent = safeTruncate(preprocessed, maxLength);
+
+  if (!finalContent.trim()) {
     return (
       <div className={`markdown-renderer simple ${className} empty`}>
         <span className="empty-placeholder">暂无内容</span>
@@ -126,34 +104,34 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
   }
 
   return (
-    <div
-      className={[
-        "markdown-renderer",
-        "simple",
-        className,
-        looksLikeMath(cleaned) && maxLength ? "is-math" : ""
-      ].join(" ")}
-      title={hadUnbalancedDollar ? "内容中存在不成对的 $，已自动修复" : undefined}
-    >
-      <MarkdownErrorBoundary fallback={<pre className="fallback-content">{processed}</pre>}>
+    <div className={`markdown-renderer simple ${className}`}>
+      <MarkdownErrorBoundary fallback={<pre className="fallback-content">{finalContent}</pre>}>
         <ReactMarkdown
           remarkPlugins={[remarkMath]}
           rehypePlugins={[
             [
               rehypeKatex,
               {
-                throwOnError: false,
-                strict: false,
-                output: "html"
-              } as any
+                throwOnError: false,   // 容错：遇到错误时显示错误而非崩溃
+                strict: false,          // 宽松模式：支持更多LaTeX语法
+                output: "html",         // HTML输出（更好的浏览器兼容性）
+                fleqn: false,           // 块级公式居中显示
+                macros: {               // 可选：自定义LaTeX宏
+                  "\\RR": "\\mathbb{R}",
+                  "\\NN": "\\mathbb{N}",
+                  "\\ZZ": "\\mathbb{Z}",
+                  "\\QQ": "\\mathbb{Q}",
+                  "\\CC": "\\mathbb{C}"
+                }
+              }
             ]
           ]}
         >
-          {processed}
+          {finalContent}
         </ReactMarkdown>
       </MarkdownErrorBoundary>
 
-      {maxLength && content && content.length > maxLength && !looksLikeMath(cleaned) && (
+      {maxLength && content && content.length > maxLength && !looksLikeMath(preprocessed) && (
         <div className="md-truncated-indicator">...</div>
       )}
     </div>
