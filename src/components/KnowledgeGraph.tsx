@@ -177,7 +177,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
 
     const nodeIds = new Set(filteredNodes.map(n => n.id));
     
-    // 安全处理链接数据
+    // 安全处理链接数据 - 确保source和target是字符串ID格式，以匹配D3的.id()函数
     const rawLinks = graphData.links || [];
     const filteredLinks = rawLinks.filter(link => {
       if (!link || typeof link.source === 'undefined' || typeof link.target === 'undefined') {
@@ -189,8 +189,9 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
       return nodeIds.has(sourceId) && nodeIds.has(targetId);
     }).map(link => ({
       ...link,
-      source: typeof link.source === 'object' ? link.source.id : link.source,
-      target: typeof link.target === 'object' ? link.target.id : link.target
+      // 转换为字符串以匹配.id()函数的返回值
+      source: String(typeof link.source === 'object' ? link.source.id : link.source),
+      target: String(typeof link.target === 'object' ? link.target.id : link.target)
     }));
 
     console.log('Filtered', filteredNodes.length, 'nodes and', filteredLinks.length, 'links');

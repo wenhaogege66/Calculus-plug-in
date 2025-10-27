@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
+import { SimpleMarkdownRenderer } from './SimpleMarkdownRenderer';
 import './KnowledgePointDetail.css';
 
 interface KnowledgePointError {
@@ -255,9 +256,10 @@ export const KnowledgePointDetail: React.FC<KnowledgePointDetailProps> = ({
             {expandedSections.explanation && (
               <div className="section-content">
                 <div className="ai-explanation">
-                  {data.aiExplanation.split('\n').map((paragraph, idx) => (
-                    <p key={idx}>{paragraph}</p>
-                  ))}
+                  <SimpleMarkdownRenderer
+                    content={data.aiExplanation || ''}
+                    className="explanation-content"
+                  />
                 </div>
                 <div className="knowledge-keywords">
                   <h4>关键词</h4>
