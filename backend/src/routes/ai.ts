@@ -371,7 +371,8 @@ async function callDeepseekAPI(
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
-      }
+      },
+      timeout: 60000 // 添加60秒超时控制
     });
 
     const result = JSON.parse(response.data.choices[0].message.content);
@@ -395,24 +396,14 @@ async function callDeepseekAPI(
 
   } catch (error) {
     console.error('Deepseek API调用失败:', error);
-    
-    // 返回默认批改结果
-    return {
-      score: 75,
-      maxScore: 100,
-      feedback: 'AI批改服务暂时不可用，请稍后重试。',
-      errors: [],
-      suggestions: ['请稍后重试AI批改功能'],
-      strengths: ['成功提交了作业'],
-      questionCount: 1,
-      incorrectCount: 0,
-      correctCount: 1,
-      knowledgePoints: ['待分析'],
-      detailedErrors: [],
-      improvementAreas: ['暂无分析'],
-      nextStepRecommendations: ['请稍后重试'],
-      raw: { error: error instanceof Error ? error.message : '未知错误' }
-    };
+    console.error('错误详情:', {
+      message: error instanceof Error ? error.message : '未知错误',
+      stack: error instanceof Error ? error.stack : undefined,
+      apiKey: apiKey ? '已配置' : '未配置'
+    });
+
+    // 直接抛出错误，不返回默认分数，避免误导用户
+    throw new Error(`AI批改服务暂时不可用: ${error instanceof Error ? error.message : '未知错误'}。请稍后重试或联系管理员: 3220104512@zju.edu.cn`);
   }
 }
 

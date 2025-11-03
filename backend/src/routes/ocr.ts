@@ -481,8 +481,15 @@ async function processPdfFile(fileBuffer: Buffer, fileType: string, BASE: string
     throw new Error('MathPix OCR未能识别出任何文本内容');
   }
 
-  // 仅清理null字节和极少数有害字符，保留LaTeX格式字符
-  const cleanText = text.replace(/\x00/g, ''); // 只移除null字节，保留其他字符以维持LaTeX格式
+  // 改进的文本清洗逻辑 - 保留LaTeX格式字符，移除有害字符
+  const cleanText = text
+    .replace(/\x00/g, '') // 移除null字节
+    .replace(/[\x01-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '') // 移除控制字符，保留\n和\r
+    .replace(/\uFFFD/g, ''); // 移除替换字符（�）
+
+  if (cleanText.trim().length === 0) {
+    throw new Error('OCR识别结果清洗后为空，可能包含过多特殊字符');
+  }
 
   // 尝试获取LaTeX格式 (可选)
   let latex = '';
@@ -492,8 +499,11 @@ async function processPdfFile(fileBuffer: Buffer, fileType: string, BASE: string
       responseType: 'text'
     });
     const rawLatex = latexResponse.data as string;
-    // 同样仅清理null字节，保留LaTeX格式字符
-    latex = rawLatex.replace(/\x00/g, '');
+    // 同样使用改进的清洗逻辑
+    latex = rawLatex
+      .replace(/\x00/g, '')
+      .replace(/[\x01-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '')
+      .replace(/\uFFFD/g, '');
   } catch (e) {
     console.log('📝 LaTeX格式不可用，使用Markdown格式');
   }
