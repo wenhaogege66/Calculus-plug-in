@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
-import { SimpleMarkdownRenderer } from './SimpleMarkdownRenderer';
+import { MathPixMarkdownRenderer } from './MathPixMarkdownRenderer';
 import './PracticeDetailPage.css';
 
 interface PracticeDetailProps {
@@ -609,8 +609,8 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                   </button>
                 </div>
                 <div className="recognized-text">
-                  <SimpleMarkdownRenderer 
-                    content={session.ocrResult?.recognizedText || ''} 
+                  <MathPixMarkdownRenderer
+                    content={session.ocrResult?.recognizedText || ''}
                     className="ocr-content"
                   />
                 </div>
@@ -690,8 +690,8 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                     </div>
                   </div>
                   <div className="feedback-content-wrapper">
-                    <SimpleMarkdownRenderer 
-                      content={session.gradingResult?.feedback || ''} 
+                    <MathPixMarkdownRenderer
+                      content={session.gradingResult?.feedback || ''}
                       className="feedback-content enhanced"
                     />
                   </div>
@@ -784,8 +784,8 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                           </div>
                           
                           <div className="question-content">
-                            <SimpleMarkdownRenderer 
-                              content={question.content || ''} 
+                            <MathPixMarkdownRenderer
+                              content={question.content || ''}
                               className="question-text"
                             />
                           </div>
@@ -822,8 +822,8 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                           {visibleAnswers.has(question.id) && (
                             <div className="standard-answer">
                               <h6>📚 标准答案：</h6>
-                              <SimpleMarkdownRenderer 
-                                content={question.standardAnswer || ''} 
+                              <MathPixMarkdownRenderer
+                                content={question.standardAnswer || ''}
                                 className="answer-content"
                               />
                             </div>
@@ -836,8 +836,8 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                                 得分：{question.aiGradingResult.score}/{question.aiGradingResult.maxScore}分
                               </div>
                               <div className="feedback-text">
-                                <SimpleMarkdownRenderer 
-                                  content={question.aiGradingResult?.feedback || ''} 
+                                <MathPixMarkdownRenderer
+                                  content={question.aiGradingResult?.feedback || ''}
                                   className="feedback-content"
                                 />
                               </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Storage } from '@plasmohq/storage';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
-import { SimpleMarkdownRenderer } from './SimpleMarkdownRenderer';
+import { MathPixMarkdownRenderer } from './MathPixMarkdownRenderer';
 import './HomePage.css';
 
 interface HomePageProps {
@@ -1024,8 +1024,8 @@ export const HomePage: React.FC<HomePageProps> = ({ authState, isDarkMode, onPag
                     <div key={index} className="search-result-item">
                       <span className="result-icon">💡</span>
                       <div className="result-content">
-                        <SimpleMarkdownRenderer 
-                          content={result} 
+                        <MathPixMarkdownRenderer
+                          content={result}
                           className="search-result-markdown"
                           maxLength={2000}
                         />

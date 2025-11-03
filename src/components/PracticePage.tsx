@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
 import { PracticeDetailPage } from './PracticeDetailPage';
-import { SimpleMarkdownRenderer } from './SimpleMarkdownRenderer';
+import { MathPixMarkdownRenderer } from './MathPixMarkdownRenderer';
 import './PracticePage.css';
 
 interface PracticeSession {
@@ -497,8 +497,8 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
             <div className="ocr-preview">
               <h5>📄 识别内容预览</h5>
               <div className="ocr-text-preview">
-                <SimpleMarkdownRenderer 
-                  content={session.ocrText} 
+                <MathPixMarkdownRenderer
+                  content={session.ocrText}
                   className="preview compact"
                   maxLength={150}
                 />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
-import { SimpleMarkdownRenderer } from './SimpleMarkdownRenderer';
+import { MathPixMarkdownRenderer } from './MathPixMarkdownRenderer';
 import './MistakesPage.css';
 
 interface ErrorBookItem {
@@ -366,8 +366,8 @@ export const MistakesPage: React.FC<MistakesPageProps> = ({ authState }) => {
 
                   {item.ocrText && (
                     <div className="ocr-content">
-                      <SimpleMarkdownRenderer 
-                        content={item.ocrText} 
+                      <MathPixMarkdownRenderer
+                        content={item.ocrText}
                         className="preview compact"
                         maxLength={200}
                       />

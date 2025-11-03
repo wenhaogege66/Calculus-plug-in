@@ -1,0 +1,255 @@
+/* MathPix Markdown Renderer Styles */
+
+.mathpix-markdown-renderer-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* Loading state */
+.mathpix-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background-color: rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error state */
+.mathpix-error {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  background-color: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.mathpix-error .error-icon {
+  font-size: 18px;
+  margin-right: 4px;
+}
+
+.mathpix-error small {
+  font-size: 12px;
+  color: rgba(239, 68, 68, 0.7);
+}
+
+/* Main content container */
+.mathpix-markdown-content {
+  width: 100%;
+  line-height: 1.6;
+  color: #1f2937;
+  transition: opacity 0.2s;
+}
+
+.mathpix-markdown-content.loading {
+  opacity: 0.5;
+}
+
+.mathpix-markdown-content.error-mode {
+  font-family: monospace;
+  white-space: pre-wrap;
+  background-color: rgba(0, 0, 0, 0.02);
+  padding: 12px;
+  border-radius: 4px;
+}
+
+/* Empty state */
+.mathpix-markdown-renderer.empty {
+  padding: 32px;
+  text-align: center;
+}
+
+.empty-message {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .mathpix-markdown-content {
+    color: #e5e7eb;
+  }
+
+  .mathpix-loading {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+
+  .mathpix-error {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+  }
+
+  .mathpix-markdown-content.error-mode {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .empty-message {
+    color: #6b7280;
+  }
+}
+
+/* Math equation styling - inherits from MathJax but can be customized */
+.mathpix-markdown-content .MathJax {
+  font-size: 1.1em;
+}
+
+.mathpix-markdown-content .MathJax_Display {
+  margin: 1em 0;
+}
+
+/* LaTeX table styling */
+.mathpix-markdown-content table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  min-width: 50%;
+}
+
+.mathpix-markdown-content table td,
+.mathpix-markdown-content table th {
+  border: 1px solid #d1d5db;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.mathpix-markdown-content table th {
+  background-color: rgba(0, 0, 0, 0.05);
+  font-weight: 600;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mathpix-markdown-content table td,
+  .mathpix-markdown-content table th {
+    border-color: #4b5563;
+  }
+
+  .mathpix-markdown-content table th {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* Code blocks */
+.mathpix-markdown-content pre {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.mathpix-markdown-content code {
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mathpix-markdown-content pre {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* Headings */
+.mathpix-markdown-content h1,
+.mathpix-markdown-content h2,
+.mathpix-markdown-content h3,
+.mathpix-markdown-content h4,
+.mathpix-markdown-content h5,
+.mathpix-markdown-content h6 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+}
+
+.mathpix-markdown-content h1 {
+  font-size: 1.8em;
+}
+
+.mathpix-markdown-content h2 {
+  font-size: 1.5em;
+}
+
+.mathpix-markdown-content h3 {
+  font-size: 1.3em;
+}
+
+/* Lists */
+.mathpix-markdown-content ul,
+.mathpix-markdown-content ol {
+  padding-left: 2em;
+  margin: 1em 0;
+}
+
+.mathpix-markdown-content li {
+  margin: 0.5em 0;
+}
+
+/* Paragraphs */
+.mathpix-markdown-content p {
+  margin: 1em 0;
+}
+
+/* Links */
+.mathpix-markdown-content a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+.mathpix-markdown-content a:hover {
+  text-decoration: underline;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mathpix-markdown-content a {
+    color: #60a5fa;
+  }
+}
+
+/* Blockquotes */
+.mathpix-markdown-content blockquote {
+  border-left: 4px solid #e5e7eb;
+  padding-left: 1em;
+  margin: 1em 0;
+  color: #6b7280;
+  font-style: italic;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mathpix-markdown-content blockquote {
+    border-left-color: #4b5563;
+    color: #9ca3af;
+  }
+}
+
+/* Horizontal rules */
+.mathpix-markdown-content hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 2em 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mathpix-markdown-content hr {
+    border-top-color: #4b5563;
+  }
+}
