@@ -14,7 +14,7 @@
  */
 
 import React, { useEffect, useRef, useMemo } from 'react';
-import { MathpixMarkdownModel } from 'mathpix-markdown-it';
+import { MathpixMarkdownModel as MM } from 'mathpix-markdown-it';
 import './MathPixMarkdownRenderer.css';
 
 interface MathPixMarkdownRendererProps {
@@ -55,6 +55,20 @@ export const MathPixMarkdownRenderer: React.FC<MathPixMarkdownRendererProps> = (
     return content;
   }, [content, maxLength]);
 
+  // 注入MathPix样式（仅执行一次）
+  useEffect(() => {
+    const styleId = 'Mathpix-styles';
+    const existingStyle = document.getElementById(styleId);
+
+    if (!existingStyle) {
+      const style = document.createElement('style');
+      style.setAttribute('id', styleId);
+      style.innerHTML = MM.getMathpixFontsStyle() + MM.getMathpixStyle(true);
+      document.head.appendChild(style);
+    }
+  }, []);
+
+  // 渲染MathPix Markdown内容
   useEffect(() => {
     if (!containerRef.current || !processedContent) {
       setIsLoading(false);
@@ -65,27 +79,13 @@ export const MathPixMarkdownRenderer: React.FC<MathPixMarkdownRendererProps> = (
       setIsLoading(true);
       setRenderError(null);
 
-      // 配置MathPix Markdown渲染选项
-      const options = {
-        // 启用LaTeX表格支持
+      // 使用MathPix官方推荐的静态方法渲染
+      const html = MM.render(processedContent, {
         htmlTags: true,
-        // 启用公式自动编号
         width: 1200,
-        // 数学公式渲染配置
         breaks: true,
-        typographer: true,
-        // MathJax配置
-        outMath: {
-          // 使用SVG渲染数学公式(更清晰)
-          display_mode: 'svg'
-        }
-      };
-
-      // 创建MathPix Markdown渲染器实例
-      const mathpixMarkdown = new MathpixMarkdownModel();
-
-      // 渲染Markdown为HTML
-      const html = mathpixMarkdown.markdownToHTML(processedContent, options);
+        typographer: true
+      });
 
       // 注入渲染后的HTML
       if (containerRef.current) {

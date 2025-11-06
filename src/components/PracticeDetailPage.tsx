@@ -372,7 +372,7 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
           {errors.map((error, index) => (
             <div key={index} className="error-item enhanced">
               <div className="error-icon">
-                {error.severity === 'major' ? '🔴' : 
+                {error.severity === 'major' ? '🔴' :
                  error.severity === 'minor' ? '🟢' : '🟡'}
               </div>
               <div className="error-content">
@@ -380,7 +380,7 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                   <span className="error-type">{error.errorType || '错误'}</span>
                   {error.severity && (
                     <span className={`error-severity ${error.severity}`}>
-                      {error.severity === 'major' ? '严重' : 
+                      {error.severity === 'major' ? '严重' :
                        error.severity === 'minor' ? '轻微' : '中等'}
                     </span>
                   )}
@@ -409,82 +409,6 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                     <span className="knowledge-tag-inline enhanced">{error.knowledgePoint}</span>
                   </div>
                 )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const renderSuggestions = (suggestions: any[]) => {
-    if (!suggestions || suggestions.length === 0) return null;
-
-    return (
-      <div className="suggestions-details enhanced">
-        <div className="section-header">
-          <h4>💡 改进建议</h4>
-          <span className="count-badge suggestion">{suggestions.length}</span>
-        </div>
-        <div className="suggestion-list">
-          {suggestions.map((suggestion, index) => (
-            <div key={index} className="suggestion-item enhanced">
-              <div className="suggestion-icon">
-                {suggestion.priority === 'high' ? '🔥' : 
-                 suggestion.priority === 'medium' ? '⚡' : '💭'}
-              </div>
-              <div className="suggestion-content">
-                <div className="suggestion-header">
-                  <span className="suggestion-aspect">{suggestion.aspect || '建议'}</span>
-                  {suggestion.priority && (
-                    <span className={`priority-badge ${suggestion.priority}`}>
-                      {suggestion.priority === 'high' ? '高优先级' : 
-                       suggestion.priority === 'medium' ? '中优先级' : '低优先级'}
-                    </span>
-                  )}
-                </div>
-                <div className="suggestion-description">
-                  {suggestion.recommendation || suggestion.description ||
-                   (typeof suggestion === 'string' ? suggestion : '暂无建议')}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const renderStrengths = (strengths: any[]) => {
-    if (!strengths || strengths.length === 0) return null;
-
-    return (
-      <div className="strengths-details enhanced">
-        <div className="section-header">
-          <h4>🌟 优点分析</h4>
-          <span className="count-badge strength">{strengths.length}</span>
-        </div>
-        <div className="strength-list">
-          {strengths.map((strength, index) => (
-            <div key={index} className="strength-item enhanced">
-              <div className="strength-icon">
-                {strength.importance === 'high' ? '⭐' : 
-                 strength.importance === 'medium' ? '✨' : '💫'}
-              </div>
-              <div className="strength-content">
-                <div className="strength-header">
-                  <span className="strength-aspect">{strength.aspect || '优点'}</span>
-                  {strength.importance && (
-                    <span className={`importance-badge ${strength.importance}`}>
-                      {strength.importance === 'high' ? '非常重要' : 
-                       strength.importance === 'medium' ? '比较重要' : '一般重要'}
-                    </span>
-                  )}
-                </div>
-                <div className="strength-description">
-                  {strength.description ||
-                   (typeof strength === 'string' ? strength : '暂无描述')}
-                </div>
               </div>
             </div>
           ))}
@@ -698,18 +622,8 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                 </div>
 
                 {/* 错误分析 */}
-                {session.gradingResult.detailedErrors && session.gradingResult.detailedErrors.length > 0 && 
+                {session.gradingResult.detailedErrors && session.gradingResult.detailedErrors.length > 0 &&
                   renderErrorDetails(session.gradingResult.detailedErrors)
-                }
-
-                {/* 改进建议 */}
-                {session.gradingResult.suggestions && session.gradingResult.suggestions.length > 0 && 
-                  renderSuggestions(session.gradingResult.suggestions)
-                }
-
-                {/* 优点分析 */}
-                {session.gradingResult.strengths && session.gradingResult.strengths.length > 0 && 
-                  renderStrengths(session.gradingResult.strengths)
                 }
 
                 {/* 类似题生成区域 */}

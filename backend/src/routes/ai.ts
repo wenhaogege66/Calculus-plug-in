@@ -344,9 +344,9 @@ async function callDeepseekAPI(
   nextStepRecommendations?: string[];
   raw: any;
 }> {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+
   try {
-    const apiKey = process.env.DEEPSEEK_API_KEY;
-    
     if (!apiKey) {
       throw new Error('Deepseek API密钥未配置');
     }
@@ -407,7 +407,7 @@ async function callDeepseekAPI(
   }
 }
 
-// 作业模式prompt - 题目和解答分开处理
+// 作业模式prompt - 简化版，专注错误定位
 function buildAssignmentModePrompt(
   subject: string,
   teacherQuestionText: string | null,
@@ -423,7 +423,7 @@ ${teacherQuestionLatex}
 ` : ''}` : '';
 
   return `
-你是一位资深的${subject}教师，请对以下学生作业进行全面、详细的智能批改分析。
+你是一位资深的${subject}教师，请精准批改学生作业，重点标注错误位置。
 
 【作业模式 - 题目与解答分离】
 ${questionSection}
@@ -432,58 +432,54 @@ ${questionSection}
 ${studentAnswerText}
 
 批改要求：
-1. 根据上述题目要求进行精准评分，检查解题过程的完整性和正确性
-2. 分析学生对题目要求的理解程度和解题思路是否正确
-3. 评估解题步骤的逻辑性和数学严谨性
-4. 验证计算结果的准确性
-5. 检查是否完整回答了题目的所有部分
+1. 精准评分（0-100分），基于解答的完整性和正确性
+2. 准确统计题目数量、答对数量、答错数量
+3. 识别涉及的微积分知识点（从下方列表中选择）
+4. **核心任务**：精确标注每个错误的位置（行号、起始字符、结束字符）
+5. 对每个错误给出：错误类型、正确答案、简短解释
+6. feedback简洁明了，指出主要问题即可
 
 ${getKnowledgePointsSection()}
 
 ${getJsonFormatSection()}
 
 关键要求：
-1. 准确统计题目数量和错题数量（基于教师提供的题目）
-2. 精确识别涉及的微积分知识点
-3. 详细分析每个错误的类型、位置和改正方法
-4. 提供具体可操作的改进建议
-5. 客观评价学生的优点和不足
-6. 评分范围0-100，要基于答题的完整性和准确性
-7. 返回格式必须是有效的JSON，不包含任何其他文字
+1. 必须返回有效的JSON格式，不包含其他文字
+2. detailedErrors是核心，必须精确标注line、startChar、endChar
+3. feedback要简洁，不要冗长的说教
+4. 不要返回suggestions、strengths、improvementAreas、nextStepRecommendations等冗余字段
 `;
 }
 
-// 练习模式prompt - 题目和解答一体处理
+// 练习模式prompt - 简化版，专注错误定位
 function buildPracticeModePrompt(subject: string, contentText: string): string {
   return `
-你是一位资深的${subject}教师，请对以下学生练习进行全面、详细的智能批改分析。
+你是一位资深的${subject}教师，请精准批改学生练习，重点标注错误位置。
 
 【练习模式 - 题目与解答一体】
-以下内容既包含题目又包含学生的解答，请仔细识别哪些是题目，哪些是学生的解答过程：
+以下内容包含题目和学生解答，请识别并批改：
 
 练习内容：
 ${contentText}
 
 批改要求：
-1. 首先识别出具体的题目内容和学生解答内容
-2. 基于微积分知识体系进行评分
-3. 分析解题思路和方法选择的合理性
-4. 检查数学概念理解的准确程度
-5. 评估计算过程的规范性
-6. 对于每道题目，分析学生的解题过程是否正确
+1. 识别题目和解答内容
+2. 精准评分（0-100分），基于解答的完整性和正确性
+3. 准确统计题目数量、答对数量、答错数量
+4. 识别涉及的微积分知识点（从下方列表中选择）
+5. **核心任务**：精确标注每个错误的位置（行号、起始字符、结束字符）
+6. 对每个错误给出：错误类型、正确答案、简短解释
+7. feedback简洁明了，指出主要问题即可
 
 ${getKnowledgePointsSection()}
 
 ${getJsonFormatSection()}
 
 关键要求：
-1. 准确识别和统计题目数量，以及学生答对/答错的题目数量
-2. 精确识别涉及的微积分知识点
-3. 详细分析每个错误的类型、位置和改正方法
-4. 提供具体可操作的改进建议
-5. 客观评价学生的优点和不足
-6. 评分范围0-100，要基于答题的完整性和准确性
-7. 返回格式必须是有效的JSON，不包含任何其他文字
+1. 必须返回有效的JSON格式，不包含其他文字
+2. detailedErrors是核心，必须精确标注line、startChar、endChar
+3. feedback要简洁，不要冗长的说教
+4. 不要返回suggestions、strengths、improvementAreas、nextStepRecommendations等冗余字段
 `;
 }
 
@@ -507,7 +503,7 @@ function getKnowledgePointsSection(): string {
 `;
 }
 
-// JSON格式示例 - 公共部分
+// JSON格式示例 - 公共部分（简化版，专注错误定位）
 function getJsonFormatSection(): string {
   return `
 请严格参考以下JSON格式返回批改结果：
@@ -522,53 +518,30 @@ function getJsonFormatSection(): string {
     "复合函数求导",
     "洛必达法则"
   ],
-  "feedback": "整体解答思路正确，显示出对微积分基本概念的良好理解。主要问题出现在计算环节，需要加强计算准确性的训练。",
+  "feedback": "整体解答思路正确，主要问题出现在第1题第3行的导数计算中。",
   "detailedErrors": [
     {
       "questionNumber": 1,
       "line": 3,
+      "startChar": 0,
+      "endChar": 20,
       "content": "d/dx(x²+1) = 2x+1",
       "errorType": "计算错误",
       "correction": "d/dx(x²+1) = 2x",
-      "explanation": "常数的导数为0，所以常数项1求导后应该消除",
+      "explanation": "常数的导数为0，常数项1求导后应该消除",
       "severity": "major",
       "knowledgePoint": "基本导数公式"
     }
-  ],
-  "suggestions": [
-    {
-      "aspect": "计算准确性",
-      "recommendation": "建议多练习基本导数公式，特别注意常数项的处理",
-      "priority": "high"
-    },
-    {
-      "aspect": "解题步骤",
-      "recommendation": "可以在每一步计算后进行自检，确保每步都正确",
-      "priority": "medium"
-    }
-  ],
-  "strengths": [
-    {
-      "aspect": "解题思路",
-      "description": "正确识别了需要使用链式法则的复合函数",
-      "importance": "high"
-    },
-    {
-      "aspect": "公式应用",
-      "description": "熟练掌握了基本的求导公式",
-      "importance": "medium"
-    }
-  ],
-  "improvementAreas": [
-    "计算准确性需要提升",
-    "细节检查能力有待加强"
-  ],
-  "nextStepRecommendations": [
-    "加强基础计算练习",
-    "学习使用验算方法检查结果",
-    "练习更复杂的复合函数求导"
   ]
 }
+
+重要说明：
+1. detailedErrors是核心，必须精确标注每个错误的位置
+2. line: 错误所在行号（从1开始）
+3. startChar: 错误内容在该行的起始字符位置（从0开始）
+4. endChar: 错误内容在该行的结束字符位置（不含）
+5. feedback要简洁明了，指出主要问题即可
+6. 不要返回suggestions, strengths, improvementAreas, nextStepRecommendations等冗余字段
 `;
 }
 

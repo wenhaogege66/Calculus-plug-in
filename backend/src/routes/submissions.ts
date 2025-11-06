@@ -233,6 +233,15 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
               rawResult: true,
               createdAt: true
             }
+          },
+          assignment: {
+            select: {
+              id: true,
+              title: true,
+              ocrText: true,
+              ocrLatex: true,
+              ocrStatus: true
+            }
           }
         }
       });

@@ -58,7 +58,7 @@
 .mathpix-markdown-content {
   width: 100%;
   line-height: 1.6;
-  color: #1f2937;
+  color: inherit; /* 继承父元素颜色，让MathPix默认样式生效 */
   transition: opacity 0.2s;
 }
 
@@ -88,7 +88,7 @@
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
   .mathpix-markdown-content {
-    color: #e5e7eb;
+    color: inherit; /* 深色模式也继承父元素颜色 */
   }
 
   .mathpix-loading {

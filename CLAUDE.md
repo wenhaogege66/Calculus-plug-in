@@ -397,7 +397,55 @@ supabase-storage/
 └── embeddings/         # Vector representations (if stored)
 ```
 
-## Recent Updates (Version 1.1.0)
+## Recent Updates
+
+### Version 1.2.0 - MathPix Rendering & AI Prompt Optimization
+
+**🔧 Critical Bug Fixes:**
+1. **MathPix Formula Color Issue** - Fixed mathematical formulas appearing gray instead of black
+   - Changed CSS from fixed color to `color: inherit` in `MathPixMarkdownRenderer.css`
+   - Allows MathPix default styles to properly render formulas with correct colors
+   - Supports both light and dark mode themes
+
+2. **Assignment OCR Data Display** - Fixed teacher's question recognition not showing in "题目识别" panel
+   - Added assignment relation to Prisma query in `backend/src/routes/submissions.ts`
+   - Now properly includes `ocrText`, `ocrLatex`, and `ocrStatus` fields
+   - Students can now see the original questions when viewing grading results
+
+3. **AI Feedback LaTeX Rendering** - Fixed AI批改 feedback displaying raw text instead of rendered LaTeX
+   - Replaced plain `<p>` tag with `MathPixMarkdownRenderer` component in `AssignmentsPage.tsx`
+   - Professional LaTeX and markdown rendering for all AI feedback content
+   - Consistent rendering experience across practice and homework modes
+
+**🚀 AI Prompt Optimization:**
+- **Focused Error Positioning** - Restructured AI prompt to emphasize precise error location tracking
+  - Added character-level positioning with `line`, `startChar`, `endChar` fields
+  - Enables frontend to highlight exact error locations in student submissions
+  - Improved error severity classification (major/minor/medium)
+
+- **Removed Verbose Fields** - Eliminated low-quality, redundant AI response fields:
+  - Removed: `suggestions`, `strengths`, `improvementAreas`, `nextStepRecommendations`
+  - Frontend cleanup: Removed corresponding UI sections from `AssignmentsPage.tsx` and `PracticeDetailPage.tsx`
+  - AI now focuses on core functionality: scoring, error detection, and concise feedback
+
+- **Simplified JSON Format** - Streamlined AI response structure for better reliability
+  - Reduced token usage and improved response consistency
+  - Clear instructions to AI: "不要返回冗余字段" (Do not return redundant fields)
+  - Focus on actionable feedback instead of generic motivational content
+
+**🛠️ Technical Improvements:**
+- Fixed TypeScript scoping error in `backend/src/routes/ai.ts` (apiKey variable)
+- Updated both assignment mode and practice mode prompts for consistency
+- Enhanced knowledge point selection with structured curriculum mapping
+
+**📝 Files Modified:**
+- `src/components/MathPixMarkdownRenderer.css` - Color inheritance fix
+- `backend/src/routes/submissions.ts` - Assignment relation added
+- `src/components/AssignmentsPage.tsx` - LaTeX rendering + removed suggestions section
+- `src/components/PracticeDetailPage.tsx` - Removed suggestions/strengths sections and functions
+- `backend/src/routes/ai.ts` - Optimized prompts, removed verbose fields, fixed scoping error
+
+### Version 1.1.0 - Markdown Renderer Overhaul
 
 **🔧 Bug Fixes & Improvements:**
 1. **Homepage Search Enhancement** - Fixed display of AI search results from raw JSON to properly formatted markdown content with LaTeX support

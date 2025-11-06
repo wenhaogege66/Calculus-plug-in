@@ -1800,13 +1800,16 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                       {gradingResults.deepseekResults[0].feedback && (
                         <div className="feedback-section">
                           <h4>💬 AI反馈</h4>
-                          <p>{gradingResults.deepseekResults[0].feedback}</p>
+                          <MathPixMarkdownRenderer
+                            content={gradingResults.deepseekResults[0].feedback || ''}
+                            className="feedback-content"
+                          />
                         </div>
                       )}
 
                       {/* 错误分析 */}
-                      {gradingResults.deepseekResults[0].errors && 
-                       Array.isArray(gradingResults.deepseekResults[0].errors) && 
+                      {gradingResults.deepseekResults[0].errors &&
+                       Array.isArray(gradingResults.deepseekResults[0].errors) &&
                        gradingResults.deepseekResults[0].errors.length > 0 && (
                         <div className="errors-section">
                           <h4>❌ 问题分析</h4>
@@ -1817,26 +1820,6 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                                 <span className="error-text">
                                   {typeof error === 'string' ? error :
                                    error.content || error.explanation || error.errorType || JSON.stringify(error)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 改进建议 */}
-                      {gradingResults.deepseekResults[0].suggestions && 
-                       Array.isArray(gradingResults.deepseekResults[0].suggestions) && 
-                       gradingResults.deepseekResults[0].suggestions.length > 0 && (
-                        <div className="suggestions-section">
-                          <h4>💡 改进建议</h4>
-                          <div className="suggestions-list">
-                            {gradingResults.deepseekResults[0].suggestions.map((suggestion: any, index: number) => (
-                              <div key={index} className="suggestion-item">
-                                <span className="suggestion-icon">💡</span>
-                                <span className="suggestion-text">
-                                  {typeof suggestion === 'string' ? suggestion :
-                                   suggestion.recommendation || suggestion.description || JSON.stringify(suggestion)}
                                 </span>
                               </div>
                             ))}
