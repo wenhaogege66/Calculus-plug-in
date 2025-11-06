@@ -316,7 +316,52 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
       };
 
     } catch (error) {
-      fastify.log.error('获取提交状态失败:', error);
+      // 增强的错误日志 - 捕获更多上下文信息
+      const submissionId = (request.params as any).submissionId;
+      const userId = request.currentUser?.id;
+
+      fastify.log.error('❌ 获取提交状态失败:', error);
+
+      // 详细的错误信息日志
+      const errorDetails: any = {
+        timestamp: new Date().toISOString(),
+        submissionId: submissionId,
+        userId: userId,
+        errorType: error?.constructor?.name || 'Unknown',
+      };
+
+      // 捕获标准Error属性
+      if (error instanceof Error) {
+        errorDetails.errorName = error.name;
+        errorDetails.errorMessage = error.message;
+        errorDetails.errorStack = error.stack;
+      }
+
+      // 捕获Prisma特定错误信息
+      if (error && typeof error === 'object') {
+        const prismaError = error as any;
+        if (prismaError.code) errorDetails.prismaCode = prismaError.code;
+        if (prismaError.meta) errorDetails.prismaMeta = prismaError.meta;
+        if (prismaError.clientVersion) errorDetails.prismaClientVersion = prismaError.clientVersion;
+
+        // 尝试捕获所有可枚举属性
+        errorDetails.allProperties = Object.keys(error);
+        errorDetails.fullErrorObject = JSON.stringify(error, Object.getOwnPropertyNames(error));
+      }
+
+      fastify.log.error('📋 完整错误详情:', errorDetails);
+
+      // 如果是Prisma查询错误，记录可能的原因
+      if (errorDetails.prismaCode) {
+        fastify.log.error('⚠️ Prisma错误代码说明:', {
+          P2001: '记录不存在',
+          P2002: '唯一性约束冲突',
+          P2003: '外键约束失败',
+          P2025: '记录未找到',
+          code: errorDetails.prismaCode
+        });
+      }
+
       return reply.code(500).send({
         success: false,
         error: '获取提交状态失败'

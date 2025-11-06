@@ -818,12 +818,30 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
             ) : session.status === 'COMPLETED' || session.status === 'FAILED' ? (
               <div className="error-content">
                 <div className="error-icon">⚠️</div>
-                <h4>AI批改失败</h4>
-                <p>由于OCR识别失败，无法进行AI批改。请先解决文档识别问题。</p>
-                <div className="contact-info">
-                  <p><strong>如需帮助，请联系管理员：</strong></p>
-                  <p>📧 <a href="mailto:3220104512@zju.edu.cn">3220104512@zju.edu.cn</a></p>
-                </div>
+                {session.ocrResult ? (
+                  // OCR成功但AI批改失败
+                  <>
+                    <h4>AI批改失败</h4>
+                    <p>文档识别已完成，但AI批改过程中出现问题。这可能是由于系统繁忙或网络问题导致。</p>
+                    <div className="contact-info">
+                      <p><strong>建议操作：</strong></p>
+                      <p>1. 稍后重新上传文件重试</p>
+                      <p>2. 如问题持续，请联系管理员：<a href="mailto:3220104512@zju.edu.cn">3220104512@zju.edu.cn</a></p>
+                    </div>
+                  </>
+                ) : (
+                  // OCR失败
+                  <>
+                    <h4>文档识别失败</h4>
+                    <p>OCR识别过程中出现问题，可能是文件格式不支持、图片质量过低或内容包含特殊字符。</p>
+                    <div className="contact-info">
+                      <p><strong>建议操作：</strong></p>
+                      <p>1. 确保文件为PDF、JPG或PNG格式</p>
+                      <p>2. 检查图片清晰度，避免模糊或倾斜</p>
+                      <p>3. 如问题持续，请联系管理员：<a href="mailto:3220104512@zju.edu.cn">3220104512@zju.edu.cn</a></p>
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <div className="empty-content">

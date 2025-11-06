@@ -808,8 +808,12 @@ async function startPracticeProcessing(submissionId: number, fastify: any) {
   try {
     fastify.log.info(`🎯 开始练习处理流程 - submissionId: ${submissionId}`);
 
-    // 1. OCR识别 - 使用内部调用header
+    // 追踪各阶段成功状态
+    let ocrSuccess = false;
+    let aiSuccess = false;
     let ocrResult: any = null;
+
+    // 1. OCR识别 - 使用内部调用header
     try {
       const ocrResponse = await fetch(`http://localhost:3000/api/ocr/mathpix`, {
         method: 'POST',
@@ -828,6 +832,9 @@ async function startPracticeProcessing(submissionId: number, fastify: any) {
         ocrResult = { success: false, error: errorText };
       } else {
         ocrResult = await ocrResponse.json();
+        if (ocrResult?.success && ocrResult.data?.recognizedText) {
+          ocrSuccess = true;
+        }
       }
 
       fastify.log.info(`✅ OCR识别完成:`, {
@@ -841,8 +848,8 @@ async function startPracticeProcessing(submissionId: number, fastify: any) {
       ocrResult = { success: false, error: '网络连接失败' };
     }
 
-    // 2. AI批改
-    if (ocrResult?.success && ocrResult.data?.recognizedText) {
+    // 2. AI批改 - 仅在OCR成功时执行
+    if (ocrSuccess) {
       try {
         const aiResponse = await fetch(`http://localhost:3000/api/ai/grade`, {
           method: 'POST',
@@ -865,9 +872,13 @@ async function startPracticeProcessing(submissionId: number, fastify: any) {
 
         if (!aiResponse.ok) {
           const errorText = await aiResponse.text();
-          fastify.log.error(`AI批改失败: ${aiResponse.status} - ${errorText}`);
-        } else {
-          const aiResult = await aiResponse.json() as any;
+          fastify.log.error(`❌ AI批改API调用失败: ${aiResponse.status} - ${errorText}`);
+          throw new Error(`AI批改失败: ${aiResponse.status} - ${errorText}`);
+        }
+
+        const aiResult = await aiResponse.json() as any;
+        if (aiResult?.success && aiResult.data) {
+          aiSuccess = true;
           fastify.log.info(`✅ AI批改完成:`, {
             submissionId,
             score: aiResult.data?.score,
@@ -887,37 +898,65 @@ async function startPracticeProcessing(submissionId: number, fastify: any) {
               fastify.log.error(`⚠️ 错题分析失败 (不影响主流程): submissionId=${submissionId}`, errorAnalysisError);
             }
           }
+        } else {
+          throw new Error('AI批改返回结果无效');
         }
       } catch (error) {
-        fastify.log.error(`AI批改过程异常:`, error);
+        fastify.log.error(`❌ AI批改过程异常:`, error);
+        aiSuccess = false;
       }
     } else {
-      fastify.log.warn(`跳过AI批改: OCR识别未成功或无文本内容`, {
+      fastify.log.warn(`⏭️ 跳过AI批改: OCR识别未成功或无文本内容`, {
         submissionId,
-        ocrSuccess: ocrResult?.success,
+        ocrSuccess,
         hasText: !!ocrResult?.data?.recognizedText
       });
     }
 
-    // 3. 更新提交状态
-    await prisma.submission.update({
-      where: { id: submissionId },
-      data: { 
-        status: 'COMPLETED',
-        completedAt: new Date()
-      }
-    });
-
-    fastify.log.info(`🎉 练习处理流程完成 - submissionId: ${submissionId}`);
+    // 3. 根据处理结果更新提交状态
+    if (ocrSuccess && aiSuccess) {
+      // 两个阶段都成功
+      await prisma.submission.update({
+        where: { id: submissionId },
+        data: {
+          status: 'COMPLETED',
+          completedAt: new Date()
+        }
+      });
+      fastify.log.info(`🎉 练习处理流程完成 - submissionId: ${submissionId}`);
+    } else if (!ocrSuccess) {
+      // OCR失败
+      await prisma.submission.update({
+        where: { id: submissionId },
+        data: {
+          status: 'FAILED',
+          metadata: { error: 'OCR识别失败' }
+        }
+      });
+      fastify.log.error(`❌ OCR识别失败 - submissionId: ${submissionId}`);
+    } else {
+      // OCR成功但AI批改失败
+      await prisma.submission.update({
+        where: { id: submissionId },
+        data: {
+          status: 'FAILED',
+          metadata: { error: 'AI批改失败', ocrCompleted: true }
+        }
+      });
+      fastify.log.error(`❌ AI批改失败 - submissionId: ${submissionId}`);
+    }
 
   } catch (error) {
     fastify.log.error(`❌ 练习处理流程失败 - submissionId: ${submissionId}`, error);
-    
+
     // 更新提交状态为失败
     try {
       await prisma.submission.update({
         where: { id: submissionId },
-        data: { status: 'FAILED' }
+        data: {
+          status: 'FAILED',
+          metadata: { error: '处理流程异常' }
+        }
       });
     } catch (updateError) {
       fastify.log.error(`❌ 更新提交状态失败 - submissionId: ${submissionId}`, updateError);
