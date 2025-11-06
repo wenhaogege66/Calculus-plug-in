@@ -478,8 +478,7 @@ ${getJsonFormatSection()}
 关键要求：
 1. 必须返回有效的JSON格式，不包含其他文字
 2. detailedErrors是核心，必须精确标注line、startChar、endChar
-3. feedback要简洁，不要冗长的说教
-4. 不要返回suggestions、strengths、improvementAreas、nextStepRecommendations等冗余字段
+3. feedback要一语见地
 `;
 }
 
@@ -541,7 +540,6 @@ function getJsonFormatSection(): string {
 3. startChar: 错误内容在该行的起始字符位置（从0开始）
 4. endChar: 错误内容在该行的结束字符位置（不含）
 5. feedback要简洁明了，指出主要问题即可
-6. 不要返回suggestions, strengths, improvementAreas, nextStepRecommendations等冗余字段
 `;
 }
 
@@ -624,8 +622,7 @@ function buildFollowUpPrompt(
 
 要求：
 1. 回应要自然、亲切
-2. 不要主动解释数学问题
-3. 保持简短，1-2句话即可`;
+2. 保持简短，1-2句话即可`;
   }
 
   // 对于数学相关问题，提供完整上下文
