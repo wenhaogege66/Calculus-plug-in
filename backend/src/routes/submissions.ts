@@ -306,6 +306,7 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
           fileUpload: submission.fileUpload,
           mathpixResults: submission.mathpixResults,
           deepseekResults: submission.deepseekResults,
+          assignment: submission.assignment, // 添加 assignment 数据
           progress: {
             percent: progress,
             stage: stage,
