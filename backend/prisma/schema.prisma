@@ -87,12 +87,13 @@ model Submission {
   // 关联
   user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   fileUpload   FileUpload        @relation(fields: [fileUploadId], references: [id], onDelete: Cascade)
+  assignment   Assignment?       @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
   mathpixResults MathPixResult[]
   deepseekResults DeepseekResult[]
   errorAnalysis ErrorAnalysis[]
   similarQuestions SimilarQuestion[]
   mistakeItems MistakeItem[]
-  
+
   @@map("submissions")
 }
 
@@ -226,7 +227,8 @@ model Assignment {
   classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   teacher     User      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   questionFile FileUpload? @relation("AssignmentQuestions", fields: [fileUploadId], references: [id])
-  
+  submissions Submission[]
+
   @@map("assignments")
 }
 
