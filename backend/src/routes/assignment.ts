@@ -113,7 +113,6 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
     } catch (error) {
-      console.error('创建作业失败:', error);
       reply.code(500).send({ success: false, error: '创建作业失败' });
     }
   });
@@ -161,7 +160,6 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
         }))
       });
     } catch (error) {
-      console.error('获取作业列表失败:', error);
       reply.code(500).send({ success: false, error: '获取作业列表失败' });
     }
   });
@@ -267,7 +265,6 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
         }))
       });
     } catch (error) {
-      console.error('获取学生作业列表失败:', error);
       reply.code(500).send({ success: false, error: '获取作业列表失败' });
     }
   });
@@ -334,7 +331,6 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
         }))
       });
     } catch (error) {
-      console.error('获取班级作业列表失败:', error);
       reply.code(500).send({ success: false, error: '获取作业列表失败' });
     }
   });
@@ -459,7 +455,6 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
       });
       
     } catch (error) {
-      console.error('更新作业失败:', error);
       reply.code(500).send({ success: false, error: '更新作业失败' });
     }
   });
@@ -517,7 +512,6 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
       });
       
     } catch (error) {
-      console.error('切换作业状态失败:', error);
       reply.code(500).send({ success: false, error: '切换作业状态失败' });
     }
   });

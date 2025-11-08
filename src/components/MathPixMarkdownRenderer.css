@@ -85,27 +85,81 @@
   font-style: italic;
 }
 
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .mathpix-markdown-content {
-    color: inherit; /* 深色模式也继承父元素颜色 */
-  }
+/* Light mode - explicit styles for app theme */
+.main-layout.light .mathpix-markdown-content {
+  color: #1e293b; /* Ensure dark text in light mode */
+}
 
-  .mathpix-loading {
+.main-layout.light .mathpix-markdown-content mjx-math,
+.main-layout.light .mathpix-markdown-content .MathJax,
+.main-layout.light .mathpix-markdown-content mjx-container {
+  color: #000000 !important; /* Force black color for math formulas */
+}
+
+.main-layout.light .mathpix-loading {
+  background-color: rgba(59, 130, 246, 0.05);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.main-layout.light .mathpix-error {
+  background-color: rgba(239, 68, 68, 0.05);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.main-layout.light .empty-message {
+  color: #9ca3af;
+}
+
+/* Dark mode support - use app theme classes */
+.main-layout.dark .mathpix-markdown-content {
+  color: #f1f5f9; /* Light text in dark mode */
+}
+
+.main-layout.dark .mathpix-markdown-content mjx-math,
+.main-layout.dark .mathpix-markdown-content .MathJax,
+.main-layout.dark .mathpix-markdown-content mjx-container {
+  color: #f1f5f9 !important; /* Light color for math formulas in dark mode */
+}
+
+.main-layout.dark .mathpix-loading {
     background-color: rgba(59, 130, 246, 0.1);
     border-color: rgba(59, 130, 246, 0.3);
   }
 
-  .mathpix-error {
+  .main-layout.dark .mathpix-error {
     background-color: rgba(239, 68, 68, 0.1);
     border-color: rgba(239, 68, 68, 0.3);
   }
 
-  .mathpix-markdown-content.error-mode {
+  .main-layout.dark .mathpix-markdown-content.error-mode {
     background-color: rgba(255, 255, 255, 0.05);
   }
 
-  .empty-message {
+  .main-layout.dark .empty-message {
+    color: #6b7280;
+  }
+
+/* Fallback for browsers without app theme - keep original media query */
+@media (prefers-color-scheme: dark) {
+  body:not(.main-layout) .mathpix-markdown-content {
+    color: #f1f5f9;
+  }
+
+  body:not(.main-layout) .mathpix-loading {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+
+  body:not(.main-layout) .mathpix-error {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+  }
+
+  body:not(.main-layout) .mathpix-markdown-content.error-mode {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  body:not(.main-layout) .empty-message {
     color: #6b7280;
   }
 }
@@ -138,13 +192,23 @@
   font-weight: 600;
 }
 
+.main-layout.dark .mathpix-markdown-content table td,
+.main-layout.dark .mathpix-markdown-content table th {
+  border-color: #4b5563;
+}
+
+.main-layout.dark .mathpix-markdown-content table th {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* Fallback for tables */
 @media (prefers-color-scheme: dark) {
-  .mathpix-markdown-content table td,
-  .mathpix-markdown-content table th {
+  body:not(.main-layout) .mathpix-markdown-content table td,
+  body:not(.main-layout) .mathpix-markdown-content table th {
     border-color: #4b5563;
   }
 
-  .mathpix-markdown-content table th {
+  body:not(.main-layout) .mathpix-markdown-content table th {
     background-color: rgba(0, 0, 0, 0.3);
   }
 }
@@ -167,13 +231,23 @@
   border-radius: 3px;
 }
 
+.main-layout.dark .mathpix-markdown-content pre {
+  background-color: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.main-layout.dark .mathpix-markdown-content code {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* Fallback for code blocks */
 @media (prefers-color-scheme: dark) {
-  .mathpix-markdown-content pre {
+  body:not(.main-layout) .mathpix-markdown-content pre {
     background-color: rgba(0, 0, 0, 0.3);
     border-color: rgba(255, 255, 255, 0.1);
   }
 
-  .mathpix-markdown-content code {
+  body:not(.main-layout) .mathpix-markdown-content code {
     background-color: rgba(0, 0, 0, 0.3);
   }
 }
@@ -228,8 +302,13 @@
   text-decoration: underline;
 }
 
+.main-layout.dark .mathpix-markdown-content a {
+  color: #60a5fa;
+}
+
+/* Fallback for links */
 @media (prefers-color-scheme: dark) {
-  .mathpix-markdown-content a {
+  body:not(.main-layout) .mathpix-markdown-content a {
     color: #60a5fa;
   }
 }
@@ -243,8 +322,14 @@
   font-style: italic;
 }
 
+.main-layout.dark .mathpix-markdown-content blockquote {
+  border-left-color: #4b5563;
+  color: #9ca3af;
+}
+
+/* Fallback for blockquotes */
 @media (prefers-color-scheme: dark) {
-  .mathpix-markdown-content blockquote {
+  body:not(.main-layout) .mathpix-markdown-content blockquote {
     border-left-color: #4b5563;
     color: #9ca3af;
   }
@@ -257,8 +342,13 @@
   margin: 2em 0;
 }
 
+.main-layout.dark .mathpix-markdown-content hr {
+  border-top-color: #4b5563;
+}
+
+/* Fallback for horizontal rules */
 @media (prefers-color-scheme: dark) {
-  .mathpix-markdown-content hr {
+  body:not(.main-layout) .mathpix-markdown-content hr {
     border-top-color: #4b5563;
   }
 }

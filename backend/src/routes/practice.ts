@@ -270,7 +270,7 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // 增强的进度计算
+      // 优化的进度计算逻辑 - 更细粒度
       let progress = 0;
       let stage = 'uploading';
       let message = '正在上传文件...';
@@ -278,36 +278,54 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
       const latestOCR = practiceSession.mathpixResults[0];
       const latestGrading = practiceSession.deepseekResults[0];
 
-      // 检查OCR进度
-      if (practiceSession.status === 'PROCESSING') {
+      // 根据status和结果判断进度
+      if (practiceSession.status === 'UPLOADED') {
+        // 文件刚上传，等待处理
+        progress = 10;
+        stage = 'uploaded';
+        message = '文件上传完成，等待处理中...';
+      } else if (practiceSession.status === 'PROCESSING') {
         if (!latestOCR) {
-          progress = 25;
+          // OCR处理中
+          progress = 30;
           stage = 'ocr_processing';
-          message = '正在进行OCR识别...';
-        } else {
-          // OCR已完成，检查AI进度
-          progress = 60;
+          message = '正在识别文档内容 (预计15-30秒)...';
+        } else if (!latestGrading) {
+          // OCR完成，AI批改中
+          progress = 65;
           stage = 'ai_processing';
-          message = '正在AI批改...';
-          
-          if (latestGrading) {
-            progress = 100;
-            stage = 'completed';
-            message = '练习批改完成';
-          }
+          message = '文档识别完成，AI智能批改中 (预计30-90秒)...';
+        } else {
+          // 两个都完成了，但status还是PROCESSING（即将变为COMPLETED）
+          progress = 95;
+          stage = 'finalizing';
+          message = '批改完成，正在保存结果...';
         }
       } else if (practiceSession.status === 'COMPLETED') {
         progress = 100;
         stage = 'completed';
-        message = '练习批改完成';
+        message = '✅ 练习批改完成';
       } else if (practiceSession.status === 'FAILED') {
-        progress = 0;
-        stage = 'failed';
-        message = '处理失败，请重试';
+        // 检查metadata来判断具体失败原因
+        const metadata = practiceSession.metadata as any;
+        const ocrCompleted = metadata?.ocrCompleted || false;
+
+        if (ocrCompleted) {
+          // OCR成功但AI失败
+          progress = 65;
+          stage = 'ai_failed';
+          message = '❌ AI批改失败 (文档识别已完成)';
+        } else {
+          // OCR失败
+          progress = 30;
+          stage = 'ocr_failed';
+          message = '❌ 文档识别失败';
+        }
       } else {
-        progress = 10;
-        stage = 'uploading';
-        message = '文件已上传，等待处理...';
+        // 其他未知状态
+        progress = 5;
+        stage = 'unknown';
+        message = '等待处理...';
       }
 
       return {
@@ -1052,7 +1070,6 @@ ${originalText}
 
     return questions;
   } catch (error) {
-    console.error('AI生成类似题失败:', error);
     // 返回备用题目
     return [{
       content: '求函数 $f(x) = x^3 - 3x + 1$ 的导数，并求其极值点。',
@@ -1135,7 +1152,6 @@ async function gradeSimilarQuestion(params: {
     const result = await response.json() as any;
     return JSON.parse(result.choices[0].message.content as string);
   } catch (error) {
-    console.error('AI评分失败:', error);
     // 返回默认评分
     return {
       score: 70,
@@ -1259,7 +1275,6 @@ AI评分结果：
     return result;
 
   } catch (error) {
-    console.error('错题分析失败:', error);
     throw error;
   }
 }

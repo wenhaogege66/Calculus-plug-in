@@ -348,7 +348,6 @@ export const HomePage: React.FC<HomePageProps> = ({ authState, isDarkMode, onPag
         }
       }
     } catch (err) {
-      console.error('加载首页数据失败:', err);
       setError('加载数据失败，请刷新页面重试');
     } finally {
       setLoading(false);
@@ -430,7 +429,6 @@ export const HomePage: React.FC<HomePageProps> = ({ authState, isDarkMode, onPag
         setSearchResults(['搜索失败，请稍后重试']);
       }
     } catch (error) {
-      console.error('AI搜索出错:', error);
       setSearchResults(['搜索遇到问题，请检查网络连接']);
     } finally {
       setIsSearching(false);

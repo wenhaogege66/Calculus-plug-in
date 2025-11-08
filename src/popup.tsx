@@ -28,10 +28,8 @@ function Popup() {
     
     // 监听认证状态变化
     const authListener = chrome.storage.local.onChanged.addListener((changes, namespace) => {
-      console.log('Storage 变化:', changes, namespace);
       if (namespace === 'local' && changes.oauth_success) {
         const authData = changes.oauth_success.newValue;
-        console.log('检测到OAuth成功:', authData);
         if (authData) {
           setAuthState({
             isAuthenticated: true,
@@ -53,16 +51,13 @@ function Popup() {
   // 初始化认证状态
   const initializeAuth = async () => {
     try {
-      console.log('正在初始化认证状态...');
       
       // 优先检查Chrome Storage Local
       const chromeStorageAuth = await chrome.storage.local.get(['auth_token', 'user_info']);
-      console.log('Chrome Storage认证数据:', chromeStorageAuth);
       
       if (chromeStorageAuth.auth_token && chromeStorageAuth.user_info) {
         const isValid = await verifyToken(chromeStorageAuth.auth_token);
         if (isValid) {
-          console.log('Chrome Storage认证有效');
           setAuthState({
             isAuthenticated: true,
             user: chromeStorageAuth.user_info,
@@ -76,12 +71,10 @@ function Popup() {
       // 检查Plasmo Storage
       const savedToken = await storage.get('auth_token');
       const savedUser = await storage.get('user_info');
-      console.log('Plasmo Storage认证数据:', { token: !!savedToken, user: !!savedUser });
 
       if (savedToken && savedUser) {
         const isValid = await verifyToken(savedToken);
         if (isValid) {
-          console.log('Plasmo Storage认证有效');
           setAuthState({
             isAuthenticated: true,
             user: savedUser,
@@ -103,10 +96,8 @@ function Popup() {
         }
       }
 
-      console.log('未找到有效认证，显示登录界面');
       setAuthState(prev => ({ ...prev, loading: false }));
     } catch (error) {
-      console.error('初始化认证状态失败:', error);
       setAuthState(prev => ({ ...prev, loading: false }));
     }
   };
@@ -121,7 +112,6 @@ function Popup() {
       });
       return response.ok;
     } catch (error) {
-      console.error('Token验证失败:', error);
       return false;
     }
   };
@@ -129,7 +119,6 @@ function Popup() {
   // GitHub OAuth登录
   const handleGitHubLogin = async () => {
     try {
-      console.log('开始GitHub登录流程');
       setUploadStatus({
         uploading: true,
         progress: 0,
@@ -140,7 +129,6 @@ function Popup() {
         type: 'INITIATE_AUTH'
       });
 
-      console.log('认证响应:', response);
 
       if (!response || !response.success) {
         throw new Error(response?.error || '认证启动失败');
@@ -158,7 +146,6 @@ function Popup() {
       }, 500);
 
     } catch (error) {
-      console.error('GitHub登录失败:', error);
       setUploadStatus({
         uploading: false,
         progress: 0,
@@ -170,7 +157,6 @@ function Popup() {
   // 登出
   const handleLogout = async () => {
     try {
-      console.log('开始退出登录');
       // 清除所有存储
       await Promise.all([
         storage.remove('auth_token'),
@@ -193,9 +179,7 @@ function Popup() {
         message: '已成功退出登录'
       });
 
-      console.log('退出登录完成');
     } catch (error) {
-      console.error('退出登录失败:', error);
       setUploadStatus({
         uploading: false,
         progress: 0,

@@ -51,7 +51,6 @@ export const CompactPopup: React.FC<CompactPopupProps> = ({ authState, onLogout 
         }
       }
     } catch (error) {
-      console.error('获取班级信息失败:', error);
     } finally {
       setLoading(false);
     }
@@ -78,7 +77,6 @@ export const CompactPopup: React.FC<CompactPopupProps> = ({ authState, onLogout 
         }
       }
     } catch (error) {
-      console.error('获取班级列表失败:', error);
     } finally {
       setLoading(false);
     }

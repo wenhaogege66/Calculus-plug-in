@@ -567,12 +567,71 @@
 /* 处理状态指示器 */
 .processing-indicator {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   gap: 12px;
   padding: 24px;
   color: #64748b;
   font-size: 14px;
+}
+
+.processing-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.processing-message {
+  font-size: 14px;
+  font-weight: 500;
+  color: #475569;
+  text-align: center;
+}
+
+.progress-bar-container {
+  width: 100%;
+}
+
+.progress-bar-bg {
+  width: 100%;
+  height: 24px;
+  background: rgba(203, 213, 225, 0.3);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 12px;
+  transition: width 0.5s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px; /* 确保即使很小的进度也能显示百分比 */
+}
+
+.progress-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: progress-shine 1.5s ease-in-out infinite;
+}
+
+.progress-percent {
+  position: relative;
+  z-index: 1;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .loading-spinner {
@@ -582,6 +641,7 @@
   border-top: 2px solid #3b82f6;
   border-radius: 50%;
   animation: spin 1s linear infinite;
+  flex-shrink: 0;
 }
 
 @keyframes spin {
@@ -1369,5 +1429,13 @@
 
   .ocr-text-preview::after {
     background: linear-gradient(transparent, #0f172a);
+  }
+
+  .processing-message {
+    color: #e2e8f0;
+  }
+
+  .progress-bar-bg {
+    background: rgba(71, 85, 105, 0.3);
   }
 }

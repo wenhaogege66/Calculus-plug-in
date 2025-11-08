@@ -294,7 +294,6 @@ async function callMathPixAPI(fileBuffer: Buffer, fileType?: string): Promise<{
       throw new Error('MathPix配置缺失: MATHPIX_APP_ID或MATHPIX_APP_KEY未设置');
     }
 
-    console.log('🔑 使用MathPix配置:', { 
       app_id: appId.slice(0, 4) + '***' + appId.slice(-4),
       file_size: Math.round(fileBuffer.length / 1024) + 'KB',
       file_type: fileType 
@@ -319,20 +318,16 @@ async function callMathPixAPI(fileBuffer: Buffer, fileType?: string): Promise<{
 
     if (isImageFile) {
       // 图片文件：使用v3/text端点直接处理
-      console.log('📷 处理图片文件...');
       return await processImageFile(fileBuffer, fileType, BASE, AXIOS_DEFAULTS);
     } else {
       // PDF文件：使用v3/pdf端点
-      console.log('📄 处理PDF文件...');
       return await processPdfFile(fileBuffer, fileType, BASE, AXIOS_DEFAULTS);
     }
 
   } catch (error) {
-    console.error('❌ MathPix API调用失败:', error);
     
     // 输出详细的错误信息以便调试
     if (error instanceof Error) {
-      console.error('错误详情:', {
         message: error.message,
         stack: error.stack,
         name: error.name
@@ -341,7 +336,6 @@ async function callMathPixAPI(fileBuffer: Buffer, fileType?: string): Promise<{
     
     // 检查是否是axios错误
     if ((error as any).response) {
-      console.error('HTTP错误响应:', {
         status: (error as any).response.status,
         statusText: (error as any).response.statusText,
         data: (error as any).response.data
@@ -372,7 +366,6 @@ async function processImageFile(fileBuffer: Buffer, fileType: string, BASE: stri
     contentType: fileType
   });
 
-  console.log('📤 正在上传图片到MathPix...');
   const response = await axios.post(`${BASE}/text`, form, {
     ...AXIOS_DEFAULTS,
     headers: { ...AXIOS_DEFAULTS.headers, ...form.getHeaders() },
@@ -385,7 +378,6 @@ async function processImageFile(fileBuffer: Buffer, fileType: string, BASE: stri
   const text = response.data.text || '';
   const latex = response.data.latex_simplified || '';
   
-  console.log('✅ 图片识别成功:', {
     textLength: text.length,
     latexLength: latex.length,
     confidence: response.data.confidence || 0.95
@@ -421,7 +413,6 @@ async function processPdfFile(fileBuffer: Buffer, fileType: string, BASE: string
     contentType: fileType || 'application/pdf'
   });
 
-  console.log('📤 正在上传PDF到MathPix...');
   const uploadResponse = await axios.post(`${BASE}/pdf`, form, {
     ...AXIOS_DEFAULTS,
     headers: { ...AXIOS_DEFAULTS.headers, ...form.getHeaders() },
@@ -429,13 +420,10 @@ async function processPdfFile(fileBuffer: Buffer, fileType: string, BASE: string
 
   const pdf_id = uploadResponse.data?.pdf_id;
   if (!pdf_id) {
-    console.error('⚠️ 上传响应:', uploadResponse.data);
     throw new Error('未返回 pdf_id');
   }
-  console.log('✅ 上传成功，pdf_id =', pdf_id);
 
   // Step 2: 轮询等待OCR完成
-  console.log('⏳ 等待OCR完成...');
   const POLL_INTERVAL_MS = 3000;
   const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10分钟超时
   const start = Date.now();
@@ -449,7 +437,6 @@ async function processPdfFile(fileBuffer: Buffer, fileType: string, BASE: string
     progress = statusResponse.data?.percent_done || 0;
     
     if (status === 'completed') {
-      console.log(`🎉 OCR完成！进度=${progress}%`);
       ocrCompleted = true;
       break;
     }
@@ -462,19 +449,16 @@ async function processPdfFile(fileBuffer: Buffer, fileType: string, BASE: string
       throw new Error('等待超时：PDF 处理未完成');
     }
     
-    console.log(`📊 OCR进度: ${progress}%`);
     await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
   // Step 3: 获取识别结果 - 使用format=mmd确保数学公式完整性
-  console.log('📥 下载识别结果...');
   const resultResponse = await axios.get(`${BASE}/pdf/${pdf_id}.mmd`, {
     ...AXIOS_DEFAULTS,
     responseType: 'text'
   });
 
   const text = resultResponse.data as string;
-  console.log('📊 识别结果长度:', text.length);
 
   // 验证结果有效性
   if (!text || text.trim().length === 0) {
@@ -505,7 +489,6 @@ async function processPdfFile(fileBuffer: Buffer, fileType: string, BASE: string
       .replace(/[\x01-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '')
       .replace(/\uFFFD/g, '');
   } catch (e) {
-    console.log('📝 LaTeX格式不可用，使用Markdown格式');
   }
 
   // 尝试获取DOCX格式 (可选) - 用户请求的下载功能
@@ -516,12 +499,9 @@ async function processPdfFile(fileBuffer: Buffer, fileType: string, BASE: string
       responseType: 'arraybuffer'
     });
     docxBuffer = Buffer.from(docxResponse.data);
-    console.log('✅ DOCX格式获取成功，大小:', Math.round(docxBuffer.length / 1024) + 'KB');
   } catch (e) {
-    console.log('📄 DOCX格式不可用');
   }
 
-  console.log('✅ MathPix识别成功:', {
     originalLength: text.length,
     cleanedLength: cleanText.length,
     latexLength: latex.length,

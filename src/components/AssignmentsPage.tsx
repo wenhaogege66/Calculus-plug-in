@@ -269,7 +269,6 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
         }
       }
     } catch (err) {
-      console.error('加载数据失败:', err);
       setError('加载数据失败，请刷新重试');
     } finally {
       setLoading(false);
@@ -351,7 +350,6 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
         setError(data.error || '创建作业失败');
       }
     } catch (err) {
-      console.error('创建作业失败:', err);
       setError('创建作业失败，请重试');
     } finally {
       setSubmitting(false);
@@ -443,7 +441,6 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
         setError(data.error || '提交作业失败');
       }
     } catch (err) {
-      console.error('提交作业失败:', err);
       setError(err instanceof Error ? err.message : '提交作业失败，请重试');
     } finally {
       setSubmitting(false);
@@ -465,7 +462,6 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
       }
       return [];
     } catch (error) {
-      console.error('获取提交历史失败:', error);
       return [];
     }
   };
@@ -546,7 +542,6 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
         showError('未找到提交记录');
       }
     } catch (error) {
-      console.error('获取批改结果失败:', error);
       showError('获取批改结果失败');
     } finally {
       setLoading(false);
@@ -620,7 +615,6 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
         setError(data.error || '更新作业失败');
       }
     } catch (err) {
-      console.error('更新作业失败:', err);
       setError('更新作业失败，请重试');
     } finally {
       setSubmitting(false);
@@ -648,7 +642,6 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
         showError(data.error || '更新作业状态失败');
       }
     } catch (err) {
-      console.error('更新作业状态失败:', err);
       showError('更新作业状态失败');
     }
   };
@@ -677,7 +670,6 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
         showError(data.error || '延期失败');
       }
     } catch (err) {
-      console.error('延期失败:', err);
       showError('延期失败');
     }
   };
@@ -711,7 +703,6 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
         showError(errorData.error || '文件下载失败');
       }
     } catch (err) {
-      console.error('下载失败:', err);
       showError('文件下载失败，请稍后重试');
     }
   };

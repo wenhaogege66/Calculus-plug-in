@@ -77,7 +77,8 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
   const [aiQuestion, setAiQuestion] = useState('');
   const [aiThinking, setAiThinking] = useState(false);
   const [chatHistory, setChatHistory] = useState<{question: string, answer: string}[]>([]);
-  
+  const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
+
   // 类似题相关状态
   const [similarQuestions, setSimilarQuestions] = useState<SimilarQuestion[]>([]);
   const [similarQuestionsParams, setSimilarQuestionsParams] = useState<SimilarQuestionsParams>({
@@ -89,9 +90,32 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
   const [questionAnswers, setQuestionAnswers] = useState<{[key: number]: string}>({});
   const [questionRatings, setQuestionRatings] = useState<{[key: number]: number}>({});
 
+  // 自动刷新 - 处理中状态每5秒刷新一次
   useEffect(() => {
     loadSessionDetails();
-  }, [sessionId, authState.token]);
+
+    // 设置定时器：如果是处理中状态，每5秒刷新一次
+    const isProcessing = session?.status === 'PROCESSING' ||
+                         session?.progress?.stage === 'ocr_processing' ||
+                         session?.progress?.stage === 'ai_processing';
+
+    if (isProcessing && authState.token) {
+      const interval = setInterval(() => {
+        loadSessionDetails();
+      }, 5000); // 每5秒刷新
+
+      return () => clearInterval(interval);
+    }
+  }, [sessionId, authState.token, session?.status]);
+
+  // 记录处理开始时间
+  useEffect(() => {
+    if (session?.status === 'PROCESSING' && !processingStartTime) {
+      setProcessingStartTime(Date.now());
+    } else if (session?.status !== 'PROCESSING' && processingStartTime) {
+      setProcessingStartTime(null);
+    }
+  }, [session?.status]);
 
   const loadSessionDetails = async () => {
     if (!authState.token) return;
@@ -121,7 +145,6 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
         }
       }
     } catch (err) {
-      console.error('加载练习详情失败:', err);
       setError('加载练习详情失败');
     } finally {
       setLoading(false);
@@ -147,7 +170,6 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
         setError(`删除失败: ${result.error}`);
       }
     } catch (err) {
-      console.error('删除练习记录失败:', err);
       setError('删除练习记录失败');
     } finally {
       setDeleting(false);
@@ -200,7 +222,6 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
         setError('生成类似题失败，请稍后重试');
       }
     } catch (error) {
-      console.error('生成类似题出错:', error);
       setError('生成类似题失败，请检查网络连接');
     } finally {
       setGeneratingSimilar(false);
@@ -238,11 +259,9 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-      } else {
-        console.error('下载DOCX失败:', response.statusText);
       }
     } catch (error) {
-      console.error('下载DOCX出错:', error);
+      // Download failed silently
     }
   };
 
@@ -277,7 +296,6 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
         setError('提交答案失败，请稍后重试');
       }
     } catch (error) {
-      console.error('提交答案出错:', error);
       setError('提交答案失败，请检查网络连接');
     }
   };
@@ -297,7 +315,6 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
         body: JSON.stringify({ rating })
       });
     } catch (error) {
-      console.error('评分失败:', error);
       // 静默处理评分错误，不影响用户体验
     }
   };
@@ -347,7 +364,6 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
         setAiQuestion('');
       }
     } catch (error) {
-      console.error('AI提问失败:', error);
       // 提供友好的错误回复
       setChatHistory(prev => [...prev, {
         question: aiQuestion.trim(),
@@ -388,19 +404,34 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                 {error.content && (
                   <div className="error-section">
                     <span className="section-label">问题内容：</span>
-                    <span className="section-content">{error.content}</span>
+                    <div className="section-content">
+                      <MathPixMarkdownRenderer
+                        content={error.content}
+                        className="error-text-content"
+                      />
+                    </div>
                   </div>
                 )}
                 {error.correction && (
                   <div className="error-section correction">
                     <span className="section-label">正确答案：</span>
-                    <span className="section-content">{error.correction}</span>
+                    <div className="section-content">
+                      <MathPixMarkdownRenderer
+                        content={error.correction}
+                        className="correction-text-content"
+                      />
+                    </div>
                   </div>
                 )}
                 {error.explanation && (
                   <div className="error-section explanation">
                     <span className="section-label">解释：</span>
-                    <span className="section-content">{error.explanation}</span>
+                    <div className="section-content">
+                      <MathPixMarkdownRenderer
+                        content={error.explanation}
+                        className="explanation-text-content"
+                      />
+                    </div>
                   </div>
                 )}
                 {error.knowledgePoint && (
@@ -852,16 +883,29 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
         </div>
       </div>
 
-      {/* 全页面底部进度指示器 - 只在处理中显示 */}
-      {session.status === 'PROCESSING' && (
+      {/* 全页面底部进度指示器 - 处理中显示 */}
+      {(session.status === 'PROCESSING' || session.progress?.stage === 'ocr_processing' || session.progress?.stage === 'ai_processing') && (
         <div className="bottom-progress-bar">
           <div className="progress-info">
-            <span className="progress-message">{session.progress.message}</span>
+            <span className="progress-message">
+              {session.progress.message}
+              {processingStartTime && (() => {
+                const elapsed = Math.floor((Date.now() - processingStartTime) / 1000);
+                if (elapsed > 120) {
+                  return ' - 处理中,请耐心等待...';
+                } else if (elapsed > 60) {
+                  return ` (已处理${Math.floor(elapsed/60)}分钟)`;
+                } else if (elapsed > 10) {
+                  return ` (${elapsed}秒)`;
+                }
+                return '';
+              })()}
+            </span>
             <span className="progress-percent">{session.progress.percent}%</span>
           </div>
           <div className="progress-track">
-            <div 
-              className="progress-fill" 
+            <div
+              className="progress-fill animated"
               style={{ width: `${session.progress.percent}%` }}
             ></div>
           </div>

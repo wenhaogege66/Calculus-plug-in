@@ -23,7 +23,6 @@ class MarkdownErrorBoundary extends React.Component<
     return { hasError: true };
   }
   componentDidCatch(err: any) {
-    console.error("Markdown render error:", err);
   }
   render() {
     if (this.state.hasError) {

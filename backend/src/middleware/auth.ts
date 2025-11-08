@@ -54,7 +54,6 @@ export function createAuthMiddleware(required: boolean = true) {
       try {
         decoded = await request.server.jwt.verify(token) as JWTPayload;
       } catch (jwtError) {
-        console.error('JWT验证失败:', jwtError);
         return reply.code(401).send({
           success: false,
           error: '认证令牌无效'

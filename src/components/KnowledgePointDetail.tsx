@@ -99,7 +99,6 @@ export const KnowledgePointDetail: React.FC<KnowledgePointDetailProps> = ({
         setError('获取知识点详情失败');
       }
     } catch (err) {
-      console.error('加载知识点详情失败:', err);
       setError('加载知识点详情失败');
     } finally {
       setLoading(false);

@@ -24,6 +24,12 @@ interface PracticeSession {
   nextStepRecommendations?: string[];
   // 错题本相关
   isInErrorBook?: boolean;
+  // 进度信息
+  progress?: {
+    percent: number;
+    stage: string;
+    message: string;
+  };
 }
 
 interface PracticePageProps {
@@ -49,6 +55,87 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
   useEffect(() => {
     loadPracticeHistory();
   }, [authState.token]);
+
+  // 自动刷新处理中的练习会话
+  useEffect(() => {
+    if (!authState.token) return;
+
+    // 检查是否有处理中的会话
+    const hasProcessingSessions = practiceHistory.some(session =>
+      session.status === 'UPLOADED' ||
+      session.status === 'OCR_PROCESSING' ||
+      session.status === 'AI_PROCESSING'
+    );
+
+    if (!hasProcessingSessions) return;
+
+    // 每5秒刷新一次处理中的会话
+    const intervalId = setInterval(async () => {
+      await loadProcessingSessionsProgress();
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [authState.token, practiceHistory]);
+
+  const loadProcessingSessionsProgress = async () => {
+    if (!authState.token) return;
+
+    // 筛选出所有处理中的会话
+    const processingSessions = practiceHistory.filter(session =>
+      session.status === 'UPLOADED' ||
+      session.status === 'OCR_PROCESSING' ||
+      session.status === 'AI_PROCESSING'
+    );
+
+    if (processingSessions.length === 0) return;
+
+    try {
+      // 并发获取所有处理中会话的最新状态
+      const updates = await Promise.all(
+        processingSessions.map(async (session) => {
+          try {
+            const response = await fetch(`${API_BASE_URL}/practice/${session.id}/status`, {
+              headers: { 'Authorization': `Bearer ${authState.token}` }
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              if (result.success) {
+                return {
+                  id: session.id,
+                  status: result.data.status,
+                  progress: result.data.progress,
+                  score: result.data.gradingResult?.score,
+                  feedback: result.data.gradingResult?.feedback,
+                  questionCount: result.data.gradingResult?.questionCount,
+                  incorrectCount: result.data.gradingResult?.incorrectCount,
+                  correctCount: result.data.gradingResult?.correctCount,
+                  knowledgePoints: result.data.gradingResult?.knowledgePoints,
+                  detailedErrors: result.data.gradingResult?.detailedErrors
+                };
+              }
+            }
+            return null;
+          } catch (error) {
+            return null;
+          }
+        })
+      );
+
+      // 更新本地状态
+      const validUpdates = updates.filter(update => update !== null);
+      if (validUpdates.length > 0) {
+        setPracticeHistory(prev => prev.map(session => {
+          const update = validUpdates.find(u => u && u.id === session.id);
+          if (update) {
+            return { ...session, ...update };
+          }
+          return session;
+        }));
+      }
+    } catch (error) {
+    }
+  };
 
   const loadPracticeHistory = async () => {
     if (!authState.token) return;
@@ -76,7 +163,6 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
         }
       }
     } catch (error) {
-      console.error('加载练习记录失败:', error);
       showMessage('加载练习记录失败', 'error');
     } finally {
       setLoading(false);
@@ -196,7 +282,6 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
         showMessage(`❌ 上传失败: ${uploadResult.error}`, 'error');
       }
     } catch (error) {
-      console.error('处理文件失败:', error);
       showMessage(`❌ 处理 ${file.name} 失败`, 'error');
     } finally {
       setLoading(false);
@@ -282,7 +367,6 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
         showMessage(`删除失败: ${result.error}`, 'error');
       }
     } catch (error) {
-      console.error('删除练习记录失败:', error);
       showMessage('删除练习记录失败', 'error');
     } finally {
       setLoading(false);
@@ -394,7 +478,6 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
         showMessage(result.error || '添加到错题本失败', 'error');
       }
     } catch (error) {
-      console.error('添加到错题本失败:', error);
       showMessage('添加到错题本失败', 'error');
     } finally {
       setLoading(false);
@@ -523,10 +606,30 @@ export const PracticePage: React.FC<PracticePageProps> = ({ authState }) => {
         </div>
       )}
 
-      {(session.status === 'OCR_PROCESSING' || session.status === 'AI_PROCESSING') && (
+      {(session.status === 'UPLOADED' ||
+        session.status === 'OCR_PROCESSING' ||
+        session.status === 'AI_PROCESSING') && (
         <div className="processing-indicator">
           <div className="loading-spinner"></div>
-          <span>{session.status === 'OCR_PROCESSING' ? '正在识别内容...' : '正在AI批改...'}</span>
+          <div className="processing-info">
+            <div className="processing-message">
+              {session.progress?.message ||
+               (session.status === 'UPLOADED' ? '等待处理中...' :
+                session.status === 'OCR_PROCESSING' ? '正在识别内容...' : '正在AI批改...')}
+            </div>
+            {session.progress && (
+              <div className="progress-bar-container">
+                <div className="progress-bar-bg">
+                  <div
+                    className="progress-bar-fill"
+                    style={{ width: `${session.progress.percent}%` }}
+                  >
+                    <span className="progress-percent">{session.progress.percent}%</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

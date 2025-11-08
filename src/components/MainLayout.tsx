@@ -53,7 +53,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           setIsDarkMode(savedTheme);
         }
       } catch (error) {
-        console.error('读取主题设置失败:', error);
       }
     };
     
@@ -67,7 +66,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     try {
       await storage.set('darkMode', newMode);
     } catch (error) {
-      console.error('保存主题设置失败:', error);
     }
   };
 

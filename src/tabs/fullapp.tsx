@@ -36,7 +36,6 @@ function FullApp() {
           setIsDarkMode(savedTheme);
         }
       } catch (error) {
-        console.error('读取主题设置失败:', error);
       }
     };
     
@@ -57,7 +56,6 @@ function FullApp() {
     // 监听认证状态变化
     const handleStorageChange = async (changes: any, area: string) => {
       if (area === 'local' && (changes.auth_token || changes.user_info)) {
-        console.log('检测到认证状态变化，重新初始化...');
         await initializeAuth();
       }
     };
@@ -67,7 +65,6 @@ function FullApp() {
     // 监听来自popup的消息
     const handleMessage = async (message: any) => {
       if (message.type === 'AUTH_SUCCESS') {
-        console.log('收到认证成功消息，重新初始化...');
         await initializeAuth();
       }
     };
@@ -83,35 +80,28 @@ function FullApp() {
   // 初始化认证状态
   const initializeAuth = async () => {
     try {
-      console.log('开始初始化认证状态...');
       
       // 尝试从Plasmo Storage获取
       let savedToken = await storage.get('auth_token');
       let savedUser = await storage.get('user_info');
       
-      console.log('Plasmo Storage 数据:', { token: !!savedToken, user: !!savedUser });
       
       // 如果Plasmo Storage没有数据，尝试Chrome Storage
       if (!savedToken || !savedUser) {
-        console.log('尝试从Chrome Storage获取数据...');
         const chromeData = await chrome.storage.local.get(['auth_token', 'user_info']);
         savedToken = savedToken || chromeData.auth_token;
         savedUser = savedUser || chromeData.user_info;
         
         // 如果Chrome Storage有数据，同步到Plasmo Storage
         if (savedToken && savedUser) {
-          console.log('同步Chrome Storage数据到Plasmo Storage');
           await storage.set('auth_token', savedToken);
           await storage.set('user_info', savedUser);
         }
       }
 
-      console.log('最终获取的数据:', { token: !!savedToken, user: !!savedUser });
 
       if (savedToken && savedUser) {
-        console.log('验证token有效性...');
         const isValid = await verifyToken(savedToken);
-        console.log('Token验证结果:', isValid);
         
         if (isValid) {
           setAuthState({
@@ -120,10 +110,8 @@ function FullApp() {
             token: savedToken,
             loading: false
           });
-          console.log('认证成功，用户已登录');
           return;
         } else {
-          console.log('Token无效，清除存储数据');
           await Promise.all([
             storage.remove('auth_token'),
             storage.remove('user_info'),
@@ -132,10 +120,8 @@ function FullApp() {
         }
       }
 
-      console.log('用户未登录');
       setAuthState(prev => ({ ...prev, loading: false }));
     } catch (error) {
-      console.error('初始化认证状态失败:', error);
       setAuthState(prev => ({ ...prev, loading: false }));
     }
   };
@@ -150,7 +136,6 @@ function FullApp() {
       });
       return response.ok;
     } catch (error) {
-      console.error('Token验证失败:', error);
       return false;
     }
   };
@@ -179,7 +164,6 @@ function FullApp() {
       });
 
     } catch (error) {
-      console.error('GitHub登录失败:', error);
       setUploadStatus({
         uploading: false,
         progress: 0,
@@ -212,7 +196,6 @@ function FullApp() {
       });
 
     } catch (error) {
-      console.error('退出登录失败:', error);
       setUploadStatus({
         uploading: false,
         progress: 0,

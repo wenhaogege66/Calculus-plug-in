@@ -250,11 +250,6 @@ async function start() {
     // 启动服务器
     await fastify.listen({ port: PORT, host: '0.0.0.0' });
     
-    console.log(`🚀 AI微积分助教服务器启动成功`);
-    console.log(`📍 端口: ${PORT}`);
-    console.log(`🔗 URL: http://localhost:${PORT}`);
-    console.log(`📚 API文档: http://localhost:${PORT}`);
-    console.log(`⚡ 框架: Fastify + Prisma + Supabase`);
     
     // 检查数据库连接状态
     try {
@@ -272,11 +267,7 @@ async function start() {
       
       const statusEmoji = statusMap[dbStatus] || '❓';
       
-      console.log(`💾 数据库: ${statusEmoji} ${dbStatus} (Supabase PostgreSQL)`);
-      console.log(`📁 存储: ⚙️ configured (Supabase Storage)`);
-      console.log(`🔐 认证: ⚙️ configured (Supabase Auth + GitHub)`);
     } catch (error) {
-      console.log(`💾 数据库: ❓ 状态检查失败`);
     }
   } catch (err) {
     fastify.log.error(err);
@@ -286,18 +277,14 @@ async function start() {
 
 // 优雅关闭
 process.on('SIGTERM', async () => {
-  console.log('📴 收到SIGTERM信号，正在关闭服务器...');
   await prisma.$disconnect();
   await fastify.close();
-  console.log('✅ 服务器已关闭');
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('📴 收到SIGINT信号，正在关闭服务器...');
   await prisma.$disconnect();
   await fastify.close();
-  console.log('✅ 服务器已关闭');
   process.exit(0);
 });
 

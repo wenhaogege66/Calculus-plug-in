@@ -121,7 +121,6 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
     } catch (error) {
-      console.error('创建班级失败:', error);
       reply.code(500).send({ success: false, error: '创建班级失败' });
     }
   });
@@ -165,7 +164,6 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
         }))
       });
     } catch (error) {
-      console.error('获取班级列表失败:', error);
       reply.code(500).send({ success: false, error: '获取班级列表失败' });
     }
   });
@@ -213,7 +211,6 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
         }))
       });
     } catch (error) {
-      console.error('获取学生班级列表失败:', error);
       reply.code(500).send({ success: false, error: '获取班级列表失败' });
     }
   });
@@ -286,7 +283,6 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
     } catch (error) {
-      console.error('加入班级失败:', error);
       reply.code(500).send({ success: false, error: '加入班级失败' });
     }
   });
@@ -342,7 +338,6 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
         }))
       });
     } catch (error) {
-      console.error('获取班级成员失败:', error);
       reply.code(500).send({ success: false, error: '获取班级成员失败' });
     }
   });

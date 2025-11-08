@@ -1420,185 +1420,369 @@
   }
 }
 
+/* 浅色模式显式支持 */
+.main-layout.light {
+  .practice-detail-fullpage {
+    background: #f8fafc;
+    color: #1e293b;
+  }
+
+  .detail-navbar {
+    background: white;
+    border-bottom-color: #e5e7eb;
+  }
+
+  .left-panel,
+  .right-panel {
+    background: white;
+    border-color: #e5e7eb;
+  }
+
+  .panel-header {
+    background: #f8fafc;
+    border-bottom-color: #e5e7eb;
+  }
+
+  .panel-header h3 {
+    color: #1e293b;
+  }
+
+  .file-meta,
+  .grading-summary {
+    color: #64748b;
+  }
+
+  .file-title h2 {
+    color: #1e293b;
+  }
+
+  .back-button {
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+    color: #64748b;
+  }
+
+  .back-button:hover {
+    background: #e2e8f0;
+    color: #475569;
+  }
+
+  .recognized-text {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+  }
+
+  .recognized-text pre {
+    color: #374151;
+  }
+
+  .confidence-info {
+    background: #f0f9ff;
+    border-color: #bae6fd;
+    color: #0369a1;
+  }
+
+  .feedback-section {
+    background: #f0f9ff;
+    border-color: #bae6fd;
+  }
+
+  .feedback-section h4 {
+    color: #0369a1;
+  }
+
+  .feedback-text {
+    color: #374151;
+  }
+
+  .knowledge-tag {
+    background: linear-gradient(135deg, #ddd6fe, #e0e7ff);
+    color: #5b21b6;
+    border-color: #c4b5fd;
+  }
+
+  .error-item {
+    background: #fef2f2;
+    border-color: #fecaca;
+  }
+
+  .suggestion-item {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+  }
+
+  .strength-item {
+    background: #f0f9ff;
+    border-color: #bae6fd;
+  }
+
+  .user-question {
+    background: #f0f9ff;
+    border-color: #bae6fd;
+  }
+
+  .ai-answer {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+  }
+
+  .question-textarea {
+    background: white;
+    border-color: #d1d5db;
+    color: #374151;
+  }
+
+  .question-textarea::placeholder {
+    color: #9ca3af;
+  }
+
+  .question-textarea:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .bottom-progress-bar {
+    background: white;
+    border-top-color: #e5e7eb;
+  }
+
+  .progress-message {
+    color: #374151;
+  }
+
+  .delete-dialog {
+    background: white;
+  }
+
+  .delete-dialog-header {
+    border-bottom-color: #e5e7eb;
+  }
+
+  .delete-dialog-header h3 {
+    color: #1e293b;
+  }
+
+  .delete-dialog-body p {
+    color: #64748b;
+  }
+
+  .cancel-btn {
+    background: #f1f5f9;
+    color: #64748b;
+    border-color: #e2e8f0;
+  }
+
+  .cancel-btn:hover:not(:disabled) {
+    background: #e2e8f0;
+    color: #475569;
+  }
+
+  .error-content {
+    background: #fef2f2;
+    border-color: #fecaca;
+  }
+
+  .error-content h4 {
+    color: #dc2626;
+  }
+
+  .error-content p {
+    color: #6b7280;
+  }
+
+  .contact-info {
+    background: white;
+    border-color: #e5e7eb;
+  }
+
+  .contact-info p {
+    color: #374151;
+  }
+
+  .contact-info a {
+    color: #3b82f6;
+  }
+}
+
 /* 深色模式支持 */
 .main-layout.dark {
   .practice-detail-fullpage {
     background: #0f172a;
     color: #f1f5f9;
   }
-  
+
   .detail-navbar {
     background: #1e293b;
     border-bottom-color: #374151;
   }
-  
+
   .left-panel,
   .right-panel {
     background: #1e293b;
     border-color: #374151;
   }
-  
+
   .panel-header {
     background: #0f172a;
     border-bottom-color: #374151;
   }
-  
+
   .panel-header h3 {
     color: #f1f5f9;
   }
-  
+
   .file-meta,
   .grading-summary {
     color: #94a3b8;
   }
-  
+
   .file-title h2 {
     color: #f1f5f9;
   }
-  
+
   .back-button {
     background: #374151;
     border-color: #4b5563;
     color: #d1d5db;
   }
-  
+
   .back-button:hover {
     background: #4b5563;
     color: #f3f4f6;
   }
-  
+
   .recognized-text {
     background: #0f172a;
     border-color: #374151;
   }
-  
+
   .recognized-text pre {
     color: #e2e8f0;
   }
-  
+
   .confidence-info {
     background: rgba(14, 165, 233, 0.1);
     border-color: rgba(14, 165, 233, 0.3);
     color: #0ea5e9;
   }
-  
+
   .feedback-section {
     background: rgba(14, 165, 233, 0.1);
     border-color: rgba(14, 165, 233, 0.3);
   }
-  
+
   .feedback-section h4 {
     color: #0ea5e9;
   }
-  
+
   .feedback-text {
     color: #e2e8f0;
   }
-  
+
   .knowledge-tag {
     background: rgba(139, 92, 246, 0.2);
     color: #a78bfa;
     border-color: rgba(139, 92, 246, 0.3);
   }
-  
+
   .error-item {
     background: rgba(239, 68, 68, 0.1);
     border-color: rgba(239, 68, 68, 0.3);
   }
-  
+
   .suggestion-item {
     background: rgba(34, 197, 94, 0.1);
     border-color: rgba(34, 197, 94, 0.3);
   }
-  
+
   .strength-item {
     background: rgba(14, 165, 233, 0.1);
     border-color: rgba(14, 165, 233, 0.3);
   }
-  
+
   .user-question {
     background: rgba(14, 165, 233, 0.1);
     border-color: rgba(14, 165, 233, 0.3);
   }
-  
+
   .ai-answer {
     background: rgba(34, 197, 94, 0.1);
     border-color: rgba(34, 197, 94, 0.3);
   }
-  
+
   .question-textarea {
     background: #374151;
     border-color: #4b5563;
     color: #f1f5f9;
   }
-  
+
   .question-textarea::placeholder {
     color: #9ca3af;
   }
-  
+
   .question-textarea:focus {
     border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
-  
+
   .bottom-progress-bar {
     background: #1e293b;
     border-top-color: #374151;
   }
-  
+
   .progress-message {
     color: #e2e8f0;
   }
-  
+
   .delete-dialog {
     background: #1e293b;
   }
-  
+
   .delete-dialog-header {
     border-bottom-color: #374151;
   }
-  
+
   .delete-dialog-header h3 {
     color: #f1f5f9;
   }
-  
+
   .delete-dialog-body p {
     color: #94a3b8;
   }
-  
+
   .cancel-btn {
     background: #374151;
     color: #d1d5db;
     border-color: #4b5563;
   }
-  
+
   .cancel-btn:hover:not(:disabled) {
     background: #4b5563;
     color: #f3f4f6;
   }
-  
+
   .error-content {
     background: rgba(239, 68, 68, 0.1);
     border-color: rgba(239, 68, 68, 0.3);
   }
-  
+
   .error-content h4 {
     color: #f87171;
   }
-  
+
   .error-content p {
     color: #d1d5db;
   }
-  
+
   .contact-info {
     background: #374151;
     border-color: #4b5563;
   }
-  
+
   .contact-info p {
     color: #e5e7eb;
   }
-  
+
   .contact-info a {
     color: #60a5fa;
   }
@@ -1675,6 +1859,7 @@
   margin-bottom: 16px;
   padding-bottom: 8px;
   border-bottom: 2px solid rgba(59, 130, 246, 0.1);
+  color: #1e293b; /* Explicit light mode color */
 }
 
 .section-header h4 {
@@ -1787,9 +1972,19 @@
 .feedback-content-wrapper {
   margin-top: 16px;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.6);
   border-radius: 12px;
-  border: 1px solid rgba(16, 185, 129, 0.1);
+}
+
+/* Light mode - explicit white background */
+.main-layout.light .feedback-content-wrapper {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+}
+
+/* Dark mode - explicit dark background */
+.main-layout.dark .feedback-content-wrapper {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(16, 185, 129, 0.25);
 }
 
 /* Enhanced Error Details */
@@ -2048,9 +2243,55 @@
   color: white;
 }
 
+/* Light mode explicit overrides for enhanced styles */
+.main-layout.light .section-header {
+  color: #1e293b;
+}
+
+.main-layout.light .section-header h4 {
+  color: #1e293b;
+}
+
+.main-layout.light .section-label {
+  color: #64748b;
+}
+
+.main-layout.light .knowledge-points-section.enhanced {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(96, 165, 250, 0.05));
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.main-layout.light .feedback-section.enhanced {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(37, 99, 235, 0.05));
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.main-layout.light .error-details.enhanced {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.05), rgba(220, 38, 38, 0.05));
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.main-layout.light .suggestions-details.enhanced {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.05), rgba(217, 119, 6, 0.05));
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.main-layout.light .strengths-details.enhanced {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(5, 150, 105, 0.05));
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
 /* Dark mode support for enhanced styles */
+.main-layout.dark .section-header {
+  color: #f1f5f9;
+}
+
 .main-layout.dark .section-header h4 {
   color: #f1f5f9;
+}
+
+.main-layout.dark .section-label {
+  color: #94a3b8;
 }
 
 .main-layout.dark .knowledge-points-section.enhanced {

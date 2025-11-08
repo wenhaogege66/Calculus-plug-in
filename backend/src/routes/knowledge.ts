@@ -381,7 +381,6 @@ async function generateKnowledgePointExplanation(knowledgePoint: any): Promise<s
 
     return response.data.choices[0].message.content || `${knowledgePoint.name}是微积分中的重要概念，需要深入理解其定义和应用。`;
   } catch (error) {
-    console.error('生成知识点解释失败:', error);
     return `${knowledgePoint.name}是微积分中的重要概念，需要深入理解其定义和应用。建议查阅相关教材或咨询教师获得更详细的解释。`;
   }
 }

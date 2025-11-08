@@ -501,10 +501,6 @@ async function startGradingProcess(submissionId: number, fastifyInstance?: any) 
   // 创建一个模拟的 fastify 实例用于日志
   const mockFastify = fastifyInstance || {
     log: {
-      info: (...args: any[]) => console.log('INFO:', ...args),
-      error: (...args: any[]) => console.error('ERROR:', ...args),
-      warn: (...args: any[]) => console.warn('WARN:', ...args),
-      debug: (...args: any[]) => console.debug('DEBUG:', ...args)
     }
   };
   
@@ -527,10 +523,6 @@ async function startQuestionProcessing(submissionId: number, fastifyInstance?: a
   // 创建一个模拟的 fastify 实例用于日志
   const mockFastify = fastifyInstance || {
     log: {
-      info: (...args: any[]) => console.log('INFO:', ...args),
-      error: (...args: any[]) => console.error('ERROR:', ...args),
-      warn: (...args: any[]) => console.warn('WARN:', ...args),
-      debug: (...args: any[]) => console.debug('DEBUG:', ...args)
     }
   };
   

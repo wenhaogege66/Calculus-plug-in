@@ -94,7 +94,6 @@ export const MathPixMarkdownRenderer: React.FC<MathPixMarkdownRendererProps> = (
 
       setIsLoading(false);
     } catch (error) {
-      console.error('MathPix Markdown渲染失败:', error);
       setRenderError(error instanceof Error ? error.message : '渲染失败');
       setIsLoading(false);
 

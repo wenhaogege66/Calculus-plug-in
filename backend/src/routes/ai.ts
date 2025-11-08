@@ -321,10 +321,59 @@ export async function aiRoutes(fastify: FastifyInstance) {
   });
 }
 
+// Deepseek API重试辅助函数
+async function callDeepseekAPIWithRetry(
+  payload: any,
+  apiKey: string,
+  maxRetries: number = 2
+): Promise<any> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const startTime = Date.now();
+
+      const response = await axios.post('https://api.deepseek.com/chat/completions', payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        timeout: 180000 // 3分钟超时
+      });
+
+      const duration = Date.now() - startTime;
+
+      return response;
+    } catch (error: any) {
+      const duration = Date.now() - Date.now();
+      const isTimeout = error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED';
+      const isNetworkError = error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED';
+
+        errorCode: error.code,
+        errorMessage: error.message,
+        isTimeout,
+        isNetworkError
+      });
+
+      // 如果还有重试机会且错误可重试
+      if (attempt < maxRetries && (isTimeout || isNetworkError)) {
+        const waitTime = Math.pow(2, attempt + 1) * 1000; // 指数退避: 2s, 4s, 8s
+
+        // 等待后重试
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+
+      // 最后一次重试失败或非可重试错误,抛出异常
+      throw error;
+    }
+  }
+
+  throw new Error('重试次数已用尽');
+}
+
 // 调用Deepseek API的辅助函数
 async function callDeepseekAPI(
-  text: string, 
-  subject: string, 
+  text: string,
+  subject: string,
   exerciseType: string,
   teacherQuestionText?: string | null,
   teacherQuestionLatex?: string | null
@@ -353,11 +402,12 @@ async function callDeepseekAPI(
 
     // 根据模式构建不同的prompt
     const isAssignmentMode = teacherQuestionText !== null;
-    const prompt = isAssignmentMode ? 
+    const prompt = isAssignmentMode ?
       buildAssignmentModePrompt(subject, teacherQuestionText || null, teacherQuestionLatex || null, text) :
       buildPracticeModePrompt(subject, text);
 
-    const response = await axios.post('https://api.deepseek.com/chat/completions', {
+
+    const payload = {
       model: 'deepseek-chat',
       messages: [
         {
@@ -367,13 +417,10 @@ async function callDeepseekAPI(
       ],
       response_format: { type: 'json_object' },
       temperature: 0.3
-    }, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      timeout: 60000 // 添加60秒超时控制
-    });
+    };
+
+    // 使用重试机制调用API
+    const response = await callDeepseekAPIWithRetry(payload, apiKey, 2);
 
     const result = JSON.parse(response.data.choices[0].message.content);
 
@@ -395,10 +442,9 @@ async function callDeepseekAPI(
     };
 
   } catch (error) {
-    console.error('Deepseek API调用失败:', error);
-    console.error('错误详情:', {
       message: error instanceof Error ? error.message : '未知错误',
       stack: error instanceof Error ? error.stack : undefined,
+      code: (error as any)?.code,
       apiKey: apiKey ? '已配置' : '未配置'
     });
 
@@ -691,7 +737,6 @@ async function callDeepseekFollowUpAPI(prompt: string): Promise<{ answer: string
     };
 
   } catch (error) {
-    console.error('Deepseek 问答API调用失败:', error);
     
     return {
       answer: '抱歉，AI助手暂时不可用，请稍后重试。如果问题持续存在，请联系老师获得帮助。'

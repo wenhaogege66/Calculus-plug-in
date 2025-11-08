@@ -88,7 +88,6 @@ export const MistakesPage: React.FC<MistakesPageProps> = ({ authState }) => {
         setError(errorResult.error || '加载错题本失败');
       }
     } catch (err) {
-      console.error('加载错题本失败:', err);
       setError('网络错误，请稍后重试');
     } finally {
       setLoading(false);
@@ -187,7 +186,6 @@ export const MistakesPage: React.FC<MistakesPageProps> = ({ authState }) => {
         setError(result.error || '创建分类失败');
       }
     } catch (err) {
-      console.error('创建分类失败:', err);
       setError('创建分类失败');
     }
   };
@@ -201,7 +199,6 @@ export const MistakesPage: React.FC<MistakesPageProps> = ({ authState }) => {
       setError('删除分类功能正在开发中');
       setShowDeleteCategoryModal('');
     } catch (err) {
-      console.error('删除分类失败:', err);
       setError('删除分类失败');
     }
   };
@@ -226,7 +223,6 @@ export const MistakesPage: React.FC<MistakesPageProps> = ({ authState }) => {
         setError(result.error || '删除错题失败');
       }
     } catch (err) {
-      console.error('删除错题失败:', err);
       setError('删除错题失败');
     }
   };

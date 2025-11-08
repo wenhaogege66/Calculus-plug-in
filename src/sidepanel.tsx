@@ -84,7 +84,6 @@ const SidePanel: React.FC = () => {
 
       setAuthState(prev => ({ ...prev, loading: false }));
     } catch (error) {
-      console.error('初始化认证状态失败:', error);
       setAuthState(prev => ({ ...prev, loading: false }));
     }
   };
@@ -98,7 +97,6 @@ const SidePanel: React.FC = () => {
       });
       return response.ok;
     } catch (error) {
-      console.error('Token验证失败:', error);
       return false;
     }
   };
@@ -121,7 +119,6 @@ const SidePanel: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('加载提交记录失败:', error);
       showStatus('加载提交记录失败', 'error');
     }
   };
@@ -174,7 +171,6 @@ const SidePanel: React.FC = () => {
       return;
     }
 
-    console.log('处理文件:', files);
     showStatus('正在上传文件...', 'info');
 
     // 验证文件类型
@@ -251,7 +247,6 @@ const SidePanel: React.FC = () => {
           showStatus(`❌ ${file.name} 上传失败: ${uploadResult.error}`, 'error');
         }
       } catch (error) {
-        console.error('上传文件失败:', error);
         showStatus(`❌ ${file.name} 上传失败`, 'error');
       }
     }
@@ -287,7 +282,6 @@ const SidePanel: React.FC = () => {
         showStatus(`❌ OCR识别失败: ${result.error}`, 'error');
       }
     } catch (error) {
-      console.error('OCR处理失败:', error);
       showStatus('❌ OCR处理失败', 'error');
     } finally {
       setIsProcessing(false);
@@ -322,7 +316,6 @@ const SidePanel: React.FC = () => {
         showStatus(`❌ AI批改失败: ${result.error}`, 'error');
       }
     } catch (error) {
-      console.error('AI批改失败:', error);
       showStatus('❌ AI批改失败', 'error');
     } finally {
       setIsProcessing(false);

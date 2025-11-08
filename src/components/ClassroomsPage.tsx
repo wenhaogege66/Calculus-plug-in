@@ -76,7 +76,6 @@ export const ClassroomsPage: React.FC<ClassroomsPageProps> = ({ authState, onPag
         throw new Error('网络请求失败');
       }
     } catch (err) {
-      console.error('加载班级失败:', err);
       setError('加载班级列表失败，请刷新重试');
     } finally {
       setLoading(false);
@@ -98,7 +97,6 @@ export const ClassroomsPage: React.FC<ClassroomsPageProps> = ({ authState, onPag
         }
       }
     } catch (err) {
-      console.error('加载班级成员失败:', err);
     }
   };
 
@@ -126,7 +124,6 @@ export const ClassroomsPage: React.FC<ClassroomsPageProps> = ({ authState, onPag
         setError(data.error || '创建班级失败');
       }
     } catch (err) {
-      console.error('创建班级失败:', err);
       setError('创建班级失败，请重试');
     } finally {
       setSubmitting(false);
@@ -157,7 +154,6 @@ export const ClassroomsPage: React.FC<ClassroomsPageProps> = ({ authState, onPag
         setError(data.error || '加入班级失败');
       }
     } catch (err) {
-      console.error('加入班级失败:', err);
       setError('加入班级失败，请重试');
     } finally {
       setSubmitting(false);
@@ -169,7 +165,6 @@ export const ClassroomsPage: React.FC<ClassroomsPageProps> = ({ authState, onPag
       await navigator.clipboard.writeText(code);
       // 这里可以添加一个 toast 提示
     } catch (err) {
-      console.error('复制失败:', err);
     }
   };
 

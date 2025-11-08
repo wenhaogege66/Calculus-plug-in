@@ -101,7 +101,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
           if (result.data && result.data.nodes && Array.isArray(result.data.nodes)) {
             setGraphData(result.data);
           } else {
-            console.warn('知识图谱数据格式不正确:', result.data);
             setGraphData({ nodes: [], links: [], chapters: [], stats: { 
               totalKnowledgePoints: 0, masteredPoints: 0, weakPoints: 0, userProgress: 0 
             }});
@@ -118,7 +117,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         setError('获取知识图谱失败');
       }
     } catch (err) {
-      console.error('加载知识图谱失败:', err);
       setError('加载知识图谱失败');
     } finally {
       setLoading(false);
@@ -131,7 +129,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     try {
       // 安全检查：确保有节点数据
       if (!graphData.nodes || graphData.nodes.length === 0) {
-        console.warn('No nodes available for rendering graph');
         
         // 显示需要初始化的提示
         const svg = d3.select(svgRef.current);
@@ -162,7 +159,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     svg.selectAll("*").remove();
     svg.attr("width", width).attr("height", height);
 
-    console.log('Rendering graph with', graphData.nodes.length, 'nodes and', graphData.links?.length || 0, 'links');
 
     // 过滤数据
     const filteredNodes = graphData.nodes.filter(node => {
@@ -181,7 +177,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     const rawLinks = graphData.links || [];
     const filteredLinks = rawLinks.filter(link => {
       if (!link || typeof link.source === 'undefined' || typeof link.target === 'undefined') {
-        console.warn('Invalid link found:', link);
         return false;
       }
       const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
@@ -194,7 +189,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
       target: String(typeof link.target === 'object' ? link.target.id : link.target)
     }));
 
-    console.log('Filtered', filteredNodes.length, 'nodes and', filteredLinks.length, 'links');
 
     // 创建力导向图仿真
     const simulation = d3.forceSimulation<KnowledgeNode, KnowledgeLink>(filteredNodes)
@@ -298,7 +292,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
       // 启动仿真
       simulation.on("tick", updatePositions);
     } catch (error) {
-      console.error('渲染知识图谱时出错:', error);
       
       // 显示错误信息
       const svg = d3.select(svgRef.current);
@@ -387,7 +380,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
   // 处理练习题点击
   const handlePracticeQuestion = (questionId: number) => {
     // 导航到练习模式
-    console.log('开始练习题:', questionId);
     window.location.hash = '#/practice';
   };
 
@@ -448,7 +440,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         setError('初始化失败');
       }
     } catch (err) {
-      console.error('初始化知识点失败:', err);
       setError('初始化知识点失败');
     } finally {
       setLoading(false);
