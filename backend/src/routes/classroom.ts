@@ -1,9 +1,11 @@
 // 班级管理API路由
 import { FastifyPluginAsync } from 'fastify';
-import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
+import { prisma } from '../lib/db';
+import { successResponse, sendError } from '../utils/response-helper';
+import { handleRouteError } from '../utils/error-handler';
 
-const prisma = new PrismaClient();
+
 
 const classroomRoutes: FastifyPluginAsync = async (fastify) => {
   // 生成邀请码
@@ -56,30 +58,20 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
       }
       
       if (classroom) {
-        return {
-          success: true,
-          data: {
-            classroom: {
-              id: classroom.id,
-              name: classroom.name,
-              description: classroom.description,
-              memberCount: classroom._count.members
-            }
+        return successResponse({
+          classroom: {
+            id: classroom.id,
+            name: classroom.name,
+            description: classroom.description,
+            memberCount: classroom._count.members
           }
-        };
-      } else {
-        return {
-          success: true,
-          data: { classroom: null }
-        };
+        });
       }
+
+      return successResponse({ classroom: null });
       
     } catch (error) {
-      fastify.log.error('获取班级信息失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '获取班级信息失败'
-      });
+      return handleRouteError(fastify, reply, error, '获取班级信息失败');
     }
   });
 
@@ -88,7 +80,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
     preHandler: async (request, reply) => {
       await requireAuth(request, reply);
       if (request.currentUser!.role.toLowerCase() !== 'teacher') {
-        reply.code(403).send({ success: false, error: '只有教师可以创建班级' });
+        return sendError(reply, '只有教师可以创建班级', 403);
       }
     }
   }, async (request, reply) => {
@@ -96,7 +88,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
       const { name, description } = request.body as { name: string; description?: string };
       
       if (!name || name.trim().length === 0) {
-        return reply.code(400).send({ success: false, error: '班级名称不能为空' });
+        return sendError(reply, '班级名称不能为空', 400);
       }
 
       const inviteCode = generateInviteCode();
@@ -110,18 +102,15 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
 
-      reply.send({
-        success: true,
-        data: {
-          id: classroom.id,
-          name: classroom.name,
-          description: classroom.description,
-          inviteCode: classroom.inviteCode,
-          createdAt: classroom.createdAt
-        }
+      return successResponse({
+        id: classroom.id,
+        name: classroom.name,
+        description: classroom.description,
+        inviteCode: classroom.inviteCode,
+        createdAt: classroom.createdAt
       });
     } catch (error) {
-      reply.code(500).send({ success: false, error: '创建班级失败' });
+      return handleRouteError(fastify, reply, error, '创建班级失败');
     }
   });
 
@@ -130,7 +119,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
     preHandler: async (request, reply) => {
       await requireAuth(request, reply);
       if (request.currentUser!.role.toLowerCase() !== 'teacher') {
-        reply.code(403).send({ success: false, error: '只有教师可以查看班级列表' });
+        return sendError(reply, '只有教师可以查看班级列表', 403);
       }
     }
   }, async (request, reply) => {
@@ -151,9 +140,8 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
         orderBy: { createdAt: 'desc' }
       });
 
-      reply.send({
-        success: true,
-        data: classrooms.map(classroom => ({
+      return successResponse(
+        classrooms.map(classroom => ({
           id: classroom.id,
           name: classroom.name,
           description: classroom.description,
@@ -162,9 +150,9 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
           assignmentCount: classroom._count.assignments,
           createdAt: classroom.createdAt
         }))
-      });
+      );
     } catch (error) {
-      reply.code(500).send({ success: false, error: '获取班级列表失败' });
+      return handleRouteError(fastify, reply, error, '获取班级列表失败');
     }
   });
 
@@ -220,7 +208,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
     preHandler: async (request, reply) => {
       await requireAuth(request, reply);
       if (request.currentUser!.role.toLowerCase() !== 'student') {
-        reply.code(403).send({ success: false, error: '只有学生可以加入班级' });
+        return sendError(reply, '只有学生可以加入班级', 403);
       }
     }
   }, async (request, reply) => {
@@ -228,7 +216,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
       const { inviteCode } = request.body as { inviteCode: string };
       
       if (!inviteCode || inviteCode.trim().length === 0) {
-        return reply.code(400).send({ success: false, error: '邀请码不能为空' });
+        return sendError(reply, '邀请码不能为空', 400);
       }
 
       // 查找班级
@@ -240,7 +228,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (!classroom || !classroom.isActive) {
-        return reply.code(404).send({ success: false, error: '无效的邀请码' });
+        return sendError(reply, '无效的邀请码', 404);
       }
 
       // 检查是否已加入
@@ -255,7 +243,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (existingMembership) {
         if (existingMembership.isActive) {
-          return reply.code(400).send({ success: false, error: '你已经加入了这个班级' });
+          return sendError(reply, '你已经加入了这个班级', 400);
         } else {
           // 重新激活成员资格
           await prisma.classroomMember.update({
@@ -273,17 +261,14 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      reply.send({
-        success: true,
-        data: {
-          id: classroom.id,
-          name: classroom.name,
-          description: classroom.description,
-          teacher: classroom.teacher
-        }
+      return successResponse({
+        id: classroom.id,
+        name: classroom.name,
+        description: classroom.description,
+        teacher: classroom.teacher
       });
     } catch (error) {
-      reply.code(500).send({ success: false, error: '加入班级失败' });
+      return handleRouteError(fastify, reply, error, '加入班级失败');
     }
   });
 
@@ -292,7 +277,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
     preHandler: async (request, reply) => {
       await requireAuth(request, reply);
       if (request.currentUser!.role.toLowerCase() !== 'teacher') {
-        reply.code(403).send({ success: false, error: '只有教师可以查看班级成员' });
+        return sendError(reply, '只有教师可以查看班级成员', 403);
       }
     }
   }, async (request, reply) => {
@@ -308,7 +293,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (!classroom) {
-        return reply.code(404).send({ success: false, error: '班级不存在或无权限' });
+        return sendError(reply, '班级不存在或无权限', 404);
       }
 
       const members = await prisma.classroomMember.findMany({
@@ -329,16 +314,15 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
         orderBy: { joinedAt: 'asc' }
       });
 
-      reply.send({
-        success: true,
-        data: members.map(member => ({
+      return successResponse(
+        members.map(member => ({
           id: member.id,
           student: member.student,
           joinedAt: member.joinedAt
         }))
-      });
+      );
     } catch (error) {
-      reply.code(500).send({ success: false, error: '获取班级成员失败' });
+      return handleRouteError(fastify, reply, error, '获取班级成员失败');
     }
   });
 };

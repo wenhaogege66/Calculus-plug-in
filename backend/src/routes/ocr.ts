@@ -1,13 +1,15 @@
 // MathPix OCR识别服务
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
+import { prisma } from '../lib/db';
 import { supabase, supabaseAdmin, STORAGE_BUCKETS } from '../config/supabase';
 import axios from 'axios';
 import FormData from 'form-data';
+import { successResponse, sendError } from '../utils/response-helper';
+import { handleRouteError } from '../utils/error-handler';
 
-const prisma = new PrismaClient();
+
 
 // OCR处理的核心逻辑 - 导出供其他模块使用
 export async function processOCR(request: FastifyRequest, reply: FastifyReply, fastify: FastifyInstance) {
@@ -15,10 +17,7 @@ export async function processOCR(request: FastifyRequest, reply: FastifyReply, f
       const { submissionId, imageData, fileId } = request.body as any;
       
       if (!submissionId) {
-        return reply.code(400).send({
-          success: false,
-          error: '缺少提交ID'
-        });
+        return sendError(reply, '缺少提交ID', 400);
       }
 
       // 获取提交记录（对于内部调用，不验证用户）
@@ -33,10 +32,7 @@ export async function processOCR(request: FastifyRequest, reply: FastifyReply, f
       });
 
       if (!submission) {
-        return reply.code(404).send({
-          success: false,
-          error: '提交记录不存在'
-        });
+        return sendError(reply, '提交记录不存在', 404);
       }
 
       let imageToProcess: Buffer | undefined = undefined;
@@ -46,10 +42,7 @@ export async function processOCR(request: FastifyRequest, reply: FastifyReply, f
         // 从文件上传记录获取文件路径
         const fileUpload = submission.fileUpload;
         if (!fileUpload) {
-          return reply.code(400).send({
-            success: false,
-            error: '文件信息不存在'
-          });
+          return sendError(reply, '文件信息不存在', 400);
         }
 
         fastify.log.info(`从Supabase Storage获取文件: ${fileUpload.filePath}`);
@@ -62,10 +55,7 @@ export async function processOCR(request: FastifyRequest, reply: FastifyReply, f
 
         if (downloadError || !fileData) {
           fastify.log.error('从Supabase Storage下载文件失败:', downloadError);
-          return reply.code(400).send({
-            success: false,
-            error: '无法获取文件数据'
-          });
+          return sendError(reply, '无法获取文件数据', 400);
         }
 
         // 将文件转换为buffer
@@ -76,17 +66,11 @@ export async function processOCR(request: FastifyRequest, reply: FastifyReply, f
         
       } catch (error) {
         fastify.log.error('获取文件数据时出错:', error);
-        return reply.code(500).send({
-          success: false,
-          error: '获取文件数据失败'
-        });
+        return handleRouteError(fastify, reply, error, '获取文件数据失败');
       }
 
       if (!imageToProcess) {
-        return reply.code(400).send({
-          success: false,
-          error: '缺少文件数据'
-        });
+        return sendError(reply, '缺少文件数据', 400);
       }
 
       // 更新提交状态为处理中
@@ -136,20 +120,15 @@ export async function processOCR(request: FastifyRequest, reply: FastifyReply, f
         throw new Error(`数据库保存失败，请联系管理员：3220104512@zju.edu.cn。错误详情：${dbError instanceof Error ? dbError.message : '未知错误'}`);
       }
 
-      return {
-        success: true,
-        data: {
-          resultId: ocrResult.id,
-          recognizedText: ocrResult.recognizedText,
-          mathLatex: ocrResult.mathLatex,
-          confidence: ocrResult.confidence,
-          processingTime: ocrResult.processingTime
-        }
-      };
+      return successResponse({
+        resultId: ocrResult.id,
+        recognizedText: ocrResult.recognizedText,
+        mathLatex: ocrResult.mathLatex,
+        confidence: ocrResult.confidence,
+        processingTime: ocrResult.processingTime
+      });
 
     } catch (error) {
-      fastify.log.error('MathPix OCR处理失败:', error);
-      
       // 不返回fallback数据，直接抛出错误
       const submissionId = (request.body as any)?.submissionId;
       if (submissionId) {
@@ -159,9 +138,8 @@ export async function processOCR(request: FastifyRequest, reply: FastifyReply, f
         }).catch(() => {});
       }
 
-      return reply.code(500).send({
-        success: false,
-        error: `OCR识别失败: ${error instanceof Error ? error.message : '未知错误'}`
+      return handleRouteError(fastify, reply, error, 'OCR识别失败', {
+        details: { submissionId: (request.body as any)?.submissionId }
       });
     }
 }
@@ -195,10 +173,7 @@ export async function ocrRoutes(fastify: FastifyInstance) {
       });
 
       if (!submission) {
-        return reply.code(404).send({
-          success: false,
-          error: '提交记录不存在'
-        });
+        return sendError(reply, '提交记录不存在', 404);
       }
 
       // 获取OCR结果
@@ -207,17 +182,10 @@ export async function ocrRoutes(fastify: FastifyInstance) {
         orderBy: { createdAt: 'desc' }
       });
 
-      return {
-        success: true,
-        data: { results: ocrResults }
-      };
+      return successResponse({ results: ocrResults });
 
     } catch (error) {
-      fastify.log.error('获取OCR结果失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '获取OCR结果失败'
-      });
+      return handleRouteError(fastify, reply, error, '获取OCR结果失败');
     }
   });
 
@@ -241,20 +209,14 @@ export async function ocrRoutes(fastify: FastifyInstance) {
       });
 
       if (!submission || submission.mathpixResults.length === 0) {
-        return reply.code(404).send({
-          success: false,
-          error: '未找到OCR结果'
-        });
+        return sendError(reply, '未找到OCR结果', 404);
       }
 
       const ocrResult = submission.mathpixResults[0];
       const docxData = (ocrResult.rawResult as any)?.docxData;
 
       if (!docxData) {
-        return reply.code(404).send({
-          success: false,
-          error: 'DOCX文件不可用'
-        });
+        return sendError(reply, 'DOCX文件不可用', 404);
       }
 
       // 转换base64回到buffer
@@ -268,11 +230,7 @@ export async function ocrRoutes(fastify: FastifyInstance) {
       return reply.send(docxBuffer);
 
     } catch (error) {
-      fastify.log.error('下载DOCX文件失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '下载文件失败'
-      });
+      return handleRouteError(fastify, reply, error, '下载文件失败');
     }
   });
 }
@@ -294,9 +252,10 @@ async function callMathPixAPI(fileBuffer: Buffer, fileType?: string): Promise<{
       throw new Error('MathPix配置缺失: MATHPIX_APP_ID或MATHPIX_APP_KEY未设置');
     }
 
-      app_id: appId.slice(0, 4) + '***' + appId.slice(-4),
-      file_size: Math.round(fileBuffer.length / 1024) + 'KB',
-      file_type: fileType 
+    console.info('[MathPix] 准备发起请求', {
+      app_id: `${appId.slice(0, 4)}***${appId.slice(-4)}`,
+      file_size: `${Math.round(fileBuffer.length / 1024)}KB`,
+      file_type: fileType || 'unknown',
     });
 
     const BASE = 'https://api.mathpix.com/v3';
@@ -316,32 +275,34 @@ async function callMathPixAPI(fileBuffer: Buffer, fileType?: string): Promise<{
       ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/tiff'].includes(fileType)
     );
 
-    if (isImageFile) {
+    if (isImageFile && fileType) {
       // 图片文件：使用v3/text端点直接处理
       return await processImageFile(fileBuffer, fileType, BASE, AXIOS_DEFAULTS);
     } else {
       // PDF文件：使用v3/pdf端点
-      return await processPdfFile(fileBuffer, fileType, BASE, AXIOS_DEFAULTS);
+      return await processPdfFile(fileBuffer, fileType || 'application/pdf', BASE, AXIOS_DEFAULTS);
     }
 
   } catch (error) {
-    
     // 输出详细的错误信息以便调试
     if (error instanceof Error) {
+      console.error('[MathPix] 调用异常', {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
       });
     }
-    
+
     // 检查是否是axios错误
-    if ((error as any).response) {
-        status: (error as any).response.status,
-        statusText: (error as any).response.statusText,
-        data: (error as any).response.data
+    const axiosResponse = (error as any)?.response;
+    if (axiosResponse) {
+      console.error('[MathPix] 返回错误', {
+        status: axiosResponse.status,
+        statusText: axiosResponse.statusText,
+        data: axiosResponse.data,
       });
     }
-    
+
     // 直接抛出真实的错误
     throw new Error(`MathPix OCR识别失败: ${error instanceof Error ? error.message : '未知网络错误'}`);
   }
@@ -378,9 +339,10 @@ async function processImageFile(fileBuffer: Buffer, fileType: string, BASE: stri
   const text = response.data.text || '';
   const latex = response.data.latex_simplified || '';
   
+  console.info('[MathPix] 图片识别成功', {
     textLength: text.length,
     latexLength: latex.length,
-    confidence: response.data.confidence || 0.95
+    confidence: response.data.confidence || 0.95,
   });
 
   return {
@@ -500,13 +462,15 @@ async function processPdfFile(fileBuffer: Buffer, fileType: string, BASE: string
     });
     docxBuffer = Buffer.from(docxResponse.data);
   } catch (e) {
+    // ignore docx fetch failure
   }
 
+  console.info('[MathPix] PDF识别成功', {
     originalLength: text.length,
     cleanedLength: cleanText.length,
     latexLength: latex.length,
-    docxSize: docxBuffer ? Math.round(docxBuffer.length / 1024) + 'KB' : '不可用',
-    confidence: 0.95 // v3/pdf API不返回置信度，使用默认值
+    docxSize: docxBuffer ? `${Math.round(docxBuffer.length / 1024)}KB` : '不可用',
+    confidence: 0.95, // v3/pdf API不返回置信度，使用默认值
   });
 
   return {

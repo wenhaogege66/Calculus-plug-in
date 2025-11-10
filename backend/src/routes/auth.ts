@@ -2,9 +2,11 @@
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { supabase, supabaseAdmin } from '../config/supabase';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/db';
+import { sendError, successResponse } from '../utils/response-helper';
+import { handleRouteError } from '../utils/error-handler';
 
-const prisma = new PrismaClient();
+
 
 // 定义JWT载荷类型
 interface JWTPayload {
@@ -25,17 +27,11 @@ export async function authRoutes(fastify: FastifyInstance) {
       const { access_token, refresh_token, error: oauthError } = request.query as any;
       
       if (oauthError) {
-        return reply.code(400).send({
-          success: false,
-          error: `OAuth错误: ${oauthError}`
-        });
+        return sendError(reply, `OAuth错误: ${oauthError}`, 400);
       }
 
       if (!access_token) {
-        return reply.code(400).send({
-          success: false,
-          error: '缺少访问令牌'
-        });
+        return sendError(reply, '缺少访问令牌', 400);
       }
 
       // 使用access_token设置Supabase session
@@ -45,10 +41,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       });
 
       if (sessionError || !sessionData.user) {
-        return reply.code(400).send({
-          success: false,
-          error: '设置用户会话失败'
-        });
+        return sendError(reply, '设置用户会话失败', 400);
       }
 
       const supabaseUser = sessionData.user;
@@ -178,10 +171,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       const { access_token, refresh_token, user } = request.body as any;
       
       if (!access_token || !user) {
-        return reply.code(400).send({
-          success: false,
-          error: '缺少必要的session信息'
-        });
+        return sendError(reply, '缺少必要的session信息', 400);
       }
 
       // 从Supabase用户信息中提取数据
@@ -211,26 +201,19 @@ export async function authRoutes(fastify: FastifyInstance) {
         expiresIn: '7d'
       });
 
-      return {
-        success: true,
-        data: {
-          token,
-          user: {
-            id: dbUser.id,
-            username: dbUser.username,
-            email: dbUser.email,
-            role: dbUser.role,
-            avatarUrl: dbUser.avatarUrl
-          }
+      return successResponse({
+        token,
+        user: {
+          id: dbUser.id,
+          username: dbUser.username,
+          email: dbUser.email,
+          role: dbUser.role,
+          avatarUrl: dbUser.avatarUrl
         }
-      };
+      });
 
     } catch (error) {
-      fastify.log.error('Supabase session交换失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: `Session交换失败: ${error instanceof Error ? error.message : '未知错误'}`
-      });
+      return handleRouteError(fastify, reply, error, 'Supabase session交换失败');
     }
   });
 
@@ -240,29 +223,20 @@ export async function authRoutes(fastify: FastifyInstance) {
       const { access_token } = request.body as { access_token: string };
       
       if (!access_token) {
-        return reply.code(400).send({
-          success: false,
-          error: '缺少访问令牌'
-        });
+        return sendError(reply, '缺少访问令牌', 400);
       }
 
       // 直接解析JWT token获取用户信息
       const tokenParts = access_token.split('.');
       if (tokenParts.length !== 3) {
-        return reply.code(400).send({
-          success: false,
-          error: '无效的JWT token格式'
-        });
+        return sendError(reply, '无效的JWT token格式', 400);
       }
 
       // 解码JWT payload
       const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
       
       if (!payload.user_metadata || !payload.email) {
-        return reply.code(400).send({
-          success: false,
-          error: 'JWT token中缺少用户信息'
-        });
+        return sendError(reply, 'JWT token中缺少用户信息', 400);
       }
 
       // 从JWT中提取用户信息
@@ -293,26 +267,19 @@ export async function authRoutes(fastify: FastifyInstance) {
         expiresIn: '7d'
       });
 
-      return {
-        success: true,
-        data: {
-          token,
-          user: {
-            id: user.id,
-            username: user.username,
-            email: user.email,
-            role: user.role,
-            avatarUrl: user.avatarUrl
-          }
+      return successResponse({
+        token,
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          avatarUrl: user.avatarUrl
         }
-      };
+      });
 
     } catch (error) {
-      fastify.log.error('Token处理失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: `Token处理失败: ${error instanceof Error ? error.message : '未知错误'}`
-      });
+      return handleRouteError(fastify, reply, error, 'Token处理失败');
     }
   });
 
@@ -324,16 +291,13 @@ export async function authRoutes(fastify: FastifyInstance) {
         try {
           await request.jwtVerify();
         } catch (err) {
-          reply.code(401).send({
-            success: false,
-            error: '无效的认证令牌'
-          });
+          return sendError(reply, '无效的认证令牌', 401);
         }
       }
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       // 如果 preHandler 成功, 说明 token 有效
-      return { success: true, message: 'Token is valid' };
+      return successResponse({ message: 'Token is valid' });
     }
   );
 
@@ -343,10 +307,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       try {
         await request.jwtVerify();
       } catch (err) {
-        reply.code(401).send({
-          success: false,
-          error: '无效的认证令牌'
-        });
+        return sendError(reply, '无效的认证令牌', 401);
       }
     }
   }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -367,29 +328,19 @@ export async function authRoutes(fastify: FastifyInstance) {
       });
 
       if (!user) {
-        return reply.code(404).send({
-          success: false,
-          error: '用户不存在'
-        });
+        return sendError(reply, '用户不存在', 404);
       }
 
-      return {
-        success: true,
-        data: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          role: user.role.toLowerCase(), // 转换为小写
-          avatarUrl: user.avatarUrl,
-          authType: user.authType
-        }
-      };
-    } catch (error) {
-      fastify.log.error('获取用户信息失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '获取用户信息失败'
+      return successResponse({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role.toLowerCase(),
+        avatarUrl: user.avatarUrl,
+        authType: user.authType
       });
+    } catch (error) {
+      return handleRouteError(fastify, reply, error, '获取用户信息失败');
     }
   });
   
@@ -399,15 +350,10 @@ export async function authRoutes(fastify: FastifyInstance) {
       // 可选：从Supabase中登出
       await supabase.auth.signOut();
       
-      return {
-        success: true,
-        message: '登出成功'
-      };
+      return successResponse({ message: '登出成功' });
     } catch (error) {
-      return {
-        success: true,
-        message: '登出成功 (本地令牌已失效)'
-      };
+      fastify.log.warn('Supabase登出失败，降级处理', error);
+      return successResponse({ message: '登出成功 (本地令牌已失效)' });
     }
   });
 

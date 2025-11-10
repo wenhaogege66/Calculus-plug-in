@@ -1,10 +1,7 @@
-// 统一的批改处理服务
-import { PrismaClient } from '@prisma/client';
 import { FastifyInstance } from 'fastify';
 import { processOCR } from '../routes/ocr';
 import { processAIGrading } from '../routes/ai';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/db';
 
 export interface ProcessingResult {
   success: boolean;

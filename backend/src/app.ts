@@ -3,7 +3,7 @@
 import Fastify from 'fastify';
 import dotenv from 'dotenv';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './lib/db';
 
 // 插件导入
 import cors from '@fastify/cors';
@@ -28,7 +28,6 @@ import { requireAuth, optionalAuth } from './middleware/auth';
 dotenv.config();
 
 const PORT = Number(process.env.PORT) || 3000;
-const prisma = new PrismaClient();
 
 // 创建 Fastify 实例
 const fastify = Fastify({

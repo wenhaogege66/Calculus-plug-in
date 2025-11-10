@@ -11,43 +11,45 @@ datasource db {
 
 // 用户表（支持GitHub OAuth）
 model User {
-  id       Int      @id @default(autoincrement())
-  username String   @db.VarChar(100)
-  email    String   @unique @db.VarChar(255)
-  
+  id       Int    @id @default(autoincrement())
+  username String @db.VarChar(100)
+  email    String @unique @db.VarChar(255)
+
   // 认证相关
-  passwordHash String?   @map("password_hash") @db.VarChar(255)
-  authType     AuthType  @default(LOCAL) @map("auth_type")
-  
+  passwordHash String?  @map("password_hash") @db.VarChar(255)
+  authType     AuthType @default(LOCAL) @map("auth_type")
+
   // GitHub OAuth字段
   githubId       String? @unique @map("github_id") @db.VarChar(50)
   githubUsername String? @map("github_username") @db.VarChar(100)
   avatarUrl      String? @map("avatar_url") @db.VarChar(500)
-  
+
   // 用户信息
   role    UserRole @default(STUDENT)
   profile Json     @default("{}")
-  
+
   // 时间戳
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-  
+
   // 关联关系
-  fileUploads    FileUpload[]
-  submissions    Submission[]
-  
+  fileUploads FileUpload[]
+  submissions Submission[]
+
   // 教师相关
-  ownedClassrooms Classroom[] @relation("TeacherClassrooms")
+  ownedClassrooms Classroom[]  @relation("TeacherClassrooms")
   assignments     Assignment[]
-  
+
   // 学生相关
-  classroomMemberships ClassroomMember[]
+  classroomMemberships    ClassroomMember[]
   learningRecommendations LearningRecommendation[]
-  
+
   // 错题本相关
   mistakeCategories MistakeCategory[]
   mistakeItems      MistakeItem[]
-  
+
+  @@index([githubId])
+  @@index([email])
   @@map("users")
 }
 
@@ -63,37 +65,43 @@ model FileUpload {
   uploadType   String   @default("manual") @map("upload_type") @db.VarChar(50)
   metadata     Json     @default("{}")
   createdAt    DateTime @default(now()) @map("created_at")
-  
+
   // 关联
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  submissions Submission[]
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submissions         Submission[]
   assignmentQuestions Assignment[] @relation("AssignmentQuestions")
-  
+
+  @@index([userId])
   @@map("file_uploads")
 }
 
 // 作业提交表
 model Submission {
-  id           Int               @id @default(autoincrement())
-  userId       Int               @map("user_id")
-  fileUploadId Int               @map("file_upload_id")
-  assignmentId Int?              @map("assignment_id") // 关联到作业（可选，刷题模式为null）
-  workMode     String            @default("practice") @map("work_mode") @db.VarChar(20) // practice 或 homework
-  status       SubmissionStatus  @default(UPLOADED)
-  submittedAt  DateTime          @default(now()) @map("submitted_at")
-  completedAt  DateTime?         @map("completed_at")
-  metadata     Json              @default("{}")
-  
-  // 关联
-  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fileUpload   FileUpload        @relation(fields: [fileUploadId], references: [id], onDelete: Cascade)
-  assignment   Assignment?       @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
-  mathpixResults MathPixResult[]
-  deepseekResults DeepseekResult[]
-  errorAnalysis ErrorAnalysis[]
-  similarQuestions SimilarQuestion[]
-  mistakeItems MistakeItem[]
+  id           Int              @id @default(autoincrement())
+  userId       Int              @map("user_id")
+  fileUploadId Int              @map("file_upload_id")
+  assignmentId Int?             @map("assignment_id") // 关联到作业（可选，刷题模式为null）
+  workMode     String           @default("practice") @map("work_mode") @db.VarChar(20) // practice 或 homework
+  status       SubmissionStatus @default(UPLOADED)
+  submittedAt  DateTime         @default(now()) @map("submitted_at")
+  completedAt  DateTime?        @map("completed_at")
+  metadata     Json             @default("{}")
 
+  // 关联
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileUpload       FileUpload        @relation(fields: [fileUploadId], references: [id], onDelete: Cascade)
+  assignment       Assignment?       @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  mathpixResults   MathPixResult[]
+  deepseekResults  DeepseekResult[]
+  errorAnalysis    ErrorAnalysis[]
+  similarQuestions SimilarQuestion[]
+  mistakeItems     MistakeItem[]
+
+  @@index([userId])
+  @@index([assignmentId])
+  @@index([status])
+  @@index([workMode])
+  @@index([userId, submittedAt])
   @@map("submissions")
 }
 
@@ -107,10 +115,11 @@ model MathPixResult {
   processingTime Int?     @map("processing_time") // 毫秒
   rawResult      Json?    @map("raw_result")
   createdAt      DateTime @default(now()) @map("created_at")
-  
+
   // 关联
   submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  
+
+  @@index([submissionId])
   @@map("mathpix_results")
 }
 
@@ -118,19 +127,18 @@ model MathPixResult {
 model DeepseekResult {
   id             Int      @id @default(autoincrement())
   submissionId   Int      @map("submission_id")
-  score          Int?     // 0-100分
+  score          Int? // 0-100分
   maxScore       Int      @default(100) @map("max_score")
   feedback       String?  @db.Text
   errors         Json     @default("[]")
-  suggestions    Json     @default("[]")
-  strengths      Json     @default("[]")
   processingTime Int?     @map("processing_time") // 毫秒
   rawResult      Json?    @map("raw_result")
   createdAt      DateTime @default(now()) @map("created_at")
-  
+
   // 关联
   submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  
+
+  @@index([submissionId])
   @@map("deepseek_results")
 }
 
@@ -138,14 +146,14 @@ model DeepseekResult {
 enum AuthType {
   LOCAL  @map("local")
   GITHUB @map("github")
-  
+
   @@map("auth_type")
 }
 
 enum UserRole {
   STUDENT @map("student")
   TEACHER @map("teacher")
-  
+
   @@map("user_role")
 }
 
@@ -154,7 +162,7 @@ enum SubmissionStatus {
   PROCESSING @map("processing")
   COMPLETED  @map("completed")
   FAILED     @map("failed")
-  
+
   @@map("submission_status")
 }
 
@@ -163,7 +171,7 @@ enum OcrStatus {
   PROCESSING @map("processing")
   COMPLETED  @map("completed")
   FAILED     @map("failed")
-  
+
   @@map("ocr_status")
 }
 
@@ -177,12 +185,12 @@ model Classroom {
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
-  
+
   // 关联
-  teacher     User               @relation("TeacherClassrooms", fields: [teacherId], references: [id], onDelete: Cascade)
+  teacher     User              @relation("TeacherClassrooms", fields: [teacherId], references: [id], onDelete: Cascade)
   members     ClassroomMember[]
   assignments Assignment[]
-  
+
   @@map("classrooms")
 }
 
@@ -193,138 +201,141 @@ model ClassroomMember {
   studentId   Int      @map("student_id")
   joinedAt    DateTime @default(now()) @map("joined_at")
   isActive    Boolean  @default(true) @map("is_active")
-  
+
   // 关联
-  classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  student     User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  student   User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
   @@unique([classroomId, studentId])
   @@map("classroom_members")
 }
 
 // 作业表
 model Assignment {
-  id          Int       @id @default(autoincrement())
-  title       String    @db.VarChar(200)
-  description String?   @db.Text
-  classroomId Int       @map("classroom_id")
-  teacherId   Int       @map("teacher_id")
+  id           Int      @id @default(autoincrement())
+  title        String   @db.VarChar(200)
+  description  String?  @db.Text
+  classroomId  Int      @map("classroom_id")
+  teacherId    Int      @map("teacher_id")
   fileUploadId Int?     @map("file_upload_id") // 题目文件
-  startDate   DateTime  @map("start_date")
-  dueDate     DateTime  @map("due_date")
-  isActive    Boolean   @default(true) @map("is_active")
-  
-  // MathPix OCR识别结果
-  ocrText     String?   @map("ocr_text") @db.Text // 题目识别的文本
-  ocrLatex    String?   @map("ocr_latex") @db.Text // 题目识别的LaTeX
-  ocrStatus   OcrStatus @default(PENDING) @map("ocr_status") // OCR处理状态
-  ocrProcessedAt DateTime? @map("ocr_processed_at") // OCR处理时间
-  
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  
-  // 关联
-  classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  teacher     User      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  questionFile FileUpload? @relation("AssignmentQuestions", fields: [fileUploadId], references: [id])
-  submissions Submission[]
+  startDate    DateTime @map("start_date")
+  dueDate      DateTime @map("due_date")
+  isActive     Boolean  @default(true) @map("is_active")
 
+  // MathPix OCR识别结果
+  ocrText        String?   @map("ocr_text") @db.Text // 题目识别的文本
+  ocrLatex       String?   @map("ocr_latex") @db.Text // 题目识别的LaTeX
+  ocrStatus      OcrStatus @default(PENDING) @map("ocr_status") // OCR处理状态
+  ocrProcessedAt DateTime? @map("ocr_processed_at") // OCR处理时间
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关联
+  classroom    Classroom    @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  teacher      User         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  questionFile FileUpload?  @relation("AssignmentQuestions", fields: [fileUploadId], references: [id])
+  submissions  Submission[]
+
+  @@index([classroomId])
+  @@index([teacherId])
+  @@index([dueDate])
   @@map("assignments")
 }
 
 // 知识点表
 model KnowledgePoint {
-  id          Int      @id @default(autoincrement())
-  name        String   @db.VarChar(100)
-  chapter     String?  @db.VarChar(50)
-  parentId    Int?     @map("parent_id") // 父级知识点
-  level       Int      @default(1) // 1=章, 2=节, 3=概念点
-  description String?  @db.Text
-  keywords    String[]
+  id               Int      @id @default(autoincrement())
+  name             String   @db.VarChar(100)
+  chapter          String?  @db.VarChar(50)
+  parentId         Int?     @map("parent_id") // 父级知识点
+  level            Int      @default(1) // 1=章, 2=节, 3=概念点
+  description      String?  @db.Text
+  keywords         String[]
   functionExamples String[] @map("function_examples") // 相关函数示例
-  difficultyLevel Int   @default(1) @map("difficulty_level")
-  aiExplanation String? @map("ai_explanation") @db.Text
-  createdAt   DateTime @default(now()) @map("created_at")
-  
+  difficultyLevel  Int      @default(1) @map("difficulty_level")
+  aiExplanation    String?  @map("ai_explanation") @db.Text
+  createdAt        DateTime @default(now()) @map("created_at")
+
   // 关联
-  parent      KnowledgePoint? @relation("KnowledgePointHierarchy", fields: [parentId], references: [id])
-  children    KnowledgePoint[] @relation("KnowledgePointHierarchy")
-  errorAnalysis ErrorAnalysis[]
+  parent                   KnowledgePoint?                 @relation("KnowledgePointHierarchy", fields: [parentId], references: [id])
+  children                 KnowledgePoint[]                @relation("KnowledgePointHierarchy")
+  errorAnalysis            ErrorAnalysis[]
   similarQuestionRelations SimilarQuestionKnowledgePoint[]
-  
+
   @@map("knowledge_points")
 }
 
 // 错题分析表
 model ErrorAnalysis {
-  id              Int      @id @default(autoincrement())
-  submissionId    Int      @map("submission_id")
-  errorType       String   @map("error_type") @db.VarChar(50) // 'calculation', 'concept', 'formula', 'logic'
-  knowledgePointId Int?    @map("knowledge_point_id")
-  errorDescription String  @map("error_description") @db.Text
-  frequencyCount  Int      @default(1) @map("frequency_count")
-  severity        String   @default("medium") @db.VarChar(20) // 'low', 'medium', 'high'
-  aiSuggestion    String?  @map("ai_suggestion") @db.Text
-  createdAt       DateTime @default(now()) @map("created_at")
-  
+  id               Int      @id @default(autoincrement())
+  submissionId     Int      @map("submission_id")
+  errorType        String   @map("error_type") @db.VarChar(50) // 'calculation', 'concept', 'formula', 'logic'
+  knowledgePointId Int?     @map("knowledge_point_id")
+  errorDescription String   @map("error_description") @db.Text
+  frequencyCount   Int      @default(1) @map("frequency_count")
+  severity         String   @default("medium") @db.VarChar(20) // 'low', 'medium', 'high'
+  aiSuggestion     String?  @map("ai_suggestion") @db.Text
+  createdAt        DateTime @default(now()) @map("created_at")
+
   // 关联
-  submission      Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  knowledgePoint  KnowledgePoint? @relation(fields: [knowledgePointId], references: [id])
-  
+  submission     Submission      @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  knowledgePoint KnowledgePoint? @relation(fields: [knowledgePointId], references: [id])
+
   @@map("error_analysis")
 }
 
 // 类似题生成记录
 model SimilarQuestion {
-  id                  Int      @id @default(autoincrement())
-  originalSubmissionId Int     @map("original_submission_id")
-  generatedContent    String   @map("generated_content") @db.Text
-  standardAnswer      String?  @map("standard_answer") @db.Text
-  difficultyLevel     Int      @default(1) @map("difficulty_level")
-  generationPrompt    String   @map("generation_prompt") @db.Text
-  userRating          Int?     @map("user_rating") // 1-5分用户评分
-  isCompleted         Boolean  @default(false) @map("is_completed")
-  userAnswer          String?  @map("user_answer") @db.Text
-  aiGradingResult     Json?    @map("ai_grading_result")
-  createdAt           DateTime @default(now()) @map("created_at")
-  
+  id                   Int      @id @default(autoincrement())
+  originalSubmissionId Int      @map("original_submission_id")
+  generatedContent     String   @map("generated_content") @db.Text
+  standardAnswer       String?  @map("standard_answer") @db.Text
+  difficultyLevel      Int      @default(1) @map("difficulty_level")
+  generationPrompt     String   @map("generation_prompt") @db.Text
+  userRating           Int?     @map("user_rating") // 1-5分用户评分
+  isCompleted          Boolean  @default(false) @map("is_completed")
+  userAnswer           String?  @map("user_answer") @db.Text
+  aiGradingResult      Json?    @map("ai_grading_result")
+  createdAt            DateTime @default(now()) @map("created_at")
+
   // 关联
-  originalSubmission  Submission @relation(fields: [originalSubmissionId], references: [id], onDelete: Cascade)
+  originalSubmission      Submission                      @relation(fields: [originalSubmissionId], references: [id], onDelete: Cascade)
   knowledgePointRelations SimilarQuestionKnowledgePoint[]
-  
+
   @@map("similar_questions")
 }
 
 // 类似题和知识点的多对多关系表
 model SimilarQuestionKnowledgePoint {
-  id                Int      @id @default(autoincrement())
-  similarQuestionId Int      @map("similar_question_id")
-  knowledgePointId  Int      @map("knowledge_point_id")
-  
-  similarQuestion   SimilarQuestion @relation(fields: [similarQuestionId], references: [id], onDelete: Cascade)
-  knowledgePoint    KnowledgePoint  @relation(fields: [knowledgePointId], references: [id], onDelete: Cascade)
-  
+  id                Int @id @default(autoincrement())
+  similarQuestionId Int @map("similar_question_id")
+  knowledgePointId  Int @map("knowledge_point_id")
+
+  similarQuestion SimilarQuestion @relation(fields: [similarQuestionId], references: [id], onDelete: Cascade)
+  knowledgePoint  KnowledgePoint  @relation(fields: [knowledgePointId], references: [id], onDelete: Cascade)
+
   @@unique([similarQuestionId, knowledgePointId])
   @@map("similar_question_knowledge_points")
 }
 
 // AI学习建议表
 model LearningRecommendation {
-  id           Int      @id @default(autoincrement())
-  userId       Int      @map("user_id")
-  type         String   @db.VarChar(50) // 'knowledge_point', 'study_path', 'practice_suggestion'
-  title        String   @db.VarChar(200)
-  content      String   @db.Text
-  priority     String   @default("medium") @db.VarChar(20) // 'low', 'medium', 'high'
-  isRead       Boolean  @default(false) @map("is_read")
-  isApplied    Boolean  @default(false) @map("is_applied")
-  expiresAt    DateTime? @map("expires_at")
-  metadata     Json     @default("{}")
-  createdAt    DateTime @default(now()) @map("created_at")
-  
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  type      String    @db.VarChar(50) // 'knowledge_point', 'study_path', 'practice_suggestion'
+  title     String    @db.VarChar(200)
+  content   String    @db.Text
+  priority  String    @default("medium") @db.VarChar(20) // 'low', 'medium', 'high'
+  isRead    Boolean   @default(false) @map("is_read")
+  isApplied Boolean   @default(false) @map("is_applied")
+  expiresAt DateTime? @map("expires_at")
+  metadata  Json      @default("{}")
+  createdAt DateTime  @default(now()) @map("created_at")
+
   // 关联
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("learning_recommendations")
 }
 
@@ -342,40 +353,42 @@ model MistakeCategory {
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
-  
+
   // 关联
-  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent      MistakeCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children    MistakeCategory[] @relation("CategoryHierarchy")
-  mistakes    MistakeItem[]
-  
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent   MistakeCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children MistakeCategory[] @relation("CategoryHierarchy")
+  mistakes MistakeItem[]
+
   @@map("mistake_categories")
 }
 
 // 错题本条目表
 model MistakeItem {
-  id              Int      @id @default(autoincrement())
-  userId          Int      @map("user_id")
-  submissionId    Int      @map("submission_id") // 关联到原始提交
-  categoryId      Int?     @map("category_id") // 所属分类（可选）
-  title           String?  @db.VarChar(200) // 用户自定义标题
-  notes           String?  @db.Text // 用户笔记
-  tags            String[] // 自定义标签
-  priority        String   @default("medium") @db.VarChar(20) // 'low', 'medium', 'high'
-  reviewCount     Int      @default(0) @map("review_count") // 复习次数
-  masteryLevel    Int      @default(0) @map("mastery_level") // 掌握程度：0-5
-  lastReviewedAt  DateTime? @map("last_reviewed_at") // 最后复习时间
-  nextReviewAt    DateTime? @map("next_review_at") // 下次复习时间（间隔复习）
-  isResolved      Boolean  @default(false) @map("is_resolved") // 是否已解决
-  addedBy         String   @default("manual") @map("added_by") @db.VarChar(20) // 'manual'（手动） 或 'auto'（自动）
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  
+  id             Int       @id @default(autoincrement())
+  userId         Int       @map("user_id")
+  submissionId   Int       @map("submission_id") // 关联到原始提交
+  categoryId     Int?      @map("category_id") // 所属分类（可选）
+  title          String?   @db.VarChar(200) // 用户自定义标题
+  notes          String?   @db.Text // 用户笔记
+  tags           String[] // 自定义标签
+  priority       String    @default("medium") @db.VarChar(20) // 'low', 'medium', 'high'
+  reviewCount    Int       @default(0) @map("review_count") // 复习次数
+  masteryLevel   Int       @default(0) @map("mastery_level") // 掌握程度：0-5
+  lastReviewedAt DateTime? @map("last_reviewed_at") // 最后复习时间
+  nextReviewAt   DateTime? @map("next_review_at") // 下次复习时间（间隔复习）
+  isResolved     Boolean   @default(false) @map("is_resolved") // 是否已解决
+  addedBy        String    @default("manual") @map("added_by") @db.VarChar(20) // 'manual'（手动） 或 'auto'（自动）
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
   // 关联
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  submission      Submission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  category        MistakeCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submission Submission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  category   MistakeCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
   @@unique([userId, submissionId]) // 一个用户对同一个提交只能有一个错题记录
+  @@index([userId])
+  @@index([categoryId])
   @@map("mistake_items")
-} 
+}

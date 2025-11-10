@@ -2,14 +2,16 @@
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { supabase, supabaseAdmin, STORAGE_BUCKETS } from '../config/supabase';
-import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
+import { prisma } from '../lib/db';
+import { successResponse, sendError } from '../utils/response-helper';
+import { handleRouteError } from '../utils/error-handler';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import os from 'os';
 
-const prisma = new PrismaClient();
+
 
 export async function uploadRoutes(fastify: FastifyInstance) {
   // 文件上传端点
@@ -80,10 +82,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
       const data = fileData;
       if (!data) {
         fastify.log.warn('❌ 没有收到文件数据');
-        return reply.code(400).send({
-          success: false,
-          error: '没有收到文件'
-        });
+        return sendError(reply, '没有收到文件', 400);
       }
 
       const { filename, mimetype, tempPath } = data;
@@ -130,10 +129,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
       ];
 
       if (!allowedTypes.includes(mimetype)) {
-        return reply.code(400).send({
-          success: false,
-          error: '不支持的文件类型，请上传PDF或图片文件'
-        });
+        return sendError(reply, '不支持的文件类型，请上传PDF或图片文件', 400);
       }
 
       // 改进文件路径生成逻辑
@@ -232,10 +228,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
         } catch (cleanupError) {
           fastify.log.warn('⚠️ 临时文件清理失败:', cleanupError);
         }
-        return reply.code(500).send({
-          success: false,
-          error: `文件上传超时，可能是网络问题或Supabase服务响应慢`
-        });
+        return sendError(reply, '文件上传超时，可能是网络问题或Supabase服务响应慢', 500);
       }
 
       if (uploadError) {
@@ -254,10 +247,11 @@ export async function uploadRoutes(fastify: FastifyInstance) {
           } catch (cleanupError) {
             fastify.log.warn('⚠️ 临时文件清理失败:', cleanupError);
           }
-          return reply.code(503).send({
-            success: false,
-            error: '网络连接超时，请检查网络环境或稍后重试。如果问题持续，可能需要配置代理或联系管理员。'
-          });
+          return sendError(
+            reply,
+            '网络连接超时，请检查网络环境或稍后重试。如果问题持续，可能需要配置代理或联系管理员。',
+            503
+          );
         }
         
         // 如果bucket不存在，尝试创建
@@ -273,10 +267,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
           
           if (bucketError) {
             fastify.log.error('❌ 创建bucket失败:', bucketError);
-            return reply.code(500).send({
-              success: false,
-              error: `无法创建存储bucket: ${bucketError.message}`
-            });
+            return sendError(reply, `无法创建存储bucket: ${bucketError.message}`, 500);
           } else {
             fastify.log.info('✅ Bucket创建成功，重试上传...');
             // 重试上传，同样使用超时机制
@@ -303,10 +294,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
                 } catch (cleanupError) {
                   fastify.log.warn('⚠️ 临时文件清理失败:', cleanupError);
                 }
-                return reply.code(500).send({
-                  success: false,
-                  error: `文件上传失败: ${retryResult.error.message}`
-                });
+                return sendError(reply, `文件上传失败: ${retryResult.error.message}`, 500);
               }
               uploadData = retryResult.data;
               fastify.log.info('✅ 重试上传成功');
@@ -318,10 +306,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
               } catch (cleanupError) {
                 fastify.log.warn('⚠️ 临时文件清理失败:', cleanupError);
               }
-              return reply.code(500).send({
-                success: false,
-                error: `重试上传超时，请检查网络连接和Supabase服务状态`
-              });
+              return sendError(reply, '重试上传超时，请检查网络连接和Supabase服务状态', 500);
             }
           }
         } else {
@@ -331,10 +316,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
           } catch (cleanupError) {
             fastify.log.warn('⚠️ 临时文件清理失败:', cleanupError);
           }
-          return reply.code(500).send({
-            success: false,
-            error: `文件上传失败: ${uploadError.message}`
-          });
+          return sendError(reply, `文件上传失败: ${uploadError.message}`, 500);
         }
       } else {
         fastify.log.info('✅ Supabase Storage上传成功');
@@ -377,18 +359,15 @@ export async function uploadRoutes(fastify: FastifyInstance) {
       const processingTime = Date.now() - startTime;
       fastify.log.info(`🎉 文件上传完成! 处理时间: ${processingTime}ms, 文件ID: ${fileUpload.id}`);
       
-      return {
-        success: true,
-        data: {
-          fileId: fileUpload.id,
-          filename: fileUpload.filename,
-          originalName: fileUpload.originalName,
-          fileSize: fileUpload.fileSize,
-          mimeType: fileUpload.mimeType,
-          uploadedAt: fileUpload.createdAt,
-          downloadUrl: publicUrlData.publicUrl
-        }
-      };
+      return successResponse({
+        fileId: fileUpload.id,
+        filename: fileUpload.filename,
+        originalName: fileUpload.originalName,
+        fileSize: fileUpload.fileSize,
+        mimeType: fileUpload.mimeType,
+        uploadedAt: fileUpload.createdAt,
+        downloadUrl: publicUrlData.publicUrl
+      });
 
     } catch (error) {
       const processingTime = Date.now() - startTime;
@@ -408,10 +387,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
       
       // 确保总是返回适当的错误响应
       if (!reply.sent) {
-        return reply.code(500).send({
-          success: false,
-          error: `文件上传处理失败: ${error instanceof Error ? error.message : '未知错误'}`
-        });
+        return handleRouteError(fastify, reply, error, '文件上传处理失败');
       }
     }
   });
@@ -432,16 +408,9 @@ export async function uploadRoutes(fastify: FastifyInstance) {
         }
       });
 
-      return {
-        success: true,
-        data: { files }
-      };
+      return successResponse({ files });
     } catch (error) {
-      fastify.log.error('获取文件列表失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '获取文件列表失败'
-      });
+      return handleRouteError(fastify, reply, error, '获取文件列表失败');
     }
   });
 
@@ -461,10 +430,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
       });
 
       if (!file) {
-        return reply.code(404).send({
-          success: false,
-          error: '文件不存在'
-        });
+        return sendError(reply, '文件不存在', 404);
       }
 
       // 权限检查逻辑
@@ -501,10 +467,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
         if (assignment && assignment.classroom.members.length > 0) {
           // 有权限，继续下载
         } else {
-          return reply.code(403).send({
-            success: false,
-            error: '无权限下载此文件'
-          });
+          return sendError(reply, '无权限下载此文件', 403);
         }
       }
 
@@ -516,10 +479,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
 
       if (error) {
         fastify.log.error('从Supabase Storage下载文件失败:', error);
-        return reply.code(404).send({
-          success: false,
-          error: '文件下载失败：文件可能已被删除或移动'
-        });
+        return sendError(reply, '文件下载失败：文件可能已被删除或移动', 404);
       }
 
       // 设置响应头并返回文件
@@ -529,11 +489,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
       return reply.send(Buffer.from(await data.arrayBuffer()));
 
     } catch (error) {
-      fastify.log.error('文件下载处理失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '文件下载处理失败'
-      });
+      return handleRouteError(fastify, reply, error, '文件下载处理失败');
     }
   });
 
@@ -560,23 +516,13 @@ export async function uploadRoutes(fastify: FastifyInstance) {
       });
 
       if (!file) {
-        return reply.code(404).send({
-          success: false,
-          error: '文件不存在'
-        });
+        return sendError(reply, '文件不存在', 404);
       }
 
-      return {
-        success: true,
-        data: file
-      };
+      return successResponse(file);
 
     } catch (error) {
-      fastify.log.error('获取文件信息失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '获取文件信息失败'
-      });
+      return handleRouteError(fastify, reply, error, '获取文件信息失败');
     }
   });
 
@@ -630,17 +576,10 @@ export async function uploadRoutes(fastify: FastifyInstance) {
         existsInAnon: results.anonClient.buckets?.includes(targetBucket) || false
       };
 
-      return {
-        success: true,
-        data: results
-      };
+      return successResponse(results);
 
     } catch (error) {
-      fastify.log.error('Debug endpoint错误:', error);
-      return reply.code(500).send({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      return handleRouteError(fastify, reply, error, 'Debug endpoint错误');
     }
   });
 } 

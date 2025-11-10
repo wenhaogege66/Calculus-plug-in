@@ -1,10 +1,12 @@
 // 简化的首页dashboard数据API
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
+import { prisma } from '../lib/db';
+import { successResponse } from '../utils/response-helper';
+import { handleRouteError } from '../utils/error-handler';
 
-const prisma = new PrismaClient();
+
 
 export async function dashboardRoutes(fastify: FastifyInstance) {
   // 学生端首页统计数据
@@ -76,35 +78,27 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
       // 进步趋势（简化计算）
       const improvementTrend = recentSubmissions.length > 1 ? 'improving' : 'stable';
 
-      reply.send({
-        success: true,
-        data: {
-          // 基础统计
-          totalSubmissions,
-          completedSubmissions: completedSubmissions.length,
-          averageScore,
-          highestScore,
-          recentPracticeCount,
-          improvementTrend,
-          
-          // 详细数据
-          recentSubmissions: recentSubmissions.map(submission => {
-            const latestGrading = submission.deepseekResults[0];
-            return {
-              id: submission.id,
-              submittedAt: submission.submittedAt,
-              score: latestGrading?.score || 0,
-              feedback: latestGrading?.feedback?.substring(0, 100) + '...' || ''
-            };
-          }),
-          
-          errorAnalysis: [],
-          learningRecommendations: []
-        }
+      return successResponse({
+        totalSubmissions,
+        completedSubmissions: completedSubmissions.length,
+        averageScore,
+        highestScore,
+        recentPracticeCount,
+        improvementTrend,
+        recentSubmissions: recentSubmissions.map(submission => {
+          const latestGrading = submission.deepseekResults[0];
+          return {
+            id: submission.id,
+            submittedAt: submission.submittedAt,
+            score: latestGrading?.score || 0,
+            feedback: latestGrading?.feedback?.substring(0, 100) + '...' || ''
+          };
+        }),
+        errorAnalysis: [],
+        learningRecommendations: []
       });
     } catch (error) {
-      fastify.log.error('获取学生统计数据失败:', error);
-      reply.code(500).send({ success: false, error: '获取统计数据失败' });
+      return handleRouteError(fastify, reply, error, '获取学生统计数据失败');
     }
   });
 
@@ -133,18 +127,14 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
         })
       ]);
 
-      reply.send({
-        success: true,
-        data: {
-          totalClassrooms,
-          totalAssignments,
-          totalStudents,
-          recentActivities: []
-        }
+      return successResponse({
+        totalClassrooms,
+        totalAssignments,
+        totalStudents,
+        recentActivities: []
       });
     } catch (error) {
-      fastify.log.error('获取教师统计数据失败:', error);
-      reply.code(500).send({ success: false, error: '获取统计数据失败' });
+      return handleRouteError(fastify, reply, error, '获取教师统计数据失败');
     }
   });
 
@@ -219,32 +209,28 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
         averageScore: 0 // 可以后续添加更详细的计算
       }));
 
-      reply.send({
-        success: true,
-        data: {
-          overview: {
-            totalSubmissions,
-            totalStudents: classrooms.reduce((sum, c) => sum + c._count.members, 0),
-            totalAssignments: assignments.length,
-            totalClassrooms: classrooms.length
-          },
-          studentsNeedingAttention,
-          classroomStats,
-          recentActivities: submissions
-            .sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime())
-            .slice(0, 5)
-            .map(sub => ({
-              type: 'submission',
-              studentName: sub.user.username,
-              assignmentTitle: sub.assignment?.title || '未知作业',
-              score: sub.deepseekResults[0]?.score || 0,
-              submittedAt: sub.submittedAt
-            }))
-        }
+      return successResponse({
+        overview: {
+          totalSubmissions,
+          totalStudents: classrooms.reduce((sum, c) => sum + c._count.members, 0),
+          totalAssignments: assignments.length,
+          totalClassrooms: classrooms.length
+        },
+        studentsNeedingAttention,
+        classroomStats,
+        recentActivities: submissions
+          .sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime())
+          .slice(0, 5)
+          .map(sub => ({
+            type: 'submission',
+            studentName: sub.user.username,
+            assignmentTitle: sub.assignment?.title || '未知作业',
+            score: sub.deepseekResults[0]?.score || 0,
+            submittedAt: sub.submittedAt
+          }))
       });
     } catch (error) {
-      fastify.log.error('获取教师班级分析数据失败:', error);
-      reply.code(500).send({ success: false, error: '获取班级分析数据失败' });
+      return handleRouteError(fastify, reply, error, '获取教师班级分析数据失败');
     }
   });
 }

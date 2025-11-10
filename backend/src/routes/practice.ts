@@ -1,10 +1,10 @@
 // 练习模式API路由
 import { FastifyPluginAsync } from 'fastify';
-import { PrismaClient } from '@prisma/client';
-import { requireAuth } from '../middleware/auth';
 import axios from 'axios';
-
-const prisma = new PrismaClient();
+import { requireAuth } from '../middleware/auth';
+import { prisma } from '../lib/db';
+import { successResponse, sendError } from '../utils/response-helper';
+import { handleRouteError } from '../utils/error-handler';
 
 const practiceRoutes: FastifyPluginAsync = async (fastify) => {
   // 获取练习历史记录
@@ -48,8 +48,6 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
               score: true,
               maxScore: true,
               feedback: true,
-              suggestions: true,
-              strengths: true,
               processingTime: true,
               createdAt: true,
               rawResult: true
@@ -76,9 +74,12 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
           }
         }
 
+        const enhancedData = (latestGrading?.rawResult as any)?.enhancedData || {};
+        const rawResult = (latestGrading?.rawResult as any) || {};
+
         // 处理建议和优点数组转换为字符串
-        const suggestions = latestGrading?.suggestions;
-        const strengths = latestGrading?.strengths;
+        const suggestions = enhancedData?.suggestions;
+        const strengths = enhancedData?.strengths;
         
         const suggestionsText = suggestions ? (
           Array.isArray(suggestions) 
@@ -88,15 +89,11 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
             : suggestions.toString()
         ) : undefined;
 
-        // 从rawResult中提取增强数据和基础统计数据
-        const enhancedData = (latestGrading?.rawResult as any)?.enhancedData || {};
-        const rawResult = latestGrading?.rawResult as any || {};
-        
         // 智能提取统计数据 - 从多个可能的来源
         const questionCount = enhancedData.questionCount || 
                              rawResult.questionCount || 
                              (rawResult.analysis?.questionCount) || 
-                             (latestGrading?.suggestions as any)?.length || 0;
+                             (Array.isArray(suggestions) ? suggestions.length : 0);
         
         const correctCount = enhancedData.correctCount || 
                             rawResult.correctCount || 
@@ -139,16 +136,10 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
         };
       });
 
-      return {
-        success: true,
-        data: practiceHistory
-      };
+      return successResponse(practiceHistory);
     } catch (error) {
       fastify.log.error('获取练习历史失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '获取练习历史失败'
-      });
+      return handleRouteError(fastify, reply, error, '获取练习历史失败');
     }
   });
 
@@ -164,10 +155,7 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
       };
 
       if (!fileUploadId) {
-        return reply.code(400).send({
-          success: false,
-          error: '缺少文件ID'
-        });
+        return sendError(reply, '缺少文件ID', 400);
       }
 
       // 验证文件是否属于当前用户
@@ -179,10 +167,7 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (!fileUpload) {
-        return reply.code(404).send({
-          success: false,
-          error: '文件不存在或无权限'
-        });
+        return sendError(reply, '文件不存在或无权限', 404);
       }
 
       // 创建练习提交记录
@@ -215,10 +200,7 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
       };
     } catch (error) {
       fastify.log.error('创建练习会话失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '创建练习会话失败'
-      });
+      return handleRouteError(fastify, reply, error, '创建练习会话失败');
     }
   });
 
@@ -347,10 +329,9 @@ const practiceRoutes: FastifyPluginAsync = async (fastify) => {
             score: latestGrading.score,
             maxScore: latestGrading.maxScore,
             feedback: latestGrading.feedback,
-            suggestions: latestGrading.suggestions,
-            strengths: latestGrading.strengths,
-            // 新增的结构化信息
             ...(((latestGrading.rawResult as any)?.enhancedData) && {
+              suggestions: (latestGrading.rawResult as any).enhancedData.suggestions || [],
+              strengths: (latestGrading.rawResult as any).enhancedData.strengths || [],
               questionCount: (latestGrading.rawResult as any).enhancedData.questionCount,
               incorrectCount: (latestGrading.rawResult as any).enhancedData.incorrectCount,
               correctCount: (latestGrading.rawResult as any).enhancedData.correctCount,

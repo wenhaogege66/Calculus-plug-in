@@ -1,9 +1,7 @@
 // 认证中间件
 
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/db';
 
 // JWT载荷类型
 interface JWTPayload {

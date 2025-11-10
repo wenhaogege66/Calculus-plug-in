@@ -1,10 +1,11 @@
 // 作业管理API路由
 import { FastifyPluginAsync } from 'fastify';
-import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
+import { prisma } from '../lib/db';
 import axios from 'axios';
+import { handleRouteError } from '../utils/error-handler';
 
-const prisma = new PrismaClient();
+
 
 const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
   // 创建作业 - 仅教师
@@ -113,7 +114,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
     } catch (error) {
-      reply.code(500).send({ success: false, error: '创建作业失败' });
+      return handleRouteError(fastify, reply, error, '创建作业失败');
     }
   });
 
@@ -160,7 +161,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
         }))
       });
     } catch (error) {
-      reply.code(500).send({ success: false, error: '获取作业列表失败' });
+      return handleRouteError(fastify, reply, error, '获取作业列表失败');
     }
   });
 
@@ -265,7 +266,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
         }))
       });
     } catch (error) {
-      reply.code(500).send({ success: false, error: '获取作业列表失败' });
+      return handleRouteError(fastify, reply, error, '获取作业列表失败');
     }
   });
 
@@ -331,7 +332,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
         }))
       });
     } catch (error) {
-      reply.code(500).send({ success: false, error: '获取作业列表失败' });
+      return handleRouteError(fastify, reply, error, '获取作业列表失败');
     }
   });
 
@@ -455,7 +456,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
       });
       
     } catch (error) {
-      reply.code(500).send({ success: false, error: '更新作业失败' });
+      return handleRouteError(fastify, reply, error, '更新作业失败');
     }
   });
 
@@ -512,7 +513,7 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
       });
       
     } catch (error) {
-      reply.code(500).send({ success: false, error: '切换作业状态失败' });
+      return handleRouteError(fastify, reply, error, '切换作业状态失败');
     }
   });
 };

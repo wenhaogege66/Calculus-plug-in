@@ -1,10 +1,12 @@
 // 知识图谱API路由
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { PrismaClient } from '@prisma/client';
-import { requireAuth } from '../middleware/auth';
 import axios from 'axios';
+import { requireAuth } from '../middleware/auth';
+import { prisma } from '../lib/db';
+import { successResponse, sendError } from '../utils/response-helper';
+import { handleRouteError } from '../utils/error-handler';
 
-const prisma = new PrismaClient();
+
 
 export async function knowledgeRoutes(fastify: FastifyInstance) {
   // 获取知识图谱数据 - 层次结构
@@ -90,28 +92,22 @@ export async function knowledgeRoutes(fastify: FastifyInstance) {
       // 合并所有连接
       const allLinks = [...links, ...sameChapterLinks];
 
-      return {
-        success: true,
-        data: {
-          nodes: nodes,
-          links: allLinks,
-          chapters: [...new Set(nodes.map(n => n.chapter).filter(Boolean))],
-          stats: {
-            totalKnowledgePoints: nodes.length,
-            masteredPoints: nodes.filter(n => n.status === 'mastered').length,
-            weakPoints: nodes.filter(n => n.status === 'weak').length,
-            userProgress: nodes.length > 0 
-              ? Math.round(nodes.filter(n => n.status === 'mastered').length / nodes.length * 100)
+      return successResponse({
+        nodes,
+        links: allLinks,
+        chapters: [...new Set(nodes.map(n => n.chapter).filter(Boolean))],
+        stats: {
+          totalKnowledgePoints: nodes.length,
+          masteredPoints: nodes.filter(n => n.status === 'mastered').length,
+          weakPoints: nodes.filter(n => n.status === 'weak').length,
+          userProgress:
+            nodes.length > 0
+              ? Math.round((nodes.filter(n => n.status === 'mastered').length / nodes.length) * 100)
               : 0
-          }
         }
-      };
-    } catch (error) {
-      fastify.log.error('获取知识图谱失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '获取知识图谱失败'
       });
+    } catch (error) {
+      return handleRouteError(fastify, reply, error, '获取知识图谱失败');
     }
   });
 
@@ -122,10 +118,7 @@ export async function knowledgeRoutes(fastify: FastifyInstance) {
       const userId = request.currentUser!.id;
 
       if (!knowledgePointId) {
-        return reply.code(400).send({
-          success: false,
-          error: '无效的知识点ID'
-        });
+        return sendError(reply, '无效的知识点ID', 400);
       }
 
       // 获取知识点详细信息
@@ -172,10 +165,7 @@ export async function knowledgeRoutes(fastify: FastifyInstance) {
       });
 
       if (!knowledgePoint) {
-        return reply.code(404).send({
-          success: false,
-          error: '知识点不存在'
-        });
+        return sendError(reply, '知识点不存在', 404);
       }
 
       // 如果没有AI解释，生成一个
@@ -194,51 +184,40 @@ export async function knowledgeRoutes(fastify: FastifyInstance) {
       const errorCount = knowledgePoint.errorAnalysis.length;
       const masteryLevel = Math.max(0, 100 - errorCount * 15);
 
-      return {
-        success: true,
-        data: {
-          id: knowledgePoint.id,
-          name: knowledgePoint.name,
-          chapter: knowledgePoint.chapter,
-          level: knowledgePoint.level,
-          description: knowledgePoint.description,
-          keywords: knowledgePoint.keywords,
-          functionExamples: knowledgePoint.functionExamples,
-          difficultyLevel: knowledgePoint.difficultyLevel,
-          aiExplanation: aiExplanation,
-          // 层次关系
-          parent: knowledgePoint.parent ? {
-            id: knowledgePoint.parent.id,
-            name: knowledgePoint.parent.name
-          } : null,
-          children: knowledgePoint.children.map(child => ({
-            id: child.id,
-            name: child.name,
-            masteryLevel: Math.max(0, 100 - 15)
-          })),
-          // 用户学习数据
-          userStats: {
-            errorCount: errorCount,
-            masteryLevel: masteryLevel,
-            status: masteryLevel > 80 ? 'mastered' : masteryLevel > 50 ? 'learning' : 'weak',
-            recentErrors: []
-          },
-          // 相关练习题
-          relatedQuestions: knowledgePoint.similarQuestionRelations.map(rel => ({
-            id: rel.similarQuestion.id,
-            content: rel.similarQuestion.generatedContent.substring(0, 100) + '...',
-            difficultyLevel: rel.similarQuestion.difficultyLevel,
-            isCompleted: rel.similarQuestion.isCompleted,
-            userRating: rel.similarQuestion.userRating
-          }))
-        }
-      };
-    } catch (error) {
-      fastify.log.error('获取知识点详情失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '获取知识点详情失败'
+      return successResponse({
+        id: knowledgePoint.id,
+        name: knowledgePoint.name,
+        chapter: knowledgePoint.chapter,
+        level: knowledgePoint.level,
+        description: knowledgePoint.description,
+        keywords: knowledgePoint.keywords,
+        functionExamples: knowledgePoint.functionExamples,
+        difficultyLevel: knowledgePoint.difficultyLevel,
+        aiExplanation,
+        parent: knowledgePoint.parent
+          ? { id: knowledgePoint.parent.id, name: knowledgePoint.parent.name }
+          : null,
+        children: knowledgePoint.children.map(child => ({
+          id: child.id,
+          name: child.name,
+          masteryLevel: Math.max(0, 100 - 15)
+        })),
+        userStats: {
+          errorCount,
+          masteryLevel,
+          status: masteryLevel > 80 ? 'mastered' : masteryLevel > 50 ? 'learning' : 'weak',
+          recentErrors: []
+        },
+        relatedQuestions: knowledgePoint.similarQuestionRelations.map(rel => ({
+          id: rel.similarQuestion.id,
+          content: rel.similarQuestion.generatedContent.substring(0, 100) + '...',
+          difficultyLevel: rel.similarQuestion.difficultyLevel,
+          isCompleted: rel.similarQuestion.isCompleted,
+          userRating: rel.similarQuestion.userRating
+        }))
       });
+    } catch (error) {
+      return handleRouteError(fastify, reply, error, '获取知识点详情失败');
     }
   });
 
@@ -247,37 +226,24 @@ export async function knowledgeRoutes(fastify: FastifyInstance) {
     try {
       const userRole = request.currentUser!.role;
       if (userRole?.toLowerCase() !== 'teacher') {
-        return reply.code(403).send({
-          success: false,
-          error: '仅教师可初始化知识点结构'
-        });
+        return sendError(reply, '仅教师可初始化知识点结构', 403);
       }
 
       // 检查是否已有知识点
       const existingCount = await prisma.knowledgePoint.count();
       if (existingCount > 0) {
-        return reply.code(400).send({
-          success: false,
-          error: '知识点结构已存在，无需重复初始化'
-        });
+        return sendError(reply, '知识点结构已存在，无需重复初始化', 400);
       }
 
       // 创建微积分知识点层次结构
       const knowledgeStructure = await createCalculusKnowledgeStructure();
 
-      return {
-        success: true,
-        data: {
-          message: '知识点结构初始化成功',
-          createdCount: knowledgeStructure.length
-        }
-      };
-    } catch (error) {
-      fastify.log.error('初始化知识点结构失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '初始化知识点结构失败'
+      return successResponse({
+        message: '知识点结构初始化成功',
+        createdCount: knowledgeStructure.length
       });
+    } catch (error) {
+      return handleRouteError(fastify, reply, error, '初始化知识点结构失败');
     }
   });
 
@@ -287,10 +253,7 @@ export async function knowledgeRoutes(fastify: FastifyInstance) {
       const { q: query } = request.query as { q?: string };
       
       if (!query || query.trim().length < 2) {
-        return reply.code(400).send({
-          success: false,
-          error: '搜索关键词至少需要2个字符'
-        });
+        return sendError(reply, '搜索关键词至少需要2个字符', 400);
       }
 
       const searchTerm = query.trim();
@@ -315,9 +278,8 @@ export async function knowledgeRoutes(fastify: FastifyInstance) {
         take: 20
       });
 
-      return {
-        success: true,
-        data: results.map(kp => ({
+      return successResponse(
+        results.map(kp => ({
           id: kp.id,
           name: kp.name,
           chapter: kp.chapter,
@@ -327,13 +289,9 @@ export async function knowledgeRoutes(fastify: FastifyInstance) {
           parent: kp.parent,
           childrenCount: kp.children.length
         }))
-      };
+      );
     } catch (error) {
-      fastify.log.error('搜索知识点失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '搜索知识点失败'
-      });
+      return handleRouteError(fastify, reply, error, '搜索知识点失败');
     }
   });
 }

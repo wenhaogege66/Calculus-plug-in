@@ -1,9 +1,9 @@
 // 错题本管理API路由
 import { FastifyPluginAsync } from 'fastify';
-import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
+import { prisma } from '../lib/db';
 
-const prisma = new PrismaClient();
+
 
 const mistakeRoutes: FastifyPluginAsync = async (fastify) => {
   // 获取用户的所有分类（树形结构）

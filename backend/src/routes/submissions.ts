@@ -1,9 +1,9 @@
 // 提交管理API路由
-import { FastifyPluginAsync } from 'fastify';
-import { PrismaClient } from '@prisma/client';
+import { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import { prisma } from '../lib/db';
 import { requireAuth } from '../middleware/auth';
-
-const prisma = new PrismaClient();
+import { successResponse, sendError } from '../utils/response-helper';
+import { handleRouteError } from '../utils/error-handler';
 
 const submissionRoutes: FastifyPluginAsync = async (fastify) => {
   // 获取提交记录 (需要认证)
@@ -29,16 +29,9 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
         take: assignmentId ? 50 : 10 // 如果查询特定作业，返回更多记录
       });
 
-      return { 
-        success: true, 
-        data: { submissions }
-      };
+      return successResponse({ submissions });
     } catch (error) {
-      fastify.log.error('获取提交记录失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '获取提交记录失败'
-      });
+      return handleRouteError(fastify, reply, error, '获取提交记录失败');
     }
   });
   
@@ -51,10 +44,7 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
       const fileIds = fileUploadIds || (fileUploadId ? [fileUploadId] : []);
       
       if (!fileIds || fileIds.length === 0) {
-        return reply.code(400).send({
-          success: false,
-          error: '缺少文件ID'
-        });
+        return sendError(reply, '缺少文件ID', 400);
       }
 
       // 验证所有文件是否属于当前用户
@@ -66,10 +56,7 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (fileUploads.length !== fileIds.length) {
-        return reply.code(404).send({
-          success: false,
-          error: '部分文件不存在或无权限'
-        });
+        return sendError(reply, '部分文件不存在或无权限', 404);
       }
 
       // 获取文件元数据中的workMode和assignmentId（使用第一个文件的元数据）
@@ -98,10 +85,7 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
         });
         
         if (!assignment || assignment.classroom.members.length === 0) {
-          return reply.code(400).send({
-            success: false,
-            error: '作业不存在或你没有权限提交'
-          });
+          return sendError(reply, '作业不存在或你没有权限提交', 400);
         }
       }
 
@@ -163,24 +147,17 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-      return {
-        success: true,
-        data: { 
-          submissionIds: submissions.map(s => s.id),
-          submissions: submissions.map(s => ({
-            id: s.id,
-            fileUploadId: s.fileUploadId,
-            status: s.status
-          })),
-          message: `成功提交${fileIds.length}个文件`
-        }
-      };
-    } catch (error) {
-      fastify.log.error('创建提交失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '创建提交失败'
+      return successResponse({ 
+        submissionIds: submissions.map(s => s.id),
+        submissions: submissions.map(s => ({
+          id: s.id,
+          fileUploadId: s.fileUploadId,
+          status: s.status
+        })),
+        message: `成功提交${fileIds.length}个文件`
       });
+    } catch (error) {
+      return handleRouteError(fastify, reply, error, '创建提交失败');
     }
   });
 
@@ -190,10 +167,7 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
       const submissionId = parseInt((request.params as any).submissionId);
       
       if (!submissionId) {
-        return reply.code(400).send({
-          success: false,
-          error: '无效的提交ID'
-        });
+        return sendError(reply, '无效的提交ID', 400);
       }
 
       // 获取提交记录及相关的批改结果
@@ -247,10 +221,7 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (!submission) {
-        return reply.code(404).send({
-          success: false,
-          error: '提交记录不存在'
-        });
+        return sendError(reply, '提交记录不存在', 404);
       }
 
       // 计算批改进度 - 根据实际结果数据判断状态
@@ -296,75 +267,29 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
         message = '等待文字识别...';
       }
 
-      return {
-        success: true,
-        data: {
-          id: submission.id,
-          status: submission.status,
-          workMode: submission.workMode,
-          submittedAt: submission.submittedAt,
-          fileUpload: submission.fileUpload,
-          mathpixResults: submission.mathpixResults,
-          deepseekResults: submission.deepseekResults,
-          assignment: submission.assignment, // 添加 assignment 数据
-          progress: {
-            percent: progress,
-            stage: stage,
-            message: message
-          }
+      return successResponse({
+        id: submission.id,
+        status: submission.status,
+        workMode: submission.workMode,
+        submittedAt: submission.submittedAt,
+        fileUpload: submission.fileUpload,
+        mathpixResults: submission.mathpixResults,
+        deepseekResults: submission.deepseekResults,
+        assignment: submission.assignment, // 添加 assignment 数据
+        progress: {
+          percent: progress,
+          stage: stage,
+          message: message
         }
-      };
+      });
 
     } catch (error) {
-      // 增强的错误日志 - 捕获更多上下文信息
-      const submissionId = (request.params as any).submissionId;
-      const userId = request.currentUser?.id;
-
-      fastify.log.error('❌ 获取提交状态失败:', error);
-
-      // 详细的错误信息日志
-      const errorDetails: any = {
-        timestamp: new Date().toISOString(),
-        submissionId: submissionId,
-        userId: userId,
-        errorType: error?.constructor?.name || 'Unknown',
-      };
-
-      // 捕获标准Error属性
-      if (error instanceof Error) {
-        errorDetails.errorName = error.name;
-        errorDetails.errorMessage = error.message;
-        errorDetails.errorStack = error.stack;
-      }
-
-      // 捕获Prisma特定错误信息
-      if (error && typeof error === 'object') {
-        const prismaError = error as any;
-        if (prismaError.code) errorDetails.prismaCode = prismaError.code;
-        if (prismaError.meta) errorDetails.prismaMeta = prismaError.meta;
-        if (prismaError.clientVersion) errorDetails.prismaClientVersion = prismaError.clientVersion;
-
-        // 尝试捕获所有可枚举属性
-        errorDetails.allProperties = Object.keys(error);
-        errorDetails.fullErrorObject = JSON.stringify(error, Object.getOwnPropertyNames(error));
-      }
-
-      fastify.log.error('📋 完整错误详情:', errorDetails);
-
-      // 如果是Prisma查询错误，记录可能的原因
-      if (errorDetails.prismaCode) {
-        fastify.log.error('⚠️ Prisma错误代码说明:', {
-          P2001: '记录不存在',
-          P2002: '唯一性约束冲突',
-          P2003: '外键约束失败',
-          P2025: '记录未找到',
-          code: errorDetails.prismaCode
-        });
-      }
-
-      return reply.code(500).send({
-        success: false,
-        error: '获取提交状态失败'
+      const submissionIdParam = (request.params as any).submissionId;
+      return handleRouteError(fastify, reply, error, '获取提交状态失败', {
+        details: {
+          submissionId: submissionIdParam,
+          userId: request.currentUser?.id
+        }
       });
     }
   });
@@ -376,10 +301,7 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
       const { fileUploadId, note } = request.body as any;
       
       if (!submissionId || !fileUploadId) {
-        return reply.code(400).send({
-          success: false,
-          error: '缺少提交ID或文件ID'
-        });
+        return sendError(reply, '缺少提交ID或文件ID', 400);
       }
 
       // 获取原始提交记录，确保用户有权限
@@ -391,10 +313,7 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (!originalSubmission) {
-        return reply.code(404).send({
-          success: false,
-          error: '原始提交记录不存在或无权限'
-        });
+        return sendError(reply, '原始提交记录不存在或无权限', 404);
       }
 
       // 如果是作业模式，验证作业是否仍然可以提交（未过期）
@@ -408,10 +327,7 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
         });
         
         if (!assignment) {
-          return reply.code(400).send({
-            success: false,
-            error: '作业已过期或不存在，无法重新提交'
-          });
+          return sendError(reply, '作业已过期或不存在，无法重新提交', 400);
         }
       }
 
@@ -424,10 +340,7 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (!fileUpload) {
-        return reply.code(404).send({
-          success: false,
-          error: '文件不存在或无权限'
-        });
+        return sendError(reply, '文件不存在或无权限', 404);
       }
 
       // 获取当前最高版本号
@@ -476,66 +389,47 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      return {
-        success: true,
-        data: {
-          submissionId: newSubmission.id,
-          version: newVersion,
-          message: `成功重新提交，这是第${newVersion}版`
-        }
-      };
-    } catch (error) {
-      fastify.log.error('重新提交失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '重新提交失败'
+      return successResponse({
+        submissionId: newSubmission.id,
+        version: newVersion,
+        message: `成功重新提交，这是第${newVersion}版`
       });
+    } catch (error) {
+      return handleRouteError(fastify, reply, error, '重新提交失败');
     }
   });
 };
 
 // 自动化批改流程 - 使用统一的处理服务
-async function startGradingProcess(submissionId: number, fastifyInstance?: any) {
+async function startGradingProcess(submissionId: number, fastifyInstance: FastifyInstance) {
   const { processSubmission } = await import('../services/processing');
-  
-  // 创建一个模拟的 fastify 实例用于日志
-  const mockFastify = fastifyInstance || {
-    log: {
-    }
-  };
-  
+
   // 使用统一的处理服务，而不是重复的代码
-  const result = await processSubmission(submissionId, mockFastify, {
+  const result = await processSubmission(submissionId, fastifyInstance, {
     mode: 'homework'
   });
   
   if (!result.success) {
-    mockFastify.log.error(`❌ 自动批改流程失败 - 提交ID: ${submissionId}`, result.error);
+    fastifyInstance.log.error(`❌ 自动批改流程失败 - 提交ID: ${submissionId}`, result.error);
   } else {
-    mockFastify.log.info(`🎉 自动批改流程完成 - 提交ID: ${submissionId}`);
+    fastifyInstance.log.info(`🎉 自动批改流程完成 - 提交ID: ${submissionId}`);
   }
 }
 
 // 教师端题目处理流程（仅OCR识别，存储到题库）
-async function startQuestionProcessing(submissionId: number, fastifyInstance?: any) {
+async function startQuestionProcessing(submissionId: number, fastifyInstance: FastifyInstance) {
   const { processSubmission } = await import('../services/processing');
-  
-  // 创建一个模拟的 fastify 实例用于日志
-  const mockFastify = fastifyInstance || {
-    log: {
-    }
-  };
-  
+
   // 使用统一的处理服务，教师上传只需要OCR，不需要AI批改
-  const result = await processSubmission(submissionId, mockFastify, {
+  const result = await processSubmission(submissionId, fastifyInstance, {
     mode: 'homework',
     skipAI: true // 教师端跳过AI批改
   });
   
   if (!result.success) {
-    mockFastify.log.error(`❌ 题目处理流程失败 - 提交ID: ${submissionId}`, result.error);
+    fastifyInstance.log.error(`❌ 题目处理流程失败 - 提交ID: ${submissionId}`, result.error);
   } else {
-    mockFastify.log.info(`🎉 题目处理流程完成 - 提交ID: ${submissionId}`);
+    fastifyInstance.log.info(`🎉 题目处理流程完成 - 提交ID: ${submissionId}`);
     // TODO: 将OCR结果存储到题库
   }
 }

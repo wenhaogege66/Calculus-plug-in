@@ -1,161 +1,146 @@
 // Deepseek AI批改服务
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { PrismaClient } from '@prisma/client';
-import { requireAuth } from '../middleware/auth';
 import axios from 'axios';
-
-const prisma = new PrismaClient();
+import { requireAuth } from '../middleware/auth';
+import { prisma } from '../lib/db';
+import { handleRouteError } from '../utils/error-handler';
+import { sendError, successResponse } from '../utils/response-helper';
 
 // AI批改的核心逻辑 - 导出供其他模块使用
 export async function processAIGrading(request: FastifyRequest, reply: FastifyReply, fastify: FastifyInstance) {
-    try {
-      const { submissionId, recognizedText, subject = '微积分', exerciseType = '练习题' } = request.body as any;
-      
-      if (!submissionId || !recognizedText) {
-        return reply.code(400).send({
-          success: false,
-          error: '缺少必要参数'
-        });
-      }
+  const { submissionId, recognizedText, subject = '微积分', exerciseType = '练习题' } = request.body as any;
 
-      // 获取提交记录（对于内部调用，不验证用户）
-      const submission = await prisma.submission.findFirst({
-        where: {
-          id: submissionId,
-          ...(request.currentUser && { userId: request.currentUser.id }) // 只有在有用户上下文时才验证
-        },
-        include: {
-          fileUpload: true,
-          mathpixResults: true
+  if (!submissionId || !recognizedText) {
+    return sendError(reply, '缺少必要参数', 400);
+  }
+
+  try {
+    // 获取提交记录（对于内部调用，不验证用户）
+    const submission = await prisma.submission.findFirst({
+      where: {
+        id: submissionId,
+        ...(request.currentUser && { userId: request.currentUser.id }) // 只有在有用户上下文时才验证
+      },
+      include: {
+        fileUpload: true,
+        mathpixResults: true
+      }
+    });
+
+    if (!submission) {
+      return sendError(reply, '提交记录不存在', 404);
+    }
+
+    // 获取教师题目信息（如果是作业模式）
+    let teacherQuestionText = null;
+    let teacherQuestionLatex = null;
+    
+    if (submission.assignmentId) {
+      fastify.log.info(`获取作业题目信息: assignmentId=${submission.assignmentId}`);
+      
+      const assignment = await prisma.assignment.findUnique({
+        where: { id: submission.assignmentId },
+        select: {
+          id: true,
+          title: true,
+          ocrText: true,
+          ocrLatex: true,
+          ocrStatus: true
         }
       });
 
-      if (!submission) {
-        return reply.code(404).send({
-          success: false,
-          error: '提交记录不存在'
-        });
-      }
-
-      // 获取教师题目信息（如果是作业模式）
-      let teacherQuestionText = null;
-      let teacherQuestionLatex = null;
-      
-      if (submission.assignmentId) {
-        fastify.log.info(`获取作业题目信息: assignmentId=${submission.assignmentId}`);
+      if (assignment) {
+        teacherQuestionText = assignment.ocrText;
+        teacherQuestionLatex = assignment.ocrLatex;
         
-        const assignment = await prisma.assignment.findUnique({
-          where: { id: submission.assignmentId },
-          select: {
-            id: true,
-            title: true,
-            ocrText: true,
-            ocrLatex: true,
-            ocrStatus: true
-          }
-        });
-
-        if (assignment) {
-          teacherQuestionText = assignment.ocrText;
-          teacherQuestionLatex = assignment.ocrLatex;
-          
-          fastify.log.info(`作业题目OCR状态: ${assignment.ocrStatus}`);
-          if (assignment.ocrText) {
-            fastify.log.info(`题目文本长度: ${assignment.ocrText.length}字符`);
-          }
+        fastify.log.info(`作业题目OCR状态: ${assignment.ocrStatus}`);
+        if (assignment.ocrText) {
+          fastify.log.info(`题目文本长度: ${assignment.ocrText.length}字符`);
         }
       }
+    }
 
-      const startTime = Date.now();
+    const startTime = Date.now();
 
-      // 调用Deepseek AI进行批改，传入教师题目信息
-      const gradingResult = await callDeepseekAPI(
-        recognizedText, 
-        subject, 
-        exerciseType,
-        teacherQuestionText,
-        teacherQuestionLatex
-      );
-      
-      const processingTime = Date.now() - startTime;
+    // 调用Deepseek AI进行批改，传入教师题目信息
+    const gradingResult = await callDeepseekAPI(
+      recognizedText, 
+      subject, 
+      exerciseType,
+      teacherQuestionText,
+      teacherQuestionLatex
+    );
+    
+    const processingTime = Date.now() - startTime;
 
-      // 保存批改结果
-      const aiResult = await prisma.deepseekResult.create({
-        data: {
-          submissionId: submissionId,
-          score: gradingResult.score,
-          maxScore: gradingResult.maxScore,
-          feedback: gradingResult.feedback,
-          errors: gradingResult.errors,
-          suggestions: gradingResult.suggestions,
-          strengths: gradingResult.strengths,
-          processingTime: processingTime,
-          rawResult: {
-            ...gradingResult.raw,
-            enhancedData: {
-              questionCount: gradingResult.questionCount,
-              incorrectCount: gradingResult.incorrectCount,
-              correctCount: gradingResult.correctCount,
-              knowledgePoints: gradingResult.knowledgePoints,
-              detailedErrors: gradingResult.detailedErrors,
-              improvementAreas: gradingResult.improvementAreas,
-              nextStepRecommendations: gradingResult.nextStepRecommendations
-            }
-          }
+    const enhancedData = {
+      questionCount: gradingResult.questionCount,
+      incorrectCount: gradingResult.incorrectCount,
+      correctCount: gradingResult.correctCount,
+      knowledgePoints: gradingResult.knowledgePoints,
+      detailedErrors: gradingResult.detailedErrors,
+      improvementAreas: gradingResult.improvementAreas,
+      nextStepRecommendations: gradingResult.nextStepRecommendations,
+      suggestions: gradingResult.suggestions,
+      strengths: gradingResult.strengths
+    };
+
+    // 保存批改结果
+    const aiResult = await prisma.deepseekResult.create({
+      data: {
+        submissionId,
+        score: gradingResult.score,
+        maxScore: gradingResult.maxScore,
+        feedback: gradingResult.feedback,
+        errors: gradingResult.errors,
+        processingTime,
+        rawResult: {
+          ...gradingResult.raw,
+          enhancedData
         }
-      });
+      }
+    });
 
-      // 更新提交状态为完成
+    // 更新提交状态为完成
+    await prisma.submission.update({
+      where: { id: submissionId },
+      data: { 
+        status: 'COMPLETED',
+        completedAt: new Date()
+      }
+    });
+
+    return successResponse({
+      resultId: aiResult.id,
+      score: aiResult.score,
+      maxScore: aiResult.maxScore,
+      feedback: aiResult.feedback,
+      errors: aiResult.errors,
+      processingTime: aiResult.processingTime,
+      questionCount: enhancedData.questionCount || 0,
+      incorrectCount: enhancedData.incorrectCount || 0,
+      correctCount: enhancedData.correctCount || 0,
+      knowledgePoints: enhancedData.knowledgePoints || [],
+      detailedErrors: enhancedData.detailedErrors || [],
+      improvementAreas: enhancedData.improvementAreas || [],
+      nextStepRecommendations: enhancedData.nextStepRecommendations || [],
+      suggestions: enhancedData.suggestions || [],
+      strengths: enhancedData.strengths || []
+    });
+  } catch (error) {
+    // 更新提交状态为失败（忽略内部错误）
+    if (submissionId) {
       await prisma.submission.update({
         where: { id: submissionId },
-        data: { 
-          status: 'COMPLETED',
-          completedAt: new Date()
-        }
-      });
-
-      // 从rawResult中提取增强数据
-      const enhancedData = (aiResult.rawResult as any)?.enhancedData || {};
-      
-      return {
-        success: true,
-        data: {
-          resultId: aiResult.id,
-          score: aiResult.score,
-          maxScore: aiResult.maxScore,
-          feedback: aiResult.feedback,
-          errors: aiResult.errors,
-          suggestions: aiResult.suggestions,
-          strengths: aiResult.strengths,
-          processingTime: aiResult.processingTime,
-          // 新增的结构化信息
-          questionCount: enhancedData.questionCount || 0,
-          incorrectCount: enhancedData.incorrectCount || 0,
-          correctCount: enhancedData.correctCount || 0,
-          knowledgePoints: enhancedData.knowledgePoints || [],
-          detailedErrors: enhancedData.detailedErrors || [],
-          improvementAreas: enhancedData.improvementAreas || [],
-          nextStepRecommendations: enhancedData.nextStepRecommendations || []
-        }
-      };
-
-    } catch (error) {
-      fastify.log.error('Deepseek AI批改失败:', error);
-      
-      // 更新提交状态为失败
-      if ((request.body as any)?.submissionId) {
-        await prisma.submission.update({
-          where: { id: (request.body as any).submissionId },
-          data: { status: 'FAILED' }
-        }).catch(() => {}); // 忽略更新失败
-      }
-
-      return reply.code(500).send({
-        success: false,
-        error: 'AI批改处理失败'
-      });
+        data: { status: 'FAILED' }
+      }).catch(() => {});
     }
+
+    return handleRouteError(fastify, reply, error, 'AI批改处理失败', {
+      details: { submissionId }
+    });
+  }
 }
 
 export async function aiRoutes(fastify: FastifyInstance) {
@@ -179,10 +164,7 @@ export async function aiRoutes(fastify: FastifyInstance) {
       const { submissionId, question } = request.body as any;
       
       if (!question || question.trim().length === 0) {
-        return reply.code(400).send({
-          success: false,
-          error: '缺少问题内容'
-        });
+        return sendError(reply, '缺少问题内容', 400);
       }
 
       // 支持通用AI搜索（submissionId为0或null）
@@ -191,15 +173,12 @@ export async function aiRoutes(fastify: FastifyInstance) {
         const generalPrompt = buildGeneralSearchPrompt(question.trim());
         const response = await callDeepseekFollowUpAPI(generalPrompt);
 
-        return {
-          success: true,
-          data: {
-            question: question.trim(),
-            answer: response.answer,
-            timestamp: new Date(),
-            mode: 'general_search'
-          }
-        };
+        return successResponse({
+          question: question.trim(),
+          answer: response.answer,
+          timestamp: new Date(),
+          mode: 'general_search'
+        });
       }
 
       // 基于提交记录的进一步提问模式
@@ -233,50 +212,39 @@ export async function aiRoutes(fastify: FastifyInstance) {
       }
 
       if (!submission) {
-        return reply.code(404).send({
-          success: false,
-          error: '提交记录不存在'
-        });
+        return sendError(reply, '提交记录不存在', 404);
       }
 
       const latestOCR = submission.mathpixResults[0];
       const latestGrading = submission.deepseekResults[0];
 
       if (!latestOCR || !latestGrading) {
-        return reply.code(400).send({
-          success: false,
-          error: '缺少OCR识别或AI批改结果'
-        });
+        return sendError(reply, '缺少OCR识别或AI批改结果', 400);
       }
+
+      const gradingEnhancedData = (latestGrading.rawResult as any)?.enhancedData || {};
 
       // 构建问答prompt
       const followUpPrompt = buildFollowUpPrompt(
         assignmentInfo?.ocrText || null,
         latestOCR.recognizedText || '',
         latestGrading.feedback || '',
-        latestGrading.suggestions ? JSON.stringify(latestGrading.suggestions) : '',
+        gradingEnhancedData.suggestions ? JSON.stringify(gradingEnhancedData.suggestions) : '',
         question.trim()
       );
 
       // 调用Deepseek API
       const response = await callDeepseekFollowUpAPI(followUpPrompt);
 
-      return {
-        success: true,
-        data: {
-          question: question.trim(),
-          answer: response.answer,
-          timestamp: new Date(),
-          mode: 'submission_based'
-        }
-      };
+      return successResponse({
+        question: question.trim(),
+        answer: response.answer,
+        timestamp: new Date(),
+        mode: 'submission_based'
+      });
 
     } catch (error) {
-      fastify.log.error('进一步提问处理失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '处理提问请求失败'
-      });
+      return handleRouteError(fastify, reply, error, '处理提问请求失败');
     }
   });
 
@@ -294,10 +262,7 @@ export async function aiRoutes(fastify: FastifyInstance) {
       });
 
       if (!submission) {
-        return reply.code(404).send({
-          success: false,
-          error: '提交记录不存在'
-        });
+        return sendError(reply, '提交记录不存在', 404);
       }
 
       // 获取批改结果
@@ -306,17 +271,21 @@ export async function aiRoutes(fastify: FastifyInstance) {
         orderBy: { createdAt: 'desc' }
       });
 
-      return {
-        success: true,
-        data: { results: aiResults }
-      };
+      const normalizedResults = aiResults.map(result => {
+        const enhancedData = (result.rawResult as any)?.enhancedData || {};
+        return {
+          ...result,
+          suggestions: enhancedData.suggestions || [],
+          strengths: enhancedData.strengths || [],
+          improvementAreas: enhancedData.improvementAreas || [],
+          nextStepRecommendations: enhancedData.nextStepRecommendations || []
+        };
+      });
+
+      return successResponse({ results: normalizedResults });
 
     } catch (error) {
-      fastify.log.error('获取AI批改结果失败:', error);
-      return reply.code(500).send({
-        success: false,
-        error: '获取AI批改结果失败'
-      });
+      return handleRouteError(fastify, reply, error, '获取AI批改结果失败');
     }
   });
 }
@@ -343,26 +312,16 @@ async function callDeepseekAPIWithRetry(
 
       return response;
     } catch (error: any) {
-      const duration = Date.now() - Date.now();
-      const isTimeout = error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED';
+      const isTimeout =
+        error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED';
       const isNetworkError = error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED';
 
-        errorCode: error.code,
-        errorMessage: error.message,
-        isTimeout,
-        isNetworkError
-      });
-
-      // 如果还有重试机会且错误可重试
       if (attempt < maxRetries && (isTimeout || isNetworkError)) {
         const waitTime = Math.pow(2, attempt + 1) * 1000; // 指数退避: 2s, 4s, 8s
-
-        // 等待后重试
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
 
-      // 最后一次重试失败或非可重试错误,抛出异常
       throw error;
     }
   }
@@ -442,6 +401,7 @@ async function callDeepseekAPI(
     };
 
   } catch (error) {
+    console.error('[Deepseek] 调用失败', {
       message: error instanceof Error ? error.message : '未知错误',
       stack: error instanceof Error ? error.stack : undefined,
       code: (error as any)?.code,
@@ -449,7 +409,9 @@ async function callDeepseekAPI(
     });
 
     // 直接抛出错误，不返回默认分数，避免误导用户
-    throw new Error(`AI批改服务暂时不可用: ${error instanceof Error ? error.message : '未知错误'}。请稍后重试或联系管理员: 3220104512@zju.edu.cn`);
+    throw new Error(
+      `AI批改服务暂时不可用: ${error instanceof Error ? error.message : '未知错误'}。请稍后重试或联系管理员: 3220104512@zju.edu.cn`
+    );
   }
 }
 
