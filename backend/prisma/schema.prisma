@@ -72,6 +72,7 @@ model FileUpload {
   assignmentQuestions Assignment[] @relation("AssignmentQuestions")
 
   @@index([userId])
+  @@index([createdAt])
   @@map("file_uploads")
 }
 
@@ -102,6 +103,7 @@ model Submission {
   @@index([status])
   @@index([workMode])
   @@index([userId, submittedAt])
+  @@index([userId, assignmentId])
   @@map("submissions")
 }
 
@@ -120,6 +122,7 @@ model MathPixResult {
   submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
   @@index([submissionId])
+  @@index([createdAt])
   @@map("mathpix_results")
 }
 
@@ -139,6 +142,7 @@ model DeepseekResult {
   submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
   @@index([submissionId])
+  @@index([createdAt])
   @@map("deepseek_results")
 }
 
@@ -191,6 +195,8 @@ model Classroom {
   members     ClassroomMember[]
   assignments Assignment[]
 
+  @@index([teacherId])
+  @@index([isActive])
   @@map("classrooms")
 }
 
@@ -207,6 +213,9 @@ model ClassroomMember {
   student   User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([classroomId, studentId])
+  @@index([studentId])
+  @@index([classroomId])
+  @@index([isActive])
   @@map("classroom_members")
 }
 
@@ -239,7 +248,10 @@ model Assignment {
 
   @@index([classroomId])
   @@index([teacherId])
+  @@index([isActive])
   @@index([dueDate])
+  @@index([startDate])
+  @@index([classroomId, isActive, dueDate])
   @@map("assignments")
 }
 
@@ -263,6 +275,9 @@ model KnowledgePoint {
   errorAnalysis            ErrorAnalysis[]
   similarQuestionRelations SimilarQuestionKnowledgePoint[]
 
+  @@index([parentId])
+  @@index([level])
+  @@index([chapter])
   @@map("knowledge_points")
 }
 
@@ -282,6 +297,9 @@ model ErrorAnalysis {
   submission     Submission      @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   knowledgePoint KnowledgePoint? @relation(fields: [knowledgePointId], references: [id])
 
+  @@index([submissionId])
+  @@index([knowledgePointId])
+  @@index([errorType])
   @@map("error_analysis")
 }
 
@@ -303,6 +321,8 @@ model SimilarQuestion {
   originalSubmission      Submission                      @relation(fields: [originalSubmissionId], references: [id], onDelete: Cascade)
   knowledgePointRelations SimilarQuestionKnowledgePoint[]
 
+  @@index([originalSubmissionId])
+  @@index([isCompleted])
   @@map("similar_questions")
 }
 
@@ -336,6 +356,9 @@ model LearningRecommendation {
   // 关联
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([isRead])
+  @@index([priority])
   @@map("learning_recommendations")
 }
 
@@ -360,6 +383,9 @@ model MistakeCategory {
   children MistakeCategory[] @relation("CategoryHierarchy")
   mistakes MistakeItem[]
 
+  @@index([userId])
+  @@index([parentId])
+  @@index([isActive])
   @@map("mistake_categories")
 }
 

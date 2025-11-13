@@ -17,6 +17,7 @@ import './ClassroomsPage.css';
 import './PracticePage.css';
 import './MistakesPage.css';
 import './Notification.css';
+import '../styles/theme.css';  // 导入全局主题变量
 
 interface MainLayoutProps {
   children: React.ReactNode;

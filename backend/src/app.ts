@@ -4,6 +4,7 @@ import Fastify from 'fastify';
 import dotenv from 'dotenv';
 import path from 'path';
 import { prisma } from './lib/db';
+import { validateEnv, printEnvValidationResult } from './utils/env-validator';
 
 // 插件导入
 import cors from '@fastify/cors';
@@ -26,6 +27,15 @@ import { requireAuth, optionalAuth } from './middleware/auth';
 
 // 加载环境变量
 dotenv.config();
+
+// 验证环境变量
+const envValidation = validateEnv();
+printEnvValidationResult(envValidation);
+
+if (!envValidation.valid) {
+  console.error('🚨 由于环境变量配置不完整，服务器启动已中止');
+  process.exit(1);
+}
 
 const PORT = Number(process.env.PORT) || 3000;
 

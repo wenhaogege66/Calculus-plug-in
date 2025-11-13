@@ -1,0 +1,170 @@
+/*
+ * 全局CSS主题变量系统
+ * 统一管理颜色、间距、字体等设计token
+ * 避免color bleeding和不一致问题
+ */
+
+:root {
+  /* ========== 颜色系统 ========== */
+
+  /* 主色调 */
+  --color-primary: #3b82f6;        /* 蓝色 - 主要操作 */
+  --color-primary-hover: #2563eb;  /* 蓝色悬停 */
+  --color-primary-light: #dbeafe;  /* 浅蓝色背景 */
+
+  /* 语义颜色 */
+  --color-success: #10b981;        /* 成功 - 绿色 */
+  --color-warning: #f59e0b;        /* 警告 - 橙色 */
+  --color-error: #ef4444;          /* 错误 - 红色 */
+  --color-info: #06b6d4;           /* 信息 - 青色 */
+
+  /* 中性颜色 - Light Mode */
+  --color-text-primary: #1e293b;   /* 主要文本 */
+  --color-text-secondary: #64748b; /* 次要文本 */
+  --color-text-tertiary: #94a3b8;  /* 辅助文本 */
+  --color-text-disabled: #cbd5e1;  /* 禁用文本 */
+
+  --color-bg-primary: #ffffff;     /* 主背景 */
+  --color-bg-secondary: #f8fafc;   /* 次背景 */
+  --color-bg-tertiary: #f1f5f9;    /* 第三背景 */
+  --color-bg-hover: #e2e8f0;       /* 悬停背景 */
+
+  --color-border: #e2e8f0;         /* 边框颜色 */
+  --color-border-light: #f1f5f9;   /* 浅边框 */
+  --color-border-dark: #cbd5e1;    /* 深边框 */
+
+  /* ========== 间距系统 ========== */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+
+  /* ========== 字体系统 ========== */
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-base: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 30px;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* ========== 圆角系统 ========== */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* ========== 阴影系统 ========== */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+
+  /* ========== 过渡动画 ========== */
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease;
+
+  /* ========== Z-Index层级 ========== */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+}
+
+/* ========== Dark Mode 主题 ========== */
+.main-layout.dark {
+  /* 中性颜色 - Dark Mode */
+  --color-text-primary: #f1f5f9;   /* 主要文本 */
+  --color-text-secondary: #cbd5e1; /* 次要文本 */
+  --color-text-tertiary: #94a3b8;  /* 辅助文本 */
+  --color-text-disabled: #64748b;  /* 禁用文本 */
+
+  --color-bg-primary: #0f172a;     /* 主背景 */
+  --color-bg-secondary: #1e293b;   /* 次背景 */
+  --color-bg-tertiary: #334155;    /* 第三背景 */
+  --color-bg-hover: #475569;       /* 悬停背景 */
+
+  --color-border: #334155;         /* 边框颜色 */
+  --color-border-light: #1e293b;   /* 浅边框 */
+  --color-border-dark: #475569;    /* 深边框 */
+
+  /* Dark mode 调整后的阴影 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+}
+
+/* ========== 工具类 - 快速应用主题变量 ========== */
+
+/* 文本颜色 */
+.text-primary { color: var(--color-text-primary); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-tertiary { color: var(--color-text-tertiary); }
+
+/* 背景颜色 */
+.bg-primary { background-color: var(--color-bg-primary); }
+.bg-secondary { background-color: var(--color-bg-secondary); }
+.bg-tertiary { background-color: var(--color-bg-tertiary); }
+
+/* 边框 */
+.border { border: 1px solid var(--color-border); }
+.border-light { border-color: var(--color-border-light); }
+.border-dark { border-color: var(--color-border-dark); }
+
+/* 圆角 */
+.rounded-sm { border-radius: var(--radius-sm); }
+.rounded-md { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
+
+/* 阴影 */
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+
+/* 间距 */
+.p-sm { padding: var(--spacing-sm); }
+.p-md { padding: var(--spacing-md); }
+.p-lg { padding: var(--spacing-lg); }
+
+.m-sm { margin: var(--spacing-sm); }
+.m-md { margin: var(--spacing-md); }
+.m-lg { margin: var(--spacing-lg); }
+
+/* ========== 使用说明 ========== */
+/*
+在组件CSS中使用主题变量的示例：
+
+.my-component {
+  color: var(--color-text-primary);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+}
+
+.my-component:hover {
+  background: var(--color-bg-hover);
+  box-shadow: var(--shadow-md);
+}
+
+优势：
+1. 自动适配 light/dark 主题
+2. 统一的颜色管理，避免 color bleeding
+3. 易于维护和扩展
+4. 语义化的命名，提高代码可读性
+*/
