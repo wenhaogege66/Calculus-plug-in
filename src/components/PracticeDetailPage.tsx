@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
 import { MathPixMarkdownRenderer } from './MathPixMarkdownRenderer';
+import { ErrorHighlightedOCRText } from './ErrorHighlightedOCRText';
 import './PracticeDetailPage.css';
 
 interface PracticeDetailProps {
@@ -89,6 +90,7 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
   const [visibleAnswers, setVisibleAnswers] = useState<Set<number>>(new Set());
   const [questionAnswers, setQuestionAnswers] = useState<{[key: number]: string}>({});
   const [questionRatings, setQuestionRatings] = useState<{[key: number]: number}>({});
+  const [activeErrorIndex, setActiveErrorIndex] = useState<number | null>(null);
 
   // 自动刷新 - 处理中状态每5秒刷新一次
   useEffect(() => {
@@ -386,7 +388,12 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
         </div>
         <div className="error-list">
           {errors.map((error, index) => (
-            <div key={index} className="error-item enhanced">
+            <div
+              key={index}
+              className={`error-item enhanced ${activeErrorIndex === index ? 'active' : ''}`}
+              onClick={() => setActiveErrorIndex(index)}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="error-icon">
                 {error.severity === 'major' ? '🔴' :
                  error.severity === 'minor' ? '🟢' : '🟡'}
@@ -564,8 +571,11 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                   </button>
                 </div>
                 <div className="recognized-text">
-                  <MathPixMarkdownRenderer
-                    content={session.ocrResult?.recognizedText || ''}
+                  <ErrorHighlightedOCRText
+                    ocrText={session.ocrResult?.recognizedText || ''}
+                    detailedErrors={session.gradingResult?.detailedErrors}
+                    activeErrorIndex={activeErrorIndex}
+                    onErrorClick={(index) => setActiveErrorIndex(index)}
                     className="ocr-content"
                   />
                 </div>

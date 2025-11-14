@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
 import { useNotificationContext } from '../contexts/NotificationContext';
 import { MathPixMarkdownRenderer } from './MathPixMarkdownRenderer';
+import { ErrorHighlightedOCRText } from './ErrorHighlightedOCRText';
 
 interface Assignment {
   id: number;
@@ -102,6 +103,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
   const [submitting, setSubmitting] = useState(false);
   const [isResubmission, setIsResubmission] = useState(false);
   const [submissionHistory, setSubmissionHistory] = useState<any[]>([]);
+  const [activeErrorIndex, setActiveErrorIndex] = useState<number | null>(null);
 
   const isTeacher = authState.user?.role === 'TEACHER';
 
@@ -1707,8 +1709,11 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                         <span>识别置信度: {(gradingResults.mathpixResults[0].confidence * 100).toFixed(1)}%</span>
                       </div>
                       <div className="recognized-text">
-                        <MathPixMarkdownRenderer
-                          content={gradingResults.mathpixResults[0].recognizedText || '暂无识别内容'}
+                        <ErrorHighlightedOCRText
+                          ocrText={gradingResults.mathpixResults[0].recognizedText || '暂无识别内容'}
+                          detailedErrors={gradingResults.deepseekResults?.[0]?.errors || []}
+                          activeErrorIndex={activeErrorIndex}
+                          onErrorClick={(index) => setActiveErrorIndex(index)}
                           className="answer-ocr-content"
                         />
                       </div>
@@ -1806,12 +1811,51 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                           <h4>❌ 问题分析</h4>
                           <div className="errors-list">
                             {gradingResults.deepseekResults[0].errors.map((error: any, index: number) => (
-                              <div key={index} className="error-item">
-                                <span className="error-icon">⚠️</span>
-                                <span className="error-text">
-                                  {typeof error === 'string' ? error :
-                                   error.content || error.explanation || error.errorType || JSON.stringify(error)}
-                                </span>
+                              <div
+                                key={index}
+                                className={`error-item ${activeErrorIndex === index ? 'active' : ''}`}
+                                onClick={() => setActiveErrorIndex(index)}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                <div className="error-icon">
+                                  {error.severity === 'major' ? '🔴' :
+                                   error.severity === 'minor' ? '🟢' : '🟡'}
+                                </div>
+                                <div className="error-content">
+                                  <div className="error-header">
+                                    <span className="error-type">{error.errorType || '错误'}</span>
+                                    {error.severity && (
+                                      <span className={`error-severity ${error.severity}`}>
+                                        {error.severity === 'major' ? '严重' :
+                                         error.severity === 'minor' ? '轻微' : '中等'}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {error.content && (
+                                    <div className="error-section">
+                                      <span className="section-label">问题内容：</span>
+                                      <span className="section-content">{error.content}</span>
+                                    </div>
+                                  )}
+                                  {error.correction && (
+                                    <div className="error-section correction">
+                                      <span className="section-label">正确答案：</span>
+                                      <span className="section-content">{error.correction}</span>
+                                    </div>
+                                  )}
+                                  {error.explanation && (
+                                    <div className="error-section explanation">
+                                      <span className="section-label">解释：</span>
+                                      <span className="section-content">{error.explanation}</span>
+                                    </div>
+                                  )}
+                                  {error.knowledgePoint && (
+                                    <div className="error-section knowledge">
+                                      <span className="section-label">相关知识点：</span>
+                                      <span className="knowledge-tag-inline">{error.knowledgePoint}</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>
