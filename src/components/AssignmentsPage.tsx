@@ -104,6 +104,8 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
   const [isResubmission, setIsResubmission] = useState(false);
   const [submissionHistory, setSubmissionHistory] = useState<any[]>([]);
   const [activeErrorIndex, setActiveErrorIndex] = useState<number | null>(null);
+  const [questionFileUrl, setQuestionFileUrl] = useState<string | null>(null);
+  const [questionFileType, setQuestionFileType] = useState<'image' | 'pdf' | 'unknown'>('unknown');
 
   const isTeacher = authState.user?.role === 'TEACHER';
 
@@ -225,6 +227,52 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
 
     setFilteredAssignments(filtered);
   }, [assignments, teacherFilters, isTeacher]);
+
+  // 加载教师题目文件
+  useEffect(() => {
+    const loadQuestionFile = async () => {
+      if (!gradingResultAssignment?.questionFile || !authState.token) {
+        setQuestionFileUrl(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/files/${gradingResultAssignment.questionFile.id}/download`,
+          {
+            headers: { 'Authorization': `Bearer ${authState.token}` }
+          }
+        );
+
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          setQuestionFileUrl(url);
+
+          // 检测文件类型
+          const fileName = gradingResultAssignment.questionFile.originalName.toLowerCase();
+          if (fileName.endsWith('.pdf')) {
+            setQuestionFileType('pdf');
+          } else if (fileName.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
+            setQuestionFileType('image');
+          } else {
+            setQuestionFileType('unknown');
+          }
+        }
+      } catch (error) {
+        console.error('加载题目文件失败:', error);
+      }
+    };
+
+    loadQuestionFile();
+
+    // Cleanup: 释放之前的 blob URL
+    return () => {
+      if (questionFileUrl) {
+        window.URL.revokeObjectURL(questionFileUrl);
+      }
+    };
+  }, [gradingResultAssignment?.questionFile, authState.token]);
 
   const loadData = async () => {
     if (!authState.token) return;
@@ -536,6 +584,15 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
         const statusData = await statusResponse.json();
         if (statusData.success) {
           setGradingResults(statusData.data);
+          // 更新 gradingResultAssignment,使用从后端返回的完整 assignment 数据
+          if (statusData.data.assignment) {
+            setGradingResultAssignment({
+              ...assignment,
+              ocrText: statusData.data.assignment.ocrText,
+              ocrLatex: statusData.data.assignment.ocrLatex,
+              ocrStatus: statusData.data.assignment.ocrStatus
+            });
+          }
           setShowGradingResultModal(true);
         } else {
           showError('获取批改结果失败');
@@ -706,6 +763,39 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
       }
     } catch (err) {
       showError('文件下载失败，请稍后重试');
+    }
+  };
+
+  const handleExportGradingResult = async () => {
+    if (!authState.token || !gradingResults || !gradingResults.id) {
+      showError('导出失败：缺少提交记录ID');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/ocr/download/docx/${gradingResults.id}`, {
+        headers: {
+          'Authorization': `Bearer ${authState.token}`
+        }
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `批改结果-${gradingResultAssignment?.title || 'assignment'}-${gradingResults.id}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showSuccess('批改结果导出成功');
+      } else {
+        const errorData = await response.json();
+        showError(errorData.error || '导出失败');
+      }
+    } catch (err) {
+      showError('导出失败，请稍后重试');
     }
   };
 
@@ -928,14 +1018,16 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                   <h3>{assignment.title}</h3>
                   {getStatusBadge(assignment)}
                 </div>
-                
+              </div>
+
+              <div className="assignment-metadata">
                 {assignment.classroom && (
                   <div className="classroom-info">
                     <span className="classroom-icon">🏫</span>
                     <span className="classroom-name">{assignment.classroom.name}</span>
                   </div>
                 )}
-                
+
                 {assignment.teacher && !isTeacher && (
                   <div className="teacher-info">
                     <span className="teacher-icon">👨‍🏫</span>
@@ -1605,17 +1697,54 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
         </div>
       )}
 
-      {/* AI批改结果模态框 */}
+      {/* AI批改结果模态框 - 全页面模式 */}
       {showGradingResultModal && gradingResultAssignment && gradingResults && (
-        <div className="modal-overlay" onClick={() => setShowGradingResultModal(false)}>
-          <div className="modal-content grading-results-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>AI批改结果：{gradingResultAssignment.title}</h2>
-              <button className="close-btn" onClick={() => setShowGradingResultModal(false)}>✕</button>
+        <div className="grading-results-fullpage">
+          {/* 顶部导航栏 */}
+          <div className="grading-navbar">
+            <div className="navbar-left">
+              <button className="back-button" onClick={() => setShowGradingResultModal(false)}>
+                ← 返回
+              </button>
+              <div className="assignment-title">
+                <span className="title-icon">📝</span>
+                <h2>{gradingResultAssignment.title}</h2>
+              </div>
             </div>
-            
-            {/* 作业批改三部分展示 */}
-            <div className="assignment-grading-layout">
+            <div className="navbar-right">
+              <div className="score-display">
+                {gradingResults.deepseekResults && gradingResults.deepseekResults.length > 0 && (
+                  <div className="score-card">
+                    <div className="score-circle">
+                      <div className="score-number">{gradingResults.deepseekResults[0].score || 0}</div>
+                      <div className="score-divider">/</div>
+                      <div className="score-max">{gradingResults.deepseekResults[0].maxScore || 100}</div>
+                    </div>
+                    <div className="score-label">
+                      {(() => {
+                        const score = gradingResults.deepseekResults[0].score || 0;
+                        return score >= 90 ? '优秀' :
+                          score >= 80 ? '良好' :
+                          score >= 70 ? '中等' :
+                          score >= 60 ? '及格' : '需改进';
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <button
+                className="export-button"
+                title="导出结果"
+                onClick={handleExportGradingResult}
+                disabled={!gradingResults?.id}
+              >
+                📄 导出
+              </button>
+            </div>
+          </div>
+
+          {/* 作业批改三部分展示 */}
+          <div className="assignment-grading-layout fullpage-content">
               {/* 左侧：题目识别 */}
               <div className="question-recognition-panel">
                 <div className="panel-header">
@@ -1639,8 +1768,53 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                       <p>正在识别教师题目...</p>
                     </div>
                   )}
-                  
-                  {gradingResultAssignment.ocrText ? (
+
+                  {/* 优先显示题目文件图片 */}
+                  {gradingResultAssignment.questionFile && questionFileUrl ? (
+                    <div className="question-file-display">
+                      <div className="file-info">
+                        <span className="file-name-label">📄 题目文件：</span>
+                        <span className="file-name">{gradingResultAssignment.questionFile.originalName}</span>
+                      </div>
+
+                      {questionFileType === 'image' && (
+                        <div className="image-preview">
+                          <img
+                            src={questionFileUrl}
+                            alt="题目图片"
+                            style={{ width: '100%', maxWidth: '100%', height: 'auto' }}
+                          />
+                        </div>
+                      )}
+
+                      {questionFileType === 'pdf' && (
+                        <div className="pdf-preview">
+                          <embed
+                            src={questionFileUrl}
+                            type="application/pdf"
+                            width="100%"
+                            height="600px"
+                            style={{ border: 'none' }}
+                          />
+                        </div>
+                      )}
+
+                      {/* 如果有OCR文本，显示在下方作为参考 */}
+                      {gradingResultAssignment.ocrText && (
+                        <details className="ocr-text-details" style={{ marginTop: '16px' }}>
+                          <summary style={{ cursor: 'pointer', fontWeight: 600, color: '#4b5563' }}>
+                            📝 查看OCR识别文本
+                          </summary>
+                          <div className="recognized-text" style={{ marginTop: '12px' }}>
+                            <MathPixMarkdownRenderer
+                              content={gradingResultAssignment.ocrText || ''}
+                              className="question-ocr-content"
+                            />
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  ) : gradingResultAssignment.ocrText ? (
                     <div className="question-content">
                       <div className="content-header">
                         <span className="content-type">识别的题目内容：</span>
@@ -1704,32 +1878,39 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                   )}
                   
                   {gradingResults.mathpixResults && gradingResults.mathpixResults.length > 0 ? (
-                    <div className="answer-content">
-                      <div className="confidence-info">
-                        <span>识别置信度: {(gradingResults.mathpixResults[0].confidence * 100).toFixed(1)}%</span>
-                      </div>
-                      <div className="recognized-text">
-                        <ErrorHighlightedOCRText
-                          ocrText={gradingResults.mathpixResults[0].recognizedText || '暂无识别内容'}
-                          detailedErrors={gradingResults.deepseekResults?.[0]?.errors || []}
-                          activeErrorIndex={activeErrorIndex}
-                          onErrorClick={(index) => setActiveErrorIndex(index)}
-                          className="answer-ocr-content"
-                        />
-                      </div>
-                      {gradingResults.mathpixResults[0].mathLatex && (
-                        <div className="latex-content">
-                          <div className="content-header">
-                            <span className="content-type">LaTeX公式：</span>
+                    <div className="answer-content-wrapper">
+                      {gradingResults.mathpixResults.map((result, index) => (
+                        <div key={index} className="ocr-result-card">
+                          <div className="result-header">
+                            <span className="image-label">📄 图片 {index + 1}</span>
+                            <span className="confidence-badge">
+                              置信度: {(result.confidence * 100).toFixed(1)}%
+                            </span>
                           </div>
-                          <div className="latex-text">
-                            <MathPixMarkdownRenderer
-                              content={gradingResults.mathpixResults[0].mathLatex || ''}
-                              className="answer-latex-content"
+                          <div className="recognized-text">
+                            <ErrorHighlightedOCRText
+                              ocrText={result.recognizedText || '暂无识别内容'}
+                              detailedErrors={gradingResults.deepseekResults?.[0]?.errors || []}
+                              activeErrorIndex={activeErrorIndex}
+                              onErrorClick={(errorIndex) => setActiveErrorIndex(errorIndex)}
+                              className="answer-ocr-content"
                             />
                           </div>
+                          {result.mathLatex && (
+                            <div className="latex-content">
+                              <div className="content-header">
+                                <span className="content-type">LaTeX公式：</span>
+                              </div>
+                              <div className="latex-text">
+                                <MathPixMarkdownRenderer
+                                  content={result.mathLatex || ''}
+                                  className="answer-latex-content"
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      ))}
                     </div>
                   ) : gradingResults.status === 'COMPLETED' || gradingResults.status === 'FAILED' ? (
                     <div className="error-content">
@@ -1834,19 +2015,34 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                                   {error.content && (
                                     <div className="error-section">
                                       <span className="section-label">问题内容：</span>
-                                      <span className="section-content">{error.content}</span>
+                                      <div className="section-content">
+                                        <MathPixMarkdownRenderer
+                                          content={error.content}
+                                          className="error-text-content"
+                                        />
+                                      </div>
                                     </div>
                                   )}
                                   {error.correction && (
                                     <div className="error-section correction">
                                       <span className="section-label">正确答案：</span>
-                                      <span className="section-content">{error.correction}</span>
+                                      <div className="section-content">
+                                        <MathPixMarkdownRenderer
+                                          content={error.correction}
+                                          className="correction-text-content"
+                                        />
+                                      </div>
                                     </div>
                                   )}
                                   {error.explanation && (
                                     <div className="error-section explanation">
                                       <span className="section-label">解释：</span>
-                                      <span className="section-content">{error.explanation}</span>
+                                      <div className="section-content">
+                                        <MathPixMarkdownRenderer
+                                          content={error.explanation}
+                                          className="explanation-text-content"
+                                        />
+                                      </div>
                                     </div>
                                   )}
                                   {error.knowledgePoint && (
@@ -1885,35 +2081,15 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                   <span className="progress-percentage">{gradingResults.progress.percent}%</span>
                 </div>
                 <div className="progress-bar-full">
-                  <div 
+                  <div
                     className="progress-fill-animated"
                     style={{ width: `${gradingResults.progress.percent}%` }}
                   ></div>
                 </div>
               </div>
             )}
-            
-            <div className="modal-actions">
-              <button 
-                className="btn-secondary"
-                onClick={() => setShowGradingResultModal(false)}
-              >
-                关闭
-              </button>
-              <button 
-                className="btn-primary"
-                onClick={() => {
-                  setShowGradingResultModal(false);
-                  // 可以添加导出或分享功能
-                }}
-              >
-                <span className="btn-icon">📄</span>
-                <span>导出结果</span>
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 };

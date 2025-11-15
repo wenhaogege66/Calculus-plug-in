@@ -12,7 +12,7 @@ const ENV_CONFIGS: EnvConfig[] = [
 
   // Supabase配置
   { name: 'NEXT_PUBLIC_SUPABASE_URL', required: true, description: 'Supabase项目URL' },
-  { name: 'SUPABASE_ANON_KEY', required: true, description: 'Supabase匿名密钥' },
+  { name: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', required: true, description: 'Supabase匿名密钥' },
   { name: 'SUPABASE_SERVICE_ROLE_KEY', required: true, description: 'Supabase服务角色密钥' },
 
   // AI服务配置

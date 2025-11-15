@@ -562,13 +562,15 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
               <div className="ocr-result">
                 <div className="confidence-info">
                   <span>识别置信度: {(session.ocrResult.confidence * 100).toFixed(1)}%</span>
-                  <button 
-                    className="download-docx-btn"
-                    onClick={downloadDocx}
-                    title="下载Word格式文档"
-                  >
-                    📄 下载DOCX
-                  </button>
+                  {session.fileInfo.mimeType === 'application/pdf' && (
+                    <button
+                      className="download-docx-btn"
+                      onClick={downloadDocx}
+                      title="下载Word格式文档"
+                    >
+                      📄 下载DOCX
+                    </button>
+                  )}
                 </div>
                 <div className="recognized-text">
                   <ErrorHighlightedOCRText

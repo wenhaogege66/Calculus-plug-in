@@ -17,8 +17,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
   // 文件上传端点
   fastify.post('/files', { preHandler: requireAuth }, async (request, reply) => {
     const startTime = Date.now();
-    fastify.log.info(`🚀 开始处理文件上传请求 - 用户: ${request.currentUser?.id}`);
-    
+
     try {
       // 获取文件和其他参数
       const parts = request.parts();
@@ -26,59 +25,49 @@ export async function uploadRoutes(fastify: FastifyInstance) {
       let workMode = 'practice';
       let assignmentId: number | null = null;
       let tempFilePath: string | null = null;
-      
-      fastify.log.info('📦 开始解析multipart数据...');
-      
+
       for await (const part of parts) {
         if (part.type === 'file') {
-          fastify.log.info(`📄 找到文件: ${part.filename}, 类型: ${part.mimetype}`);
-          
           // 立即处理文件流，写入临时文件
           const tempDir = os.tmpdir();
           const tempFileName = `upload-${uuidv4()}.tmp`;
           tempFilePath = path.join(tempDir, tempFileName);
-          
-          fastify.log.info(`📁 创建临时文件: ${tempFilePath}`);
-          
+
           const writeStream = fs.createWriteStream(tempFilePath);
-          
+
           // 将文件流写入临时文件
           await new Promise<void>((resolve, reject) => {
             part.file.pipe(writeStream);
-            
+
             writeStream.on('finish', () => {
-              fastify.log.info('📝 临时文件写入完成');
               resolve();
             });
-            
+
             part.file.on('error', (error) => {
               fastify.log.error('❌ 文件流读取错误:', error);
               reject(error);
             });
-            
+
             writeStream.on('error', (error) => {
               fastify.log.error('❌ 临时文件写入错误:', error);
               reject(error);
             });
           });
-          
+
           // 保存文件信息供后续使用
           fileData = {
             filename: part.filename,
             mimetype: part.mimetype,
             tempPath: tempFilePath
           };
-          
+
         } else if (part.fieldname === 'workMode') {
           workMode = (part as any).value;
-          fastify.log.info(`⚙️ 工作模式: ${workMode}`);
         } else if (part.fieldname === 'assignmentId') {
           assignmentId = parseInt((part as any).value) || null;
-          fastify.log.info(`📝 作业ID: ${assignmentId}`);
         }
       }
-      
-      fastify.log.info('📦 Multipart解析完成');
+
       const data = fileData;
       if (!data) {
         fastify.log.warn('❌ 没有收到文件数据');
@@ -86,8 +75,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
       }
 
       const { filename, mimetype, tempPath } = data;
-      fastify.log.info(`📋 文件信息 - 名称: ${filename}, 类型: ${mimetype}`);
-      
+
       // 获取文件大小
       const fileStats = fs.statSync(tempPath);
       const fileSize = fileStats.size;
@@ -154,31 +142,22 @@ export async function uploadRoutes(fastify: FastifyInstance) {
 
       // 使用admin客户端上传到Supabase Storage
       const storageClient = supabaseAdmin || supabase;
-      const clientType = supabaseAdmin ? 'Admin客户端' : 'Anonymous客户端';
-      fastify.log.info(`☁️ 开始上传到Supabase Storage - 客户端类型: ${clientType}, Bucket: ${STORAGE_BUCKETS.ASSIGNMENTS}, 路径: ${filePath}`);
 
       // 先检查bucket是否存在
-      fastify.log.info('🔍 检查bucket是否存在...');
       try {
         // 增加超时控制的bucket检查
         const bucketCheckPromise = storageClient.storage.listBuckets();
         const bucketCheckTimeout = new Promise<never>((_, reject) => {
           setTimeout(() => reject(new Error('Bucket检查超时')), 10000); // 10秒超时
         });
-        
+
         const { data: buckets, error: listError } = await Promise.race([bucketCheckPromise, bucketCheckTimeout]);
-        
+
         if (listError) {
           fastify.log.error('❌ 获取bucket列表失败:', {
             message: listError.message,
             details: listError
           });
-        } else {
-          const bucketExists = buckets?.some(bucket => bucket.name === STORAGE_BUCKETS.ASSIGNMENTS);
-          fastify.log.info(`📋 Bucket存在状态: ${bucketExists ? '存在' : '不存在'}`);
-          if (buckets && buckets.length > 0) {
-            fastify.log.info(`📦 现有buckets: ${buckets.map(b => b.name).join(', ')}`);
-          }
         }
       } catch (bucketCheckError) {
         fastify.log.error('❌ 检查bucket时发生异常:', {
@@ -187,7 +166,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
           cause: (bucketCheckError as any)?.cause?.message,
           type: bucketCheckError instanceof Error ? bucketCheckError.constructor.name : typeof bucketCheckError
         });
-        
+
         // 如果是网络连接问题，提供友好的错误信息
         if (bucketCheckError instanceof Error) {
           if (bucketCheckError.message.includes('timeout') || bucketCheckError.message.includes('TIMEOUT')) {
@@ -197,29 +176,27 @@ export async function uploadRoutes(fastify: FastifyInstance) {
           }
         }
       }
-      
+
       // 创建超时Promise来防止无限等待
       const uploadTimeout = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Supabase Storage upload timeout after 30 seconds')), 30000);
       });
-      
+
       let uploadData: any, uploadError: any;
       try {
         // 读取临时文件内容
         const fileBuffer = fs.readFileSync(tempPath);
-        
+
         const uploadPromise = storageClient.storage
           .from(STORAGE_BUCKETS.ASSIGNMENTS)
           .upload(filePath, fileBuffer, {
             contentType: mimetype,
             upsert: false
           });
-        
-        fastify.log.info('📤 正在执行上传操作...');
+
         const result = await Promise.race([uploadPromise, uploadTimeout]);
         uploadData = result.data;
         uploadError = result.error;
-        fastify.log.info('✅ 上传操作完成，检查结果...');
       } catch (timeoutError) {
         fastify.log.error('⏰ Supabase Storage上传超时:', timeoutError);
         // 清理临时文件
@@ -256,20 +233,16 @@ export async function uploadRoutes(fastify: FastifyInstance) {
         
         // 如果bucket不存在，尝试创建
         if (uploadError.message?.includes('bucket') || uploadError.message?.includes('not found')) {
-          fastify.log.info(`🛠️ 检测到bucket不存在错误，尝试创建Storage bucket: ${STORAGE_BUCKETS.ASSIGNMENTS}...`);
-          fastify.log.info(`🔧 Bucket配置 - public: false, maxSize: ${maxSize}, allowedTypes: ${allowedTypes.join(', ')}`);
-          
           const { error: bucketError } = await storageClient.storage.createBucket(STORAGE_BUCKETS.ASSIGNMENTS, {
             public: false,
             allowedMimeTypes: allowedTypes,
             fileSizeLimit: maxSize
           });
-          
+
           if (bucketError) {
             fastify.log.error('❌ 创建bucket失败:', bucketError);
             return sendError(reply, `无法创建存储bucket: ${bucketError.message}`, 500);
           } else {
-            fastify.log.info('✅ Bucket创建成功，重试上传...');
             // 重试上传，同样使用超时机制
             try {
               const fileBuffer = fs.readFileSync(tempPath);
@@ -279,13 +252,13 @@ export async function uploadRoutes(fastify: FastifyInstance) {
                   contentType: mimetype,
                   upsert: false
                 });
-              
+
               const retryUploadTimeout = new Promise<never>((_, reject) => {
                 setTimeout(() => reject(new Error('Retry upload timeout after 30 seconds')), 30000);
               });
-              
+
               const retryResult = await Promise.race([retryUploadPromise, retryUploadTimeout]);
-              
+
               if (retryResult.error) {
                 fastify.log.error('❌ 重试上传失败:', retryResult.error);
                 // 清理临时文件
@@ -297,7 +270,6 @@ export async function uploadRoutes(fastify: FastifyInstance) {
                 return sendError(reply, `文件上传失败: ${retryResult.error.message}`, 500);
               }
               uploadData = retryResult.data;
-              fastify.log.info('✅ 重试上传成功');
             } catch (retryTimeoutError) {
               fastify.log.error('⏰ 重试上传超时:', retryTimeoutError);
               // 清理临时文件
@@ -318,14 +290,11 @@ export async function uploadRoutes(fastify: FastifyInstance) {
           }
           return sendError(reply, `文件上传失败: ${uploadError.message}`, 500);
         }
-      } else {
-        fastify.log.info('✅ Supabase Storage上传成功');
       }
 
       // 清理临时文件
       try {
         fs.unlinkSync(tempPath);
-        fastify.log.info('🗑️ 临时文件清理成功');
       } catch (cleanupError) {
         fastify.log.warn('⚠️ 临时文件清理失败:', cleanupError);
       }
@@ -357,8 +326,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
       });
 
       const processingTime = Date.now() - startTime;
-      fastify.log.info(`🎉 文件上传完成! 处理时间: ${processingTime}ms, 文件ID: ${fileUpload.id}`);
-      
+
       return successResponse({
         fileId: fileUpload.id,
         filename: fileUpload.filename,
@@ -372,16 +340,15 @@ export async function uploadRoutes(fastify: FastifyInstance) {
     } catch (error) {
       const processingTime = Date.now() - startTime;
       fastify.log.error(`❌ 文件上传处理失败 (${processingTime}ms):`, error);
-      
+
       // 清理可能存在的临时文件
       const tempDir = os.tmpdir();
       const tempFiles = fs.readdirSync(tempDir).filter(file => file.startsWith('upload-') && file.endsWith('.tmp'));
       tempFiles.forEach(file => {
         try {
           fs.unlinkSync(path.join(tempDir, file));
-          fastify.log.info(`🗑️ 清理临时文件: ${file}`);
         } catch (cleanupError) {
-          fastify.log.warn(`⚠️ 清理临时文件失败: ${file}`, cleanupError);
+          // Silently fail temp file cleanup in catch block
         }
       });
       

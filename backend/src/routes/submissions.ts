@@ -201,8 +201,6 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
               maxScore: true,
               feedback: true,
               errors: true,
-              suggestions: true,
-              strengths: true,
               processingTime: true,
               rawResult: true,
               createdAt: true
