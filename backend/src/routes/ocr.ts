@@ -193,7 +193,13 @@ export async function ocrRoutes(fastify: FastifyInstance) {
   fastify.get('/ocr/download/docx/:submissionId', { preHandler: requireAuth }, async (request, reply) => {
     try {
       const submissionId = parseInt((request.params as any).submissionId);
-      
+
+      // 验证submissionId是否有效
+      if (isNaN(submissionId)) {
+        fastify.log.error('无效的submissionId参数:', (request.params as any).submissionId);
+        return sendError(reply, '无效的提交记录ID', 400);
+      }
+
       // 验证提交记录是否属于当前用户
       const submission = await prisma.submission.findFirst({
         where: {

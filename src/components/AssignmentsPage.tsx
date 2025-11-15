@@ -30,6 +30,9 @@ interface Assignment {
   createdAt: string;
   submissionCount?: number; // 提交次数
   latestSubmissionVersion?: number; // 最新提交版本
+  ocrText?: string; // 教师题目OCR识别文本
+  ocrLatex?: string; // 教师题目OCR识别LaTeX
+  ocrStatus?: string; // 教师题目OCR状态
 }
 
 interface Classroom {
@@ -767,13 +770,29 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
   };
 
   const handleExportGradingResult = async () => {
-    if (!authState.token || !gradingResults || !gradingResults.id) {
-      showError('导出失败：缺少提交记录ID');
+    // 添加详细的验证和日志
+    console.log('Export grading result - gradingResults:', gradingResults);
+    console.log('Export grading result - gradingResults.id:', gradingResults?.id);
+
+    if (!authState.token) {
+      showError('请先登录');
+      return;
+    }
+
+    if (!gradingResults) {
+      showError('导出失败：批改结果数据不存在');
+      return;
+    }
+
+    const submissionId = gradingResults.id;
+    if (!submissionId || isNaN(submissionId)) {
+      console.error('Invalid submissionId:', submissionId, 'gradingResults:', gradingResults);
+      showError(`导出失败：无效的提交记录ID (${submissionId})`);
       return;
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/ocr/download/docx/${gradingResults.id}`, {
+      const response = await fetch(`${API_BASE_URL}/ocr/download/docx/${submissionId}`, {
         headers: {
           'Authorization': `Bearer ${authState.token}`
         }
@@ -784,7 +803,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `批改结果-${gradingResultAssignment?.title || 'assignment'}-${gradingResults.id}.docx`;
+        a.download = `批改结果-${gradingResultAssignment?.title || 'assignment'}-${submissionId}.docx`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -795,6 +814,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
         showError(errorData.error || '导出失败');
       }
     } catch (err) {
+      console.error('Export error:', err);
       showError('导出失败，请稍后重试');
     }
   };
@@ -1879,7 +1899,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                   
                   {gradingResults.mathpixResults && gradingResults.mathpixResults.length > 0 ? (
                     <div className="answer-content-wrapper">
-                      {gradingResults.mathpixResults.map((result, index) => (
+                      {gradingResults.mathpixResults.map((result: any, index: number) => (
                         <div key={index} className="ocr-result-card">
                           <div className="result-header">
                             <span className="image-label">📄 图片 {index + 1}</span>
