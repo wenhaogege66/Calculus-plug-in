@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
 import { MathPixMarkdownRenderer } from './MathPixMarkdownRenderer';
-import { ErrorHighlightedOCRText } from './ErrorHighlightedOCRText';
+import { ErrorHighlightedOCRText, type DetailedError } from './ErrorHighlightedOCRText';
 import './PracticeDetailPage.css';
 
 interface PracticeDetailProps {
@@ -37,7 +37,7 @@ interface DetailedSession {
     incorrectCount?: number;
     correctCount?: number;
     knowledgePoints?: string[];
-    detailedErrors?: any[];
+    detailedErrors?: DetailedError[];
     improvementAreas?: string[];
     nextStepRecommendations?: string[];
   } | null;
@@ -377,7 +377,7 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
     }
   };
 
-  const renderErrorDetails = (errors: any[]) => {
+  const renderErrorDetails = (errors: DetailedError[]) => {
     if (!errors || errors.length === 0) return null;
 
     return (

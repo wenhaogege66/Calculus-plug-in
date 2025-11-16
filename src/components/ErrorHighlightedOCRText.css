@@ -1,239 +1,251 @@
+/**
+ * ErrorHighlightedOCRText组件样式
+ * 新版本：基于<mark>标签的错误高亮，简洁统一的渲染方式
+ */
+
 .error-highlighted-ocr-text {
   position: relative;
-  width: 100%;
-  font-family: 'Monaco', 'Consolas', monospace;
+  padding: 16px;
+  background: var(--surface-bg, #ffffff);
+  border-radius: 8px;
+  font-family: 'Monaco', 'Courier New', monospace;
   font-size: 14px;
   line-height: 1.8;
+  color: var(--text-primary, #1f2937);
 }
 
+/* 空内容状态 */
 .error-highlighted-ocr-text.empty {
-  color: var(--text-secondary, #9ca3af);
-  font-style: italic;
-  padding: 2rem;
   text-align: center;
+  padding: 48px 16px;
+  color: var(--text-secondary, #6b7280);
+  font-style: italic;
 }
 
-/* Error count badge */
-.error-count-badge {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  background: var(--error-bg, #fee2e2);
-  color: var(--error-text, #dc2626);
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  z-index: 10;
-}
-
-/* Dark mode error count badge */
-[data-theme="dark"] .error-count-badge {
-  background: rgba(220, 38, 38, 0.2);
-  color: #fca5a5;
-}
-
-/* Lines container */
-.highlighted-lines {
+/* 错误统计徽章 */
+.error-stats-badge {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 1rem;
-  background: var(--surface-secondary, #f9fafb);
-  border-radius: 8px;
-  max-height: 600px;
-  overflow-y: auto;
-}
-
-[data-theme="dark"] .highlighted-lines {
-  background: rgba(17, 24, 39, 0.5);
-}
-
-/* Individual line */
-.ocr-line {
-  display: flex;
-  align-items: flex-start;
-  padding: 0.5rem;
-  background: var(--surface-primary, #ffffff);
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: var(--surface-hover, #f9fafb);
   border-radius: 6px;
-  border: 1px solid transparent;
-  transition: all 0.2s ease;
-}
-
-[data-theme="dark"] .ocr-line {
-  background: rgba(31, 41, 55, 0.5);
-}
-
-.ocr-line.with-errors {
-  border-color: var(--border-error, #fecaca);
-  background: var(--surface-error-subtle, #fef2f2);
-}
-
-[data-theme="dark"] .ocr-line.with-errors {
-  border-color: rgba(220, 38, 38, 0.3);
-  background: rgba(220, 38, 38, 0.05);
-}
-
-/* Line number */
-.line-number {
-  flex-shrink: 0;
-  width: 40px;
-  padding-right: 1rem;
-  color: var(--text-tertiary, #6b7280);
-  font-size: 12px;
-  text-align: right;
-  user-select: none;
-}
-
-/* Line content */
-.line-content {
-  flex: 1;
-  display: flex;
+  border-left: 3px solid var(--primary-color, #3b82f6);
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.25rem;
 }
 
-/* Text segments */
-.text-segment {
-  display: inline;
-}
-
-/* Error segments */
-.error-segment {
-  position: relative;
-  display: inline-block;
-  padding: 2px 4px;
+.stats-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
   border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  background: white;
+  border: 1px solid #e5e7eb;
+}
+
+.stats-item.total {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1e40af;
+}
+
+.stats-item.severity-major {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #991b1b;
+}
+
+.stats-item.severity-medium {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.stats-item.severity-minor {
+  background: #f0fdf4;
+  border-color: #10b981;
+  color: #065f46;
+}
+
+.stats-icon {
+  font-size: 16px;
+}
+
+.stats-text {
+  font-weight: 600;
+}
+
+/* 高亮内容容器 */
+.highlighted-content {
+  position: relative;
+  padding: 16px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+/* <mark>标签基础样式 - 错误高亮 */
+.highlighted-content mark.error-highlight {
+  background: none;
+  color: inherit;
+  padding: 2px 4px;
+  border-radius: 3px;
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
+  display: inline;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
 }
 
-/* Severity-based coloring */
-.error-segment.severity-major {
-  background: rgba(220, 38, 38, 0.15);
-  border-bottom: 2px wavy #dc2626;
+/* 不同严重程度的错误颜色 */
+.highlighted-content mark.error-highlight.severity-major {
+  background: rgba(239, 68, 68, 0.15);
+  border-bottom-color: #ef4444;
+  color: #991b1b;
 }
 
-.error-segment.severity-medium {
-  background: rgba(249, 115, 22, 0.15);
-  border-bottom: 2px wavy #f97316;
+.highlighted-content mark.error-highlight.severity-medium {
+  background: rgba(245, 158, 11, 0.15);
+  border-bottom-color: #f59e0b;
+  color: #92400e;
 }
 
-.error-segment.severity-minor {
-  background: rgba(234, 179, 8, 0.15);
-  border-bottom: 2px wavy #eab308;
+.highlighted-content mark.error-highlight.severity-minor {
+  background: rgba(16, 185, 129, 0.15);
+  border-bottom-color: #10b981;
+  color: #065f46;
 }
 
-/* Dark mode error segments */
-[data-theme="dark"] .error-segment.severity-major {
-  background: rgba(220, 38, 38, 0.25);
-  border-bottom-color: #f87171;
+/* 悬停效果 */
+.highlighted-content mark.error-highlight:hover,
+.highlighted-content mark.error-highlight.hovered {
+  filter: brightness(0.95);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-[data-theme="dark"] .error-segment.severity-medium {
-  background: rgba(249, 115, 22, 0.25);
-  border-bottom-color: #fb923c;
+.highlighted-content mark.error-highlight.severity-major:hover,
+.highlighted-content mark.error-highlight.severity-major.hovered {
+  background: rgba(239, 68, 68, 0.25);
 }
 
-[data-theme="dark"] .error-segment.severity-minor {
-  background: rgba(234, 179, 8, 0.25);
-  border-bottom-color: #facc15;
+.highlighted-content mark.error-highlight.severity-medium:hover,
+.highlighted-content mark.error-highlight.severity-medium.hovered {
+  background: rgba(245, 158, 11, 0.25);
 }
 
-/* Hover state */
-.error-segment:hover,
-.error-segment.hovered {
-  transform: scale(1.02);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+.highlighted-content mark.error-highlight.severity-minor:hover,
+.highlighted-content mark.error-highlight.severity-minor.hovered {
+  background: rgba(16, 185, 129, 0.25);
 }
 
-.error-segment.severity-major:hover,
-.error-segment.severity-major.hovered {
-  background: rgba(220, 38, 38, 0.25);
-}
-
-.error-segment.severity-medium:hover,
-.error-segment.severity-medium.hovered {
-  background: rgba(249, 115, 22, 0.25);
-}
-
-.error-segment.severity-minor:hover,
-.error-segment.severity-minor.hovered {
-  background: rgba(234, 179, 8, 0.25);
-}
-
-/* Active state (clicked from error list) */
-.error-segment.active {
+/* 激活状态 */
+.highlighted-content mark.error-highlight.active {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  z-index: 10;
   animation: pulseError 1s ease-in-out 2;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
 }
 
 @keyframes pulseError {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
 }
 
-/* Error tooltip */
-.error-tooltip {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 100;
-  min-width: 300px;
+.highlighted-content mark.error-highlight.severity-major.active {
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2);
+}
+
+.highlighted-content mark.error-highlight.severity-medium.active {
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2);
+}
+
+.highlighted-content mark.error-highlight.severity-minor.active {
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+}
+
+/* 错误提示浮层 */
+.error-tooltip-overlay {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
   max-width: 400px;
-  margin-top: 8px;
-  padding: 1rem;
-  background: var(--surface-primary, #ffffff);
-  border: 1px solid var(--border-primary, #e5e7eb);
-  border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 13px;
-  line-height: 1.6;
+  animation: slideInUp 0.3s ease;
 }
 
-[data-theme="dark"] .error-tooltip {
-  background: var(--surface-secondary, #1f2937);
-  border-color: var(--border-secondary, #374151);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.error-tooltip-content {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
 }
 
 .tooltip-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--border-secondary, #e5e7eb);
-}
-
-[data-theme="dark"] .tooltip-header {
-  border-bottom-color: var(--border-tertiary, #4b5563);
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .tooltip-header .error-type {
   font-weight: 600;
-  color: var(--text-primary, #111827);
-}
-
-[data-theme="dark"] .tooltip-header .error-type {
-  color: var(--text-primary, #f9fafb);
+  font-size: 14px;
+  color: #1f2937;
 }
 
 .tooltip-header .error-severity {
-  font-size: 11px;
+  font-size: 12px;
   padding: 2px 8px;
-  border-radius: 10px;
-  background: var(--surface-tertiary, #f3f4f6);
+  border-radius: 12px;
+  font-weight: 500;
 }
 
-[data-theme="dark"] .tooltip-header .error-severity {
-  background: rgba(75, 85, 99, 0.5);
+.tooltip-header .error-severity.severity-major {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.tooltip-header .error-severity.severity-medium {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.tooltip-header .error-severity.severity-minor {
+  background: #f0fdf4;
+  color: #065f46;
+}
+
+.tooltip-body {
+  padding: 16px;
 }
 
 .tooltip-section {
-  margin-bottom: 0.75rem;
+  margin-bottom: 12px;
 }
 
 .tooltip-section:last-child {
@@ -242,55 +254,156 @@
 
 .tooltip-section strong {
   display: block;
-  margin-bottom: 0.25rem;
-  color: var(--text-secondary, #6b7280);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.tooltip-section span {
+  display: block;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #1f2937;
 }
 
 .tooltip-section .knowledge-tag {
   display: inline-block;
-  padding: 4px 10px;
-  background: var(--primary-bg, #dbeafe);
-  color: var(--primary-text, #1e40af);
-  border-radius: 12px;
+  padding: 4px 12px;
+  background: #eff6ff;
+  color: #1e40af;
+  border-radius: 4px;
   font-size: 12px;
   font-weight: 500;
 }
 
-[data-theme="dark"] .tooltip-section .knowledge-tag {
-  background: rgba(59, 130, 246, 0.2);
-  color: #93c5fd;
+/* 暗色主题支持 */
+@media (prefers-color-scheme: dark) {
+  .error-highlighted-ocr-text {
+    background: #1f2937;
+    color: #f9fafb;
+  }
+
+  .error-stats-badge {
+    background: #374151;
+    border-left-color: #60a5fa;
+  }
+
+  .stats-item {
+    background: #1f2937;
+    border-color: #4b5563;
+  }
+
+  .stats-item.total {
+    background: #1e3a8a;
+    border-color: #60a5fa;
+    color: #93c5fd;
+  }
+
+  .stats-item.severity-major {
+    background: #7f1d1d;
+    border-color: #f87171;
+    color: #fca5a5;
+  }
+
+  .stats-item.severity-medium {
+    background: #78350f;
+    border-color: #fb923c;
+    color: #fcd34d;
+  }
+
+  .stats-item.severity-minor {
+    background: #064e3b;
+    border-color: #34d399;
+    color: #6ee7b7;
+  }
+
+  .highlighted-content {
+    background: #111827;
+    border-color: #374151;
+  }
+
+  .highlighted-content mark.error-highlight.severity-major {
+    background: rgba(239, 68, 68, 0.25);
+    color: #fca5a5;
+  }
+
+  .highlighted-content mark.error-highlight.severity-medium {
+    background: rgba(245, 158, 11, 0.25);
+    color: #fcd34d;
+  }
+
+  .highlighted-content mark.error-highlight.severity-minor {
+    background: rgba(16, 185, 129, 0.25);
+    color: #6ee7b7;
+  }
+
+  .error-tooltip-content {
+    background: #1f2937;
+    border-color: #4b5563;
+  }
+
+  .tooltip-header {
+    background: #374151;
+    border-bottom-color: #4b5563;
+  }
+
+  .tooltip-header .error-type {
+    color: #f9fafb;
+  }
+
+  .tooltip-section strong {
+    color: #d1d5db;
+  }
+
+  .tooltip-section span {
+    color: #f9fafb;
+  }
+
+  .tooltip-section .knowledge-tag {
+    background: #1e3a8a;
+    color: #93c5fd;
+  }
 }
 
-/* Scrollbar styling */
-.highlighted-lines::-webkit-scrollbar {
-  width: 8px;
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .error-stats-badge {
+    padding: 8px 12px;
+  }
+
+  .stats-item {
+    font-size: 12px;
+    padding: 3px 8px;
+  }
+
+  .highlighted-content {
+    padding: 12px;
+    font-size: 13px;
+  }
+
+  .error-tooltip-overlay {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    max-width: none;
+  }
 }
 
-.highlighted-lines::-webkit-scrollbar-track {
-  background: var(--surface-tertiary, #f3f4f6);
-  border-radius: 4px;
-}
+/* 打印样式 */
+@media print {
+  .error-stats-badge {
+    background: white;
+    border: 1px solid #000;
+  }
 
-[data-theme="dark"] .highlighted-lines::-webkit-scrollbar-track {
-  background: rgba(55, 65, 81, 0.5);
-}
+  .highlighted-content mark.error-highlight {
+    background: white !important;
+    border-bottom: 2px solid #000 !important;
+    color: #000 !important;
+  }
 
-.highlighted-lines::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb, #9ca3af);
-  border-radius: 4px;
-}
-
-.highlighted-lines::-webkit-scrollbar-thumb:hover {
-  background: var(--scrollbar-thumb-hover, #6b7280);
-}
-
-[data-theme="dark"] .highlighted-lines::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.4);
-}
-
-[data-theme="dark"] .highlighted-lines::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 163, 175, 0.6);
+  .error-tooltip-overlay {
+    display: none;
+  }
 }

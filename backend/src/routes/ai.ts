@@ -415,7 +415,7 @@ async function callDeepseekAPI(
   }
 }
 
-// 作业模式prompt - 简化版，专注错误定位
+// 作业模式prompt
 function buildAssignmentModePrompt(
   subject: string,
   teacherQuestionText: string | null,
@@ -431,77 +431,63 @@ ${teacherQuestionLatex}
 ` : ''}` : '';
 
   return `
-你是一位资深的${subject}教师，请精准批改学生作业，重点标注错误位置。
+你是一位资深的${subject}教师，当前是【作业模式 - 题目与解答分别提供】，请批改该学生的作业。
 
-【作业模式 - 题目与解答分离】
+教师给出的题目：
 ${questionSection}
 
 学生提交的解答内容：
 ${studentAnswerText}
 
 批改要求：
-1. 精准评分（0-100分），基于解答的完整性和正确性
+1. 精准评分(0-100分),你应该先判断老师给出了多少题目,学生完成了多少题目,并基于解答的完整性和正确性给出分数
 2. 准确统计题目数量、答对数量、答错数量
 3. 识别涉及的微积分知识点（从下方列表中选择）
-4. **核心任务**：精确标注每个错误的位置（行号、起始字符、结束字符）
-5. 对每个错误给出：错误类型、正确答案、简短解释
-6. feedback简洁明了，指出主要问题即可
+4. 对每个错误给出：错误内容、错误类型、正确答案、简短解释，如果没有错题请忽略
+5. 注意，错误内容请从"学生提交的解答内容"中完整的截选出来，确保我们能通过此找到错误点在学生解答中的位置，确保是能被渲染出来的符合语法规则的markdown语句
+6. feedback简洁明了,指出主要问题即可
 
+微积分知识点列表：
 ${getKnowledgePointsSection()}
 
 ${getJsonFormatSection()}
 
-关键要求：
-1. 必须返回有效的JSON格式，不包含其他文字
-2. detailedErrors是核心，必须精确标注line、startChar、endChar
-3. feedback要简洁，不要冗长的说教
-4. 不要返回suggestions、strengths、improvementAreas、nextStepRecommendations等冗余字段
+其他要求：
+1. 返回有效的JSON格式,而非其他文字
+2. feedback要简洁,不要冗长的说教
+3. 推荐你先自行计算出题目的结果,优先看学生的最终答案,如果所有题目最终答案均正确,则完全可以直接给出满分,detailedErrors可以为空
 `;
 }
 
 // 练习模式prompt - 简化版，专注错误定位
 function buildPracticeModePrompt(subject: string, contentText: string): string {
   return `
-你是一位资深的${subject}教师，请精准批改学生练习，重点标注错误位置。
+你是一位资深的${subject}教师，当前是【练习模式 - 题目与解答将一同提供】，请批改该学生的练习。
 
-【练习模式 - 题目与解答一体】
-以下内容包含题目和学生解答，格式通常为：
-- 前面部分：题目原文（可能包含"题目"、"习题"、"第X题"等标识）
-- 后面部分：学生的手写解答（可能包含"解："、"解答："、"答："等标识，或直接开始计算过程）
+以下内容同时包含题目与学生解答，格式通常为：
+- 前面部分：题目原文（可能包含"题目"、"习题"、"第X题"等标识）,OCR识别的结果较为准确
+- 后面部分：学生的手写解答（可能包含"解："、"解答："、"答："等标识,或直接开始计算过程）,OCR识别的结果可能存在误差
 
-练习内容：
+完整练习内容如下:
 ${contentText}
 
 批改要求：
-1. **🔴 关键步骤**：先识别题目和学生解答的分界线
-   - 题目部分通常是印刷体或清晰的原题
-   - 解答部分通常是手写内容，包含计算步骤、公式推导等
+1. 精准评分(0-100分),你应该先判断总题目数量,学生完成了多少题目,并基于解答的完整性和正确性给出分数
+2. 准确统计题目数量、答对数量、答错数量
+3. 识别涉及的微积分知识点（从下方列表中选择）
+4. 对每个错误给出：错误内容、错误类型、正确答案、简短解释，如果没有错题请忽略
+5. 注意，错误内容请从"后面部分，即学生的解答内容"中完整的截选出来，确保我们能通过此找到错误点在学生解答中的位置，确保是能被渲染出来的符合语法规则的markdown语句
+6. feedback简洁明了,指出主要问题即可
 
-2. **🔴 核心任务**：只批改学生解答部分，不要批改题目部分
-   - detailedErrors 必须只包含学生解答中的错误
-   - 行号（line）基于整个OCR文本（从1开始），方便前端定位
-   - 但content、errorType、correction等必须针对学生解答内容
-
-3. 精准评分（0-100分），基于解答的完整性和正确性
-
-4. 准确统计题目数量、答对数量、答错数量
-
-5. 识别涉及的微积分知识点（从下方列表中选择）
-
-6. 对每个错误给出：错误类型、正确答案、简短解释
-
-7. feedback简洁明了，指出主要问题即可
-
+微积分知识点列表：
 ${getKnowledgePointsSection()}
 
 ${getJsonFormatSection()}
 
-关键要求：
-1. 必须返回有效的JSON格式，不包含其他文字
-2. detailedErrors 是核心，必须精确标注 line、startChar、endChar
-3. **重要**：如果无法明确区分题目和解答，请在 feedback 中说明"无法区分题目和解答部分，批改可能不准确"
-4. **重要**：line 必须是基于整个OCR文本的行号（从1开始），不是相对于解答部分的行号
-5. feedback 要一语见地，不要冗长说教
+其他要求：
+1. 返回有效的JSON格式,而非其他文字
+2. feedback要简洁,不要冗长的说教
+3. 推荐你先自行计算出题目的结果,优先看学生的最终答案,如果所有题目最终答案均正确,则完全可以直接给出满分,detailedErrors可以为空
 `;
 }
 
@@ -528,7 +514,7 @@ function getKnowledgePointsSection(): string {
 // JSON格式示例 - 公共部分（简化版，专注错误定位）
 function getJsonFormatSection(): string {
   return `
-请严格参考以下JSON格式返回批改结果：
+请参考以下JSON格式返回批改结果：
 {
   "score": 85,
   "maxScore": 100,
@@ -544,9 +530,6 @@ function getJsonFormatSection(): string {
   "detailedErrors": [
     {
       "questionNumber": 1,
-      "line": 3,
-      "startChar": 0,
-      "endChar": 20,
       "content": "d/dx(x²+1) = 2x+1",
       "errorType": "计算错误",
       "correction": "d/dx(x²+1) = 2x",
@@ -556,13 +539,6 @@ function getJsonFormatSection(): string {
     }
   ]
 }
-
-重要说明：
-1. detailedErrors是核心，必须精确标注每个错误的位置
-2. line: 错误所在行号（从1开始）
-3. startChar: 错误内容在该行的起始字符位置（从0开始）
-4. endChar: 错误内容在该行的结束字符位置（不含）
-5. feedback要简洁明了，指出主要问题即可
 `;
 }
 

@@ -140,8 +140,9 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
         orderBy: { createdAt: 'desc' }
       });
 
-      return successResponse(
-        classrooms.map(classroom => ({
+      reply.send({
+        success: true,
+        data: classrooms.map(classroom => ({
           id: classroom.id,
           name: classroom.name,
           description: classroom.description,
@@ -150,7 +151,7 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
           assignmentCount: classroom._count.assignments,
           createdAt: classroom.createdAt
         }))
-      );
+      });
     } catch (error) {
       return handleRouteError(fastify, reply, error, '获取班级列表失败');
     }
@@ -314,13 +315,14 @@ const classroomRoutes: FastifyPluginAsync = async (fastify) => {
         orderBy: { joinedAt: 'asc' }
       });
 
-      return successResponse(
-        members.map(member => ({
+      reply.send({
+        success: true,
+        data: members.map(member => ({
           id: member.id,
           student: member.student,
           joinedAt: member.joinedAt
         }))
-      );
+      });
     } catch (error) {
       return handleRouteError(fastify, reply, error, '获取班级成员失败');
     }

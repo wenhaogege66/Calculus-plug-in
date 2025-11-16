@@ -211,18 +211,8 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
         orderBy: { dueDate: 'asc' }
       });
 
-      // 获取学生的详细提交统计信息
-      const submissionCounts = await prisma.submission.groupBy({
-        by: ['assignmentId'],
-        where: {
-          userId: request.currentUser!.id,
-          assignmentId: { in: assignments.map(a => a.id) }
-        },
-        _count: { id: true }
-      });
-
-      // 获取最新提交版本信息
-      const latestSubmissions = await prisma.submission.findMany({
+      // 获取学生的所有提交记录（需要按 batchId 去重统计）
+      const allSubmissions = await prisma.submission.findMany({
         where: {
           userId: request.currentUser!.id,
           assignmentId: { in: assignments.map(a => a.id) }
@@ -235,15 +225,50 @@ const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
         orderBy: { submittedAt: 'desc' }
       });
 
-      const submissionMap = new Map(
-        submissionCounts.map(s => [s.assignmentId, s._count.id])
-      );
+      // 按 batchId 去重统计提交次数
+      const submissionMap = new Map<number, number>();
+      const versionMap = new Map<number, number>();
 
-      const versionMap = new Map();
-      for (const submission of latestSubmissions) {
-        if (!versionMap.has(submission.assignmentId)) {
+      for (const assignment of assignments) {
+        // 获取该作业的所有提交
+        const assignmentSubmissions = allSubmissions.filter(s => s.assignmentId === assignment.id);
+
+        // 按 batchId 去重（同一批次只算1次）
+        const uniqueBatches = new Set<string>();
+        const seenBatchIds = new Set<string>();
+
+        fastify.log.info(`作业 ${assignment.id} - 总提交记录数: ${assignmentSubmissions.length}`);
+
+        for (const submission of assignmentSubmissions) {
           const metadata = submission.metadata as any;
-          versionMap.set(submission.assignmentId, metadata?.version || 1);
+          const batchId = metadata?.batchId;
+
+          if (batchId) {
+            // 有 batchId：同一批次只算一次
+            if (!seenBatchIds.has(batchId)) {
+              uniqueBatches.add(batchId);
+              seenBatchIds.add(batchId);
+              fastify.log.info(`  - 添加批次: ${batchId}`);
+            } else {
+              fastify.log.info(`  - 跳过重复批次: ${batchId}`);
+            }
+          } else {
+            // 没有 batchId：旧数据，每个 submission 算一次
+            const legacyKey = `legacy_${submission.submittedAt.getTime()}`;
+            uniqueBatches.add(legacyKey);
+            fastify.log.info(`  - 添加旧提交: ${legacyKey}`);
+          }
+        }
+
+        // 设置提交次数（去重后的批次数）
+        const count = uniqueBatches.size;
+        submissionMap.set(assignment.id, count);
+        fastify.log.info(`作业 ${assignment.id} - 去重后提交次数: ${count}`);
+
+        // 设置最新版本号
+        if (assignmentSubmissions.length > 0) {
+          const latestMetadata = assignmentSubmissions[0].metadata as any;
+          versionMap.set(assignment.id, latestMetadata?.version || 1);
         }
       }
 

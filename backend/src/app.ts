@@ -42,12 +42,12 @@ const PORT = Number(process.env.PORT) || 3000;
 // 创建 Fastify 实例
 const fastify = Fastify({
   logger: {
-    level: 'info',
+    level: process.env.LOG_LEVEL || 'info',
     transport: {
       target: 'pino-pretty',
       options: {
         translateTime: 'HH:MM:ss Z',
-        ignore: 'pid,hostname',
+        ignore: 'pid,hostname,reqId,req,res,responseTime', // 🔥 隐藏详细的请求/响应日志
       },
     },
   }
@@ -96,13 +96,8 @@ async function registerPlugins() {
     }
   });
 
-  // 静态文件服务
-  await fastify.register(staticFiles, {
-    root: path.join(__dirname, '../uploads'),
-    prefix: '/uploads/',
-  });
-
-  // 公共静态文件服务
+  // 公共静态文件服务（保留用于可能的静态资源）
+  // 注意：文件实际存储在 Supabase Storage，不使用本地 uploads 目录
   await fastify.register(staticFiles, {
     root: path.join(__dirname, '../public'),
     prefix: '/',

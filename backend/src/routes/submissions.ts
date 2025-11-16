@@ -91,6 +91,10 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
 
       // 为每个文件创建提交记录
       const submissions = [];
+
+      // 🔥 关键修复：在循环外生成 batchId，所有文件共享同一个 batchId
+      const batchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
       for (const fileId of fileIds) {
         const submission = await prisma.submission.create({
           data: {
@@ -101,7 +105,7 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
             status: 'UPLOADED',
             metadata: {
               note: note || null,
-              batchId: `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // 为批次添加标识
+              batchId: batchId, // 使用统一的 batchId
               fileIndex: fileIds.indexOf(fileId) + 1,
               totalFiles: fileIds.length,
               ...(clientMetadata || {}) // 合并前端传递的metadata（包括版本信息）
@@ -165,7 +169,7 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/submissions/:submissionId/status', { preHandler: requireAuth }, async (request, reply) => {
     try {
       const submissionId = parseInt((request.params as any).submissionId);
-      
+
       if (!submissionId) {
         return sendError(reply, '无效的提交ID', 400);
       }
@@ -222,24 +226,95 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
         return sendError(reply, '提交记录不存在', 404);
       }
 
+      // 检查是否是批量提交（通过 metadata.batchId）
+      const metadata = submission.metadata as any;
+      const batchId = metadata?.batchId;
+
+      fastify.log.info(`查询提交状态 - submissionId: ${submissionId}, batchId: ${batchId || '无'}`);
+
+      let allMathpixResults = submission.mathpixResults;
+      let allDeepseekResults = submission.deepseekResults;
+
+      // 如果存在 batchId，查询同一批次的所有提交记录的 OCR 结果
+      if (batchId) {
+        fastify.log.info(`检测到批量提交，开始查询 batchId: ${batchId}`);
+
+        const batchSubmissions = await prisma.submission.findMany({
+          where: {
+            userId: request.currentUser!.id,
+            metadata: {
+              path: ['batchId'],
+              equals: batchId
+            }
+          },
+          include: {
+            mathpixResults: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: {
+                id: true,
+                recognizedText: true,
+                confidence: true,
+                processingTime: true,
+                rawResult: true,
+                createdAt: true
+              }
+            },
+            deepseekResults: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: {
+                id: true,
+                score: true,
+                maxScore: true,
+                feedback: true,
+                errors: true,
+                processingTime: true,
+                rawResult: true,
+                createdAt: true
+              }
+            }
+          },
+          orderBy: { submittedAt: 'asc' } // 按提交时间排序，保持文件顺序
+        });
+
+        fastify.log.info(`批量提交查询结果 - batchId: ${batchId}, 找到 ${batchSubmissions.length} 个提交记录`);
+
+        // 汇总所有批次提交的 mathpixResults
+        allMathpixResults = batchSubmissions.flatMap(sub => sub.mathpixResults);
+        fastify.log.info(`汇总 mathpixResults - 总数: ${allMathpixResults.length}`);
+
+        // 对于 deepseekResults，只取最新的一个（因为AI批改是针对整个作业的）
+        const latestDeepseek = batchSubmissions
+          .flatMap(sub => sub.deepseekResults)
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+
+        allDeepseekResults = latestDeepseek ? [latestDeepseek] : [];
+
+        fastify.log.info(`批量提交查询 - batchId: ${batchId}, 文件数: ${batchSubmissions.length}, OCR结果数: ${allMathpixResults.length}, AI批改数: ${allDeepseekResults.length}`);
+      }
+
       // 计算批改进度 - 根据实际结果数据判断状态
       let progress = 0;
       let stage = '';
       let message = '';
 
-      if (submission.mathpixResults && submission.mathpixResults.length > 0) {
-        const mathpixResult = submission.mathpixResults[0];
-        
+      if (allMathpixResults && allMathpixResults.length > 0) {
+        // 检查是否所有文件的OCR都已完成
+        const hasValidOCR = allMathpixResults.some(result =>
+          result.recognizedText && result.recognizedText.trim().length > 0
+        );
+
         // 如果有文字识别结果且有文本内容，说明OCR完成
-        if (mathpixResult.recognizedText && mathpixResult.recognizedText.trim().length > 0) {
+        if (hasValidOCR) {
           progress = 60;
           stage = 'grading';
           message = 'AI智能批改中...';
-          
+
           // 检查Deepseek结果
-          if (submission.deepseekResults && submission.deepseekResults.length > 0) {
-            const deepseekResult = submission.deepseekResults[0];
-            
+          if (allDeepseekResults && allDeepseekResults.length > 0) {
+            const deepseekResult = allDeepseekResults[0];
+
             // 如果有评分或反馈，说明批改完成
             if (deepseekResult.score !== null || (deepseekResult.feedback && deepseekResult.feedback.trim().length > 0)) {
               progress = 100;
@@ -271,8 +346,8 @@ const submissionRoutes: FastifyPluginAsync = async (fastify) => {
         workMode: submission.workMode,
         submittedAt: submission.submittedAt,
         fileUpload: submission.fileUpload,
-        mathpixResults: submission.mathpixResults,
-        deepseekResults: submission.deepseekResults,
+        mathpixResults: allMathpixResults, // 返回所有批次的OCR结果
+        deepseekResults: allDeepseekResults, // 返回汇总的AI批改结果
         assignment: submission.assignment, // 添加 assignment 数据
         progress: {
           percent: progress,

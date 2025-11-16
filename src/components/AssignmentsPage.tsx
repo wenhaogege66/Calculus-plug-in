@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
 import { useNotificationContext } from '../contexts/NotificationContext';
 import { MathPixMarkdownRenderer } from './MathPixMarkdownRenderer';
-import { ErrorHighlightedOCRText } from './ErrorHighlightedOCRText';
+import { ErrorHighlightedOCRText, type DetailedError } from './ErrorHighlightedOCRText';
 
 interface Assignment {
   id: number;
@@ -304,8 +304,11 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
 
         if (classroomsRes.ok) {
           const classroomsData = await classroomsRes.json();
-          if (classroomsData.success) {
+          if (classroomsData.success && Array.isArray(classroomsData.data)) {
             setClassrooms(classroomsData.data);
+          } else {
+            console.error('Invalid classrooms data structure:', classroomsData);
+            setClassrooms([]);
           }
         }
       } else {
@@ -2011,7 +2014,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                         <div className="errors-section">
                           <h4>❌ 问题分析</h4>
                           <div className="errors-list">
-                            {gradingResults.deepseekResults[0].errors.map((error: any, index: number) => (
+                            {gradingResults.deepseekResults[0].errors.map((error: DetailedError, index: number) => (
                               <div
                                 key={index}
                                 className={`error-item ${activeErrorIndex === index ? 'active' : ''}`}

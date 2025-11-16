@@ -53,7 +53,6 @@ export function validateEnv(): { valid: boolean; errors: string[]; warnings: str
 }
 
 export function printEnvValidationResult(result: { valid: boolean; errors: string[]; warnings: string[] }) {
-  console.log('\n🔍 环境变量验证结果:\n');
 
   if (result.errors.length > 0) {
     console.error('💥 发现以下错误:');
