@@ -3,6 +3,7 @@ import { API_BASE_URL, type AuthState } from '../common/config/supabase';
 import { useNotificationContext } from '../contexts/NotificationContext';
 import { MathPixMarkdownRenderer } from './MathPixMarkdownRenderer';
 import { ErrorHighlightedOCRText, type DetailedError } from './ErrorHighlightedOCRText';
+import { wrapLatexContent } from '../utils/errorHighlighter';
 
 interface Assignment {
   id: number;
@@ -2040,7 +2041,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                                       <span className="section-label">问题内容：</span>
                                       <div className="section-content">
                                         <MathPixMarkdownRenderer
-                                          content={error.content}
+                                          content={wrapLatexContent(error.content)}
                                           className="error-text-content"
                                         />
                                       </div>
@@ -2051,7 +2052,7 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                                       <span className="section-label">正确答案：</span>
                                       <div className="section-content">
                                         <MathPixMarkdownRenderer
-                                          content={error.correction}
+                                          content={wrapLatexContent(error.correction)}
                                           className="correction-text-content"
                                         />
                                       </div>

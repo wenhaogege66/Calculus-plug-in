@@ -161,3 +161,78 @@ export function removeHighlights(highlightedText: string): string {
   // 移除所有<mark>标签，保留内容
   return highlightedText.replace(/<mark[^>]*>(.*?)<\/mark>/g, '$1');
 }
+
+/**
+ * 自动包裹LaTeX公式
+ * 检测文本是否包含LaTeX命令，如果是且未被$包裹，则自动添加
+ * @param text 可能包含LaTeX代码的文本
+ * @returns 处理后的文本，确保LaTeX被正确包裹
+ */
+export function wrapLatexContent(text: string): string {
+  if (!text || text.trim().length === 0) {
+    return text;
+  }
+
+  // 如果已经包含$符号，认为已经是正确的markdown格式
+  if (text.includes('$')) {
+    return text;
+  }
+
+  // LaTeX命令的特征模式
+  const latexPatterns = [
+    /\\frac\{/,           // 分数
+    /\\int[_^{]/,         // 积分
+    /\\sum[_^{]/,         // 求和
+    /\\prod[_^{]/,        // 连乘
+    /\\lim[_^{]/,         // 极限
+    /\\sqrt\{/,           // 根号
+    /\\left[(\[{]/,       // 左括号
+    /\\right[)\]}]/,      // 右括号
+    /\\begin\{/,          // 环境开始
+    /\\end\{/,            // 环境结束
+    /[_^]\{/,             // 上下标
+    /\\pi/,               // 希腊字母
+    /\\omega/,
+    /\\alpha/,
+    /\\beta/,
+    /\\gamma/,
+    /\\theta/,
+    /\\cos/,              // 三角函数
+    /\\sin/,
+    /\\tan/,
+    /\\log/,
+    /\\ln/,
+    /\\exp/,
+    /\\infty/,            // 无穷
+    /\\partial/,          // 偏导
+    /\\nabla/,            // 梯度
+    /\\cdot/,             // 点乘
+    /\\times/,            // 叉乘
+    /\\pm/,               // 正负号
+    /\\mp/,
+    /\\geq/,              // 比较符号
+    /\\leq/,
+    /\\neq/,
+    /\\approx/,
+    /\\equiv/
+  ];
+
+  // 检查是否包含LaTeX命令
+  const hasLatex = latexPatterns.some(pattern => pattern.test(text));
+
+  if (hasLatex) {
+    // 检查是否是多行公式（包含换行或较长）
+    const isMultiLine = text.includes('\n') || text.length > 100;
+
+    if (isMultiLine) {
+      // 块级公式，使用 $$...$$
+      return `$$${text}$$`;
+    } else {
+      // 行内公式，使用 $...$
+      return `$${text}$`;
+    }
+  }
+
+  // 不包含LaTeX命令，返回原文本
+  return text;
+}
