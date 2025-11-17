@@ -139,31 +139,6 @@
     color: #6b7280;
   }
 
-/* Fallback for browsers without app theme - keep original media query */
-@media (prefers-color-scheme: dark) {
-  body:not(.main-layout) .mathpix-markdown-content {
-    color: #f1f5f9;
-  }
-
-  body:not(.main-layout) .mathpix-loading {
-    background-color: rgba(59, 130, 246, 0.1);
-    border-color: rgba(59, 130, 246, 0.3);
-  }
-
-  body:not(.main-layout) .mathpix-error {
-    background-color: rgba(239, 68, 68, 0.1);
-    border-color: rgba(239, 68, 68, 0.3);
-  }
-
-  body:not(.main-layout) .mathpix-markdown-content.error-mode {
-    background-color: rgba(255, 255, 255, 0.05);
-  }
-
-  body:not(.main-layout) .empty-message {
-    color: #6b7280;
-  }
-}
-
 /* Math equation styling - inherits from MathJax but can be customized */
 .mathpix-markdown-content .MathJax {
   font-size: 1.1em;
@@ -201,18 +176,6 @@
   background-color: rgba(0, 0, 0, 0.3);
 }
 
-/* Fallback for tables */
-@media (prefers-color-scheme: dark) {
-  body:not(.main-layout) .mathpix-markdown-content table td,
-  body:not(.main-layout) .mathpix-markdown-content table th {
-    border-color: #4b5563;
-  }
-
-  body:not(.main-layout) .mathpix-markdown-content table th {
-    background-color: rgba(0, 0, 0, 0.3);
-  }
-}
-
 /* Code blocks */
 .mathpix-markdown-content pre {
   background-color: rgba(255, 255, 255, 0.6);
@@ -238,18 +201,6 @@
 
 .main-layout.dark .mathpix-markdown-content code {
   background-color: rgba(0, 0, 0, 0.3);
-}
-
-/* Fallback for code blocks */
-@media (prefers-color-scheme: dark) {
-  body:not(.main-layout) .mathpix-markdown-content pre {
-    background-color: rgba(0, 0, 0, 0.3);
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-
-  body:not(.main-layout) .mathpix-markdown-content code {
-    background-color: rgba(0, 0, 0, 0.3);
-  }
 }
 
 /* Headings */
@@ -306,13 +257,6 @@
   color: #60a5fa;
 }
 
-/* Fallback for links */
-@media (prefers-color-scheme: dark) {
-  body:not(.main-layout) .mathpix-markdown-content a {
-    color: #60a5fa;
-  }
-}
-
 /* Blockquotes */
 .mathpix-markdown-content blockquote {
   border-left: 4px solid #e5e7eb;
@@ -327,14 +271,6 @@
   color: #9ca3af;
 }
 
-/* Fallback for blockquotes */
-@media (prefers-color-scheme: dark) {
-  body:not(.main-layout) .mathpix-markdown-content blockquote {
-    border-left-color: #4b5563;
-    color: #9ca3af;
-  }
-}
-
 /* Horizontal rules */
 .mathpix-markdown-content hr {
   border: none;
@@ -344,11 +280,4 @@
 
 .main-layout.dark .mathpix-markdown-content hr {
   border-top-color: #4b5563;
-}
-
-/* Fallback for horizontal rules */
-@media (prefers-color-scheme: dark) {
-  body:not(.main-layout) .mathpix-markdown-content hr {
-    border-top-color: #4b5563;
-  }
 }

@@ -668,195 +668,99 @@
   }
 }
 
-/* 深色模式支持 */
-@media (prefers-color-scheme: dark) {
-  .detail-modal {
-    background: #1f2937;
-    color: #f3f4f6;
-  }
-
-  .mastery-status {
-    background: #111827;
-  }
-
-  .status-card {
-    background: #374151;
-  }
-  
-  .status-header h4, .node-info-header h3 {
-    color: #f3f4f6;
-  }
-  
-  .stat-label, .info-label {
-    color: #9ca3af;
-  }
-  
-  .stat-value, .info-value {
-    color: #e5e7eb;
-  }
-
-  .content-section {
-    background: #374151;
-    border-color: #4b5563;
-  }
-
-  .section-header {
-    background: #4b5563;
-  }
-
-  .section-header:hover {
-    background: #6b7280;
-  }
-  
-  .section-header h3 {
-    color: #f3f4f6;
-  }
-
-  .child-card {
-    background: #4b5563;
-    border-color: #6b7280;
-  }
-  
-  .child-card h4 {
-    color: #f3f4f6;
-  }
-
-  .error-item {
-    background: #3f1f1f;
-    border-color: #7c2d12;
-  }
-  
-  .error-type {
-    color: #f3f4f6;
-  }
-  
-  .error-description {
-    color: #d1d5db;
-  }
-
-  .question-card {
-    background: #1e3a5f;
-    border-color: #1e40af;
-  }
-
-  .question-card.completed {
-    background: #1f3d2f;
-    border-color: #047857;
-  }
-  
-  .question-content {
-    color: #d1d5db;
-  }
-
-  .detail-footer {
-    background: #374151;
-    border-color: #4b5563;
-  }
-
-  .example-code {
-    background: #4b5563;
-    color: #e5e7eb;
-    border-left-color: #667eea;
-  }
-  
-  .ai-explanation {
-    color: #d1d5db;
-  }
-}
-
-/* 为支持programmatic dark mode切换，添加.dark类样式 */
-.dark .detail-modal {
+/* 深色模式支持 - 使用项目的class-based主题切换 */
+.main-layout.dark .detail-modal {
   background: #1f2937;
   color: #f3f4f6;
 }
 
-.dark .mastery-status {
+.main-layout.dark .mastery-status {
   background: #111827;
 }
 
-.dark .status-card {
+.main-layout.dark .status-card {
   background: #374151;
 }
 
-.dark .status-header h4, 
-.dark .node-info-header h3 {
+.main-layout.dark .status-header h4, 
+.main-layout.dark .node-info-header h3 {
   color: #f3f4f6;
 }
 
-.dark .stat-label, 
-.dark .info-label {
+.main-layout.dark .stat-label, 
+.main-layout.dark .info-label {
   color: #9ca3af;
 }
 
-.dark .stat-value, 
-.dark .info-value {
+.main-layout.dark .stat-value, 
+.main-layout.dark .info-value {
   color: #e5e7eb;
 }
 
-.dark .content-section {
+.main-layout.dark .content-section {
   background: #374151;
   border-color: #4b5563;
 }
 
-.dark .section-header {
+.main-layout.dark .section-header {
   background: #4b5563;
 }
 
-.dark .section-header:hover {
+.main-layout.dark .section-header:hover {
   background: #6b7280;
 }
 
-.dark .section-header h3 {
+.main-layout.dark .section-header h3 {
   color: #f3f4f6;
 }
 
-.dark .child-card {
+.main-layout.dark .child-card {
   background: #4b5563;
   border-color: #6b7280;
 }
 
-.dark .child-card h4 {
+.main-layout.dark .child-card h4 {
   color: #f3f4f6;
 }
 
-.dark .error-item {
+.main-layout.dark .error-item {
   background: #3f1f1f;
   border-color: #7c2d12;
 }
 
-.dark .error-type {
+.main-layout.dark .error-type {
   color: #f3f4f6;
 }
 
-.dark .error-description {
+.main-layout.dark .error-description {
   color: #d1d5db;
 }
 
-.dark .question-card {
+.main-layout.dark .question-card {
   background: #1e3a5f;
   border-color: #1e40af;
 }
 
-.dark .question-card.completed {
+.main-layout.dark .question-card.completed {
   background: #1f3d2f;
   border-color: #047857;
 }
 
-.dark .question-content {
+.main-layout.dark .question-content {
   color: #d1d5db;
 }
 
-.dark .detail-footer {
+.main-layout.dark .detail-footer {
   background: #374151;
   border-color: #4b5563;
 }
 
-.dark .example-code {
+.main-layout.dark .example-code {
   background: #4b5563;
   color: #e5e7eb;
   border-left-color: #667eea;
 }
 
-.dark .ai-explanation {
+.main-layout.dark .ai-explanation {
   color: #d1d5db;
 }

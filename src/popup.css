@@ -221,28 +221,6 @@
   }
 }
 
-/* 深色模式支持 */
-@media (prefers-color-scheme: dark) {
-  .popup-container,
-  .auth-container {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-    color: #f1f5f9;
-  }
-  
-  .app-subtitle,
-  .version-info {
-    color: #94a3b8;
-  }
-  
-  .loading-container p {
-    color: #94a3b8;
-  }
-  
-  .main-app {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  }
-}
-
 /* 科技风装饰效果 */
 .auth-container::after {
   content: '';

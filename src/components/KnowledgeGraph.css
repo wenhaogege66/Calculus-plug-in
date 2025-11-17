@@ -578,104 +578,57 @@
   }
 }
 
-/* 深色模式支持 */
-@media (prefers-color-scheme: dark) {
-  .knowledge-graph-container {
-    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-  }
-
-  .knowledge-controls, .knowledge-stats, .knowledge-legend, .selected-node-info {
-    background: rgba(31, 41, 55, 0.95);
-    border-color: #374151;
-  }
-
-  .search-input, .chapter-filter {
-    background: #374151;
-    color: #f3f4f6;
-    border-color: #4b5563;
-  }
-  
-  .search-input::placeholder {
-    color: #9ca3af;
-  }
-
-  .node-label {
-    fill: #f3f4f6;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-  }
-
-  .stat-value, .node-info-header h3 {
-    color: #f3f4f6;
-  }
-
-  .stat-label, .info-label {
-    color: #9ca3af;
-  }
-
-  .info-value {
-    color: #e5e7eb;
-  }
-
-  .legend-items .legend-item {
-    color: #d1d5db;
-  }
-  
-  .loading-container p, .error-container h3, .error-container p, .empty-container h3, .empty-container p {
-    color: #f3f4f6;
-  }
-}
-
-/* 为支持programmatic dark mode切换，添加.dark类样式 */
-.dark .knowledge-graph-container {
+/* 深色模式支持 - 使用项目的class-based主题切换 */
+.main-layout.dark .knowledge-graph-container {
   background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
 }
 
-.dark .knowledge-controls, 
-.dark .knowledge-stats, 
-.dark .knowledge-legend, 
-.dark .selected-node-info {
+.main-layout.dark .knowledge-controls, 
+.main-layout.dark .knowledge-stats, 
+.main-layout.dark .knowledge-legend, 
+.main-layout.dark .selected-node-info {
   background: rgba(31, 41, 55, 0.95);
   border-color: #374151;
 }
 
-.dark .search-input, 
-.dark .chapter-filter {
+.main-layout.dark .search-input, 
+.main-layout.dark .chapter-filter {
   background: #374151;
   color: #f3f4f6;
   border-color: #4b5563;
 }
 
-.dark .search-input::placeholder {
+.main-layout.dark .search-input::placeholder {
   color: #9ca3af;
 }
 
-.dark .node-label {
+.main-layout.dark .node-label {
   fill: #f3f4f6 !important;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
 }
 
-.dark .stat-value, 
-.dark .node-info-header h3 {
+.main-layout.dark .stat-value, 
+.main-layout.dark .node-info-header h3 {
   color: #f3f4f6;
 }
 
-.dark .stat-label, 
-.dark .info-label {
+.main-layout.dark .stat-label, 
+.main-layout.dark .info-label {
   color: #9ca3af;
 }
 
-.dark .info-value {
+.main-layout.dark .info-value {
   color: #e5e7eb;
 }
 
-.dark .legend-items .legend-item {
+.main-layout.dark .legend-items .legend-item {
   color: #d1d5db;
 }
 
-.dark .loading-container p, 
-.dark .error-container h3, 
-.dark .error-container p, 
-.dark .empty-container h3, 
-.dark .empty-container p {
+.main-layout.dark .loading-container p, 
+.main-layout.dark .error-container h3, 
+.main-layout.dark .error-container p, 
+.main-layout.dark .empty-container h3, 
+.main-layout.dark .empty-container p {
   color: #f3f4f6;
 }

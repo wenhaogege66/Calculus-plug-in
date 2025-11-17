@@ -289,96 +289,94 @@
   font-weight: 500;
 }
 
-/* 暗色主题支持 */
-@media (prefers-color-scheme: dark) {
-  .error-highlighted-ocr-text {
-    background: #1f2937;
-    color: #f9fafb;
-  }
+/* 暗色主题支持 - 使用项目的class-based主题切换 */
+.main-layout.dark .error-highlighted-ocr-text {
+  background: var(--color-bg-secondary, #1f2937);
+  color: var(--color-text-primary, #f9fafb);
+}
 
-  .error-stats-badge {
-    background: #374151;
-    border-left-color: #60a5fa;
-  }
+.main-layout.dark .error-stats-badge {
+  background: var(--color-bg-tertiary, #374151);
+  border-left-color: var(--color-primary, #60a5fa);
+}
 
-  .stats-item {
-    background: #1f2937;
-    border-color: #4b5563;
-  }
+.main-layout.dark .stats-item {
+  background: var(--color-bg-secondary, #1f2937);
+  border-color: var(--color-border, #4b5563);
+}
 
-  .stats-item.total {
-    background: #1e3a8a;
-    border-color: #60a5fa;
-    color: #93c5fd;
-  }
+.main-layout.dark .stats-item.total {
+  background: #1e3a8a;
+  border-color: var(--color-primary, #60a5fa);
+  color: #93c5fd;
+}
 
-  .stats-item.severity-major {
-    background: #7f1d1d;
-    border-color: #f87171;
-    color: #fca5a5;
-  }
+.main-layout.dark .stats-item.severity-major {
+  background: #7f1d1d;
+  border-color: #f87171;
+  color: #fca5a5;
+}
 
-  .stats-item.severity-medium {
-    background: #78350f;
-    border-color: #fb923c;
-    color: #fcd34d;
-  }
+.main-layout.dark .stats-item.severity-medium {
+  background: #78350f;
+  border-color: #fb923c;
+  color: #fcd34d;
+}
 
-  .stats-item.severity-minor {
-    background: #064e3b;
-    border-color: #34d399;
-    color: #6ee7b7;
-  }
+.main-layout.dark .stats-item.severity-minor {
+  background: #064e3b;
+  border-color: #34d399;
+  color: #6ee7b7;
+}
 
-  .highlighted-content {
-    --highlighted-bg: #111827;
-    --text-primary: #f9fafb;
-    background: var(--highlighted-bg, #111827);
-    border-color: #374151;
-    color: var(--text-primary, #f9fafb);
-  }
+.main-layout.dark .highlighted-content {
+  --highlighted-bg: var(--color-bg-primary, #111827);
+  --text-primary: var(--color-text-primary, #f9fafb);
+  background: var(--highlighted-bg);
+  border-color: var(--color-border, #374151);
+  color: var(--text-primary);
+}
 
-  .highlighted-content mark.error-highlight.severity-major {
-    background: rgba(239, 68, 68, 0.25);
-    color: #fca5a5;
-  }
+.main-layout.dark .highlighted-content mark.error-highlight.severity-major {
+  background: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+}
 
-  .highlighted-content mark.error-highlight.severity-medium {
-    background: rgba(245, 158, 11, 0.25);
-    color: #fcd34d;
-  }
+.main-layout.dark .highlighted-content mark.error-highlight.severity-medium {
+  background: rgba(245, 158, 11, 0.25);
+  color: #fcd34d;
+}
 
-  .highlighted-content mark.error-highlight.severity-minor {
-    background: rgba(16, 185, 129, 0.25);
-    color: #6ee7b7;
-  }
+.main-layout.dark .highlighted-content mark.error-highlight.severity-minor {
+  background: rgba(16, 185, 129, 0.25);
+  color: #6ee7b7;
+}
 
-  .error-tooltip-content {
-    background: #1f2937;
-    border-color: #4b5563;
-  }
+.main-layout.dark .error-tooltip-content {
+  background: var(--color-bg-secondary, #1f2937);
+  border-color: var(--color-border, #4b5563);
+}
 
-  .tooltip-header {
-    background: #374151;
-    border-bottom-color: #4b5563;
-  }
+.main-layout.dark .tooltip-header {
+  background: var(--color-bg-tertiary, #374151);
+  border-bottom-color: var(--color-border, #4b5563);
+}
 
-  .tooltip-header .error-type {
-    color: #f9fafb;
-  }
+.main-layout.dark .tooltip-header .error-type {
+  color: var(--color-text-primary, #f9fafb);
+}
 
-  .tooltip-section strong {
-    color: #d1d5db;
-  }
+.main-layout.dark .tooltip-section strong {
+  color: var(--color-text-secondary, #d1d5db);
+}
 
-  .tooltip-section span {
-    color: #f9fafb;
-  }
+.main-layout.dark .tooltip-section span {
+  color: var(--color-text-primary, #f9fafb);
+}
 
-  .tooltip-section .knowledge-tag {
-    background: #1e3a8a;
-    color: #93c5fd;
-  }
+.main-layout.dark .tooltip-section .knowledge-tag {
+  background: #1e3a8a;
+  color: #93c5fd;
 }
 
 /* 响应式设计 */
