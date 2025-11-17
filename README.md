@@ -111,38 +111,22 @@ MATHPIX_APP_KEY=your-mathpix-app-key
 MAX_FILE_SIZE=104857600  # 100MB
 ```
 
-### 数据库初始化
+### 数据库初始化（未更新数据库schema的情况下，执行一次之后就不用执行了，多次执行也不会出事）
 ```bash
 cd backend
 
 # 生成Prisma客户端
 npm run db:generate
-
-# 应用数据库迁移
-npm run db:migrate
-
-# 或重置数据库 (开发环境)
-npm run db:reset
 ```
 
-### 开发环境
+### 开发环境（测试时看这里就行！！！）
 ```bash
-# 启动前端开发服务器
-pnpm dev
+# 构建Chrome扩展,构建完请去重新安装插件
+pnpm build
 
 # 启动后端服务器
 cd backend
 npm run dev
-```
-
-### 构建项目
-```bash
-# 构建Chrome扩展
-pnpm build
-
-# 构建后端
-cd backend
-npm run build
 ```
 
 ## 📁 项目结构

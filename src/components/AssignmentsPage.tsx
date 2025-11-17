@@ -1774,7 +1774,9 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState, onP
                 <div className="panel-header">
                   <h3>📝 题目识别</h3>
                   <div className="progress-indicator">
-                    {gradingResultAssignment.ocrStatus === 'PROCESSING' ? (
+                    {gradingResultAssignment.questionFile && questionFileUrl ? (
+                      <span className="status-badge completed">文件已加载</span>
+                    ) : gradingResultAssignment.ocrStatus === 'PROCESSING' ? (
                       <span className="status-badge processing">识别中...</span>
                     ) : gradingResultAssignment.ocrStatus === 'COMPLETED' ? (
                       <span className="status-badge completed">已完成</span>

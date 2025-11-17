@@ -1541,6 +1541,13 @@
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   padding: 20px;
+  max-width: 100%;
+  overflow-x: auto; /* 允许横向滚动查看长公式 */
+  overflow-y: hidden;
+  white-space: pre-wrap; /* 保留换行 */
+  word-wrap: break-word; /* 兼容性 */
+  scrollbar-width: thin; /* Firefox 细滚动条 */
+  scrollbar-color: #cbd5e1 transparent; /* Firefox 滚动条颜色 */
 }
 
 .feedback-content p {
@@ -1548,6 +1555,29 @@
   font-size: 14px;
   line-height: 1.6;
   color: #374151;
+}
+
+.feedback-content img,
+.feedback-content svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.feedback-content::-webkit-scrollbar {
+  height: 6px;
+}
+
+.feedback-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.feedback-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.feedback-content::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* 错误分析列表 */
@@ -2785,6 +2815,122 @@
   border-radius: 8px;
   transition: all 0.3s ease;
   cursor: pointer;
+  overflow: hidden; /* 防止内容溢出 */
+}
+
+/* 错误项内部元素样式 */
+.fullpage-content .error-item .error-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.fullpage-content .error-item .error-content {
+  flex: 1;
+  min-width: 0; /* 允许flex子元素收缩 */
+  overflow: hidden; /* 防止内容溢出 */
+}
+
+.fullpage-content .error-item .error-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.fullpage-content .error-item .error-type {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.fullpage-content .error-item .error-severity {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.fullpage-content .error-item .error-severity.major {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.fullpage-content .error-item .error-severity.medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.fullpage-content .error-item .error-severity.minor {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.fullpage-content .error-item .error-section {
+  margin-bottom: 8px;
+}
+
+.fullpage-content .error-item .error-section:last-child {
+  margin-bottom: 0;
+}
+
+.fullpage-content .error-item .section-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.fullpage-content .error-item .section-content {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #374151;
+  max-width: 100%; /* 限制最大宽度 */
+  overflow-x: auto; /* 允许横向滚动查看长公式 */
+  overflow-y: hidden;
+  white-space: pre-wrap; /* 保留换行 */
+  word-wrap: break-word; /* 兼容性 */
+  scrollbar-width: thin; /* Firefox 细滚动条 */
+  scrollbar-color: #cbd5e1 transparent; /* Firefox 滚动条颜色 */
+}
+
+/* Webkit 浏览器滚动条样式 */
+.fullpage-content .error-item .section-content::-webkit-scrollbar {
+  height: 6px;
+}
+
+.fullpage-content .error-item .section-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fullpage-content .error-item .section-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.fullpage-content .error-item .section-content::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* MathPixMarkdownRenderer内容宽度控制 */
+.fullpage-content .error-item .section-content .error-text-content,
+.fullpage-content .error-item .section-content .correction-text-content,
+.fullpage-content .error-item .section-content .explanation-text-content {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+.fullpage-content .error-item .knowledge-tag-inline {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #eff6ff;
+  color: #1e40af;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .fullpage-content .error-item:hover,
@@ -2798,6 +2944,23 @@
 .main-layout.dark .fullpage-content .error-item {
   background: rgba(239, 68, 68, 0.1);
   border-color: rgba(239, 68, 68, 0.3);
+}
+
+.main-layout.dark .fullpage-content .error-item .error-type {
+  color: #f9fafb;
+}
+
+.main-layout.dark .fullpage-content .error-item .section-label {
+  color: #9ca3af;
+}
+
+.main-layout.dark .fullpage-content .error-item .section-content {
+  color: #e5e7eb;
+}
+
+.main-layout.dark .fullpage-content .error-item .knowledge-tag-inline {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
 }
 
 .main-layout.dark .fullpage-content .error-item:hover,

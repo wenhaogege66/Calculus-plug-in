@@ -396,6 +396,43 @@
   color: #374151;
   line-height: 1.6;
   margin: 0;
+  max-width: 100%;
+  overflow-x: auto; /* 允许横向滚动查看长公式 */
+  overflow-y: hidden;
+  white-space: pre-wrap; /* 保留换行 */
+  word-wrap: break-word; /* 兼容性 */
+  scrollbar-width: thin; /* Firefox 细滚动条 */
+  scrollbar-color: #cbd5e1 transparent; /* Firefox 滚动条颜色 */
+}
+
+.feedback-text::-webkit-scrollbar {
+  height: 6px;
+}
+
+.feedback-text::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.feedback-text::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.feedback-text::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.feedback-text .feedback-content,
+.feedback-content {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+.feedback-content img,
+.feedback-content svg {
+  max-width: 100%;
+  height: auto;
 }
 
 /* 错误详情样式 */
@@ -1973,6 +2010,12 @@
   margin-top: 16px;
   padding: 16px;
   border-radius: 12px;
+  max-width: 100%;
+  overflow-x: auto; /* 允许横向滚动查看长公式 */
+  overflow-y: hidden;
+  white-space: pre-wrap;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
 }
 
 /* Light mode - explicit white background */
@@ -1985,6 +2028,23 @@
 .main-layout.dark .feedback-content-wrapper {
   background: rgba(30, 41, 59, 0.6);
   border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.feedback-content-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+
+.feedback-content-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.feedback-content-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.feedback-content-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* Enhanced Error Details */
@@ -2056,6 +2116,38 @@
   font-size: 14px;
   color: #374151;
   line-height: 1.5;
+  max-width: 100%;
+  overflow-x: auto; /* 允许横向滚动查看长公式 */
+  overflow-y: hidden;
+  white-space: pre-wrap; /* 保留换行 */
+  word-wrap: break-word; /* 兼容性 */
+  scrollbar-width: thin; /* Firefox 细滚动条 */
+  scrollbar-color: #cbd5e1 transparent; /* Firefox 滚动条颜色 */
+}
+
+.section-content::-webkit-scrollbar {
+  height: 6px;
+}
+
+.section-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.section-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.section-content::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.section-content .error-text-content,
+.section-content .correction-text-content,
+.section-content .explanation-text-content {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 .error-section.correction .section-content {
