@@ -2070,6 +2070,8 @@
   border-radius: 12px;
   border: 1px solid rgba(239, 68, 68, 0.2);
   transition: all 0.3s ease;
+  align-items: flex-start;
+  overflow: hidden; /* 防止子元素溢出 */
 }
 
 .error-item.enhanced:hover {
@@ -2091,6 +2093,8 @@
 
 .error-content {
   flex: 1;
+  min-width: 0; /* 允许内容在弹性布局中收缩 */
+  overflow: hidden;
 }
 
 .error-section {
@@ -2148,6 +2152,37 @@
   max-width: 100%;
   overflow-wrap: break-word;
   word-wrap: break-word;
+}
+
+/* MathJax/MathPix 渲染的长公式横向滚动且不撑破父容器 */
+.section-content [data-mml-node="math"],
+.feedback-text [data-mml-node="math"],
+.feedback-content [data-mml-node="math"] {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: pre; /* 保持公式行内布局 */
+  vertical-align: middle;
+}
+
+.section-content [data-mml-node="math"]::-webkit-scrollbar,
+.feedback-text [data-mml-node="math"]::-webkit-scrollbar,
+.feedback-content [data-mml-node="math"]::-webkit-scrollbar {
+  height: 6px;
+}
+
+.section-content [data-mml-node="math"]::-webkit-scrollbar-thumb,
+.feedback-text [data-mml-node="math"]::-webkit-scrollbar-thumb,
+.feedback-content [data-mml-node="math"]::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.section-content [data-mml-node="math"]::-webkit-scrollbar-track,
+.feedback-text [data-mml-node="math"]::-webkit-scrollbar-track,
+.feedback-content [data-mml-node="math"]::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .error-section.correction .section-content {
