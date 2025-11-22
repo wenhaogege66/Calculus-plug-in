@@ -451,11 +451,15 @@
 }
 
 .error-item {
+  display: flex;
+  gap: 10px;
   margin-bottom: 16px;
   padding: 16px;
   background: #fef2f2;
   border: 1px solid #fecaca;
   border-radius: 12px;
+  transition: all 0.3s ease;
+  overflow: hidden; /* 防止内容溢出 */
 }
 
 .error-header {
