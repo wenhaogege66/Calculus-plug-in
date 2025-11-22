@@ -500,7 +500,7 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
   }
 
   return (
-    <div className="practice-detail-fullpage">
+      <div className="practice-detail-fullpage main-layout light">
       {/* 顶部导航栏 */}
       <div className="detail-navbar">
         <div className="navbar-left">
