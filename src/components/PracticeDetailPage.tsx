@@ -659,7 +659,7 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                   </div>
                   <div className="feedback-content-wrapper">
                     <MathPixMarkdownRenderer
-                      content={session.gradingResult?.feedback || ''}
+                      content={(session.gradingResult?.feedback || '').trim()}
                       className="feedback-content enhanced"
                     />
                   </div>
