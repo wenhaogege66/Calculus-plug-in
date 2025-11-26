@@ -500,7 +500,7 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
   }
 
   return (
-    <div className="practice-detail-fullpage">
+      <div className="practice-detail-fullpage main-layout light">
       {/* 顶部导航栏 */}
       <div className="detail-navbar">
         <div className="navbar-left">
@@ -659,7 +659,7 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                   </div>
                   <div className="feedback-content-wrapper">
                     <MathPixMarkdownRenderer
-                      content={session.gradingResult?.feedback || ''}
+                      content={(session.gradingResult?.feedback || '').trim()}
                       className="feedback-content enhanced"
                     />
                   </div>

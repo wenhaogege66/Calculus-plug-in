@@ -2017,9 +2017,34 @@
   max-width: 100%;
   overflow-x: auto; /* 允许横向滚动查看长公式 */
   overflow-y: hidden;
-  white-space: pre-wrap;
+  white-space: normal;
+    /* CHANGED: from pre-wrap to normal to avoid extra spacing around block elements */
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
+}
+
+/* 修复：重置段落默认间距，特别是 margin-top，防止与容器 padding 叠加 */
+.feedback-content-wrapper p,
+.feedback-content p {
+    margin-top: 0;
+    /* 关键：移除顶部间距 */
+    margin-bottom: 0.8em;
+    /* 保持适度的段落间距 */
+    line-height: 1.6;
+}
+
+/* 修复：强制移除最后一个元素的底部间距，确保底部紧凑 */
+.feedback-content-wrapper>*:last-child,
+.feedback-content>*:last-child,
+.feedback-content-wrapper p:last-child,
+.feedback-content p:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* 针对公式块的微调，避免公式前后间距过大 */
+.feedback-content-wrapper .katex-display,
+.feedback-content .katex-display {
+    margin: 0.5em 0;
 }
 
 /* Light mode - explicit white background */
@@ -2127,7 +2152,8 @@
   max-width: 100%;
   overflow-x: auto; /* 允许横向滚动查看长公式 */
   overflow-y: hidden;
-  white-space: pre-wrap; /* 保留换行 */
+  white-space: normal;
+    /* CHANGED: from pre-wrap to normal to avoid extra spacing around block elements */
   word-wrap: break-word; /* 兼容性 */
   scrollbar-width: thin; /* Firefox 细滚动条 */
   scrollbar-color: #cbd5e1 transparent; /* Firefox 滚动条颜色 */

@@ -55,3 +55,5 @@ backend/uploads/
 
 /generated/prisma
 backend/.env.example
+
+.spec-workflow/
