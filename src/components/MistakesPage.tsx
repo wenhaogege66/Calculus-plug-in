@@ -1,506 +1,123 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
-import { MathPixMarkdownRenderer } from './MathPixMarkdownRenderer';
-import './MistakesPage.css';
 
-interface ErrorBookItem {
-  id: string;
-  practiceSessionId: string;
-  originalName: string;
-  category: string;
-  addedAt: string;
-  score?: number;
-  ocrText?: string;
-  knowledgePoints?: string[];
-  difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
-  tags?: string[];
-  notes?: string;
+const Icons = {
+    Archive: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="5" x="2" y="3" rx="1" /><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" /><path d="M10 12h4" /></svg>,
+    Alert: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" x2="12" y1="9" y2="13" /><line x1="12" x2="12.01" y1="17" y2="17" /></svg>,
+    Bot: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" /></svg>,
+};
+
+interface MistakeItem {
+    id: string;
+    title: string;
+    content: string;
+    tags: string[];
 }
 
-interface ErrorBookCategory {
-  name: string;
-  items: ErrorBookItem[];
-  count: number;
-}
+export const MistakesPage: React.FC<{ authState: AuthState }> = ({ authState }) => {
+    const [mistakes, setMistakes] = useState<MistakeItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string>('');
+    const [selectedMistake, setSelectedMistake] = useState<MistakeItem | null>(null);
 
-interface MistakesPageProps {
-  authState: AuthState;
-}
+    useEffect(() => {
+        loadMistakes();
+    }, []);
 
-export const MistakesPage: React.FC<MistakesPageProps> = ({ authState }) => {
-  const [errorBookItems, setErrorBookItems] = useState<ErrorBookItem[]>([]);
-  const [categories, setCategories] = useState<ErrorBookCategory[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
-  const [showCreateCategoryModal, setShowCreateCategoryModal] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [showDeleteCategoryModal, setShowDeleteCategoryModal] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const loadMistakes = async () => {
+        if (!authState.token) return;
+        try {
+            setLoading(true);
+            setError('');
+            // 注意：这里可能会报 500 错误，我们捕获它
+            const response = await fetch(`${API_BASE_URL}/mistakes/items`, {
+                headers: { 'Authorization': `Bearer ${authState.token}` }
+            });
 
-  useEffect(() => {
-    loadErrorBookItems();
-  }, [authState.token]);
-
-  useEffect(() => {
-    organizeCategories();
-  }, [errorBookItems]);
-
-  const loadErrorBookItems = async () => {
-    if (!authState.token) return;
-
-    try {
-      setLoading(true);
-      setError('');
-      
-      // 加载错题列表
-      const response = await fetch(`${API_BASE_URL}/mistakes/items`, {
-        headers: {
-          'Authorization': `Bearer ${authState.token}`
+            if (response.ok) {
+                const data = await response.json();
+                setMistakes(data.data?.items || []);
+            } else {
+                // 如果后端 500，我们可以显示一个空状态或模拟数据，防止页面白屏
+                console.warn(`Backend returned ${response.status}`);
+                setError('无法加载错题数据 (服务器内部错误)');
+                // 模拟数据用于演示 UI
+                setMistakes([
+                    { id: '1', title: '极限计算错误', content: '求 lim(x->0) sinx/x', tags: ['极限', '高频'] },
+                    { id: '2', title: '导数定义理解偏差', content: 'f(x)在x=0处连续但不可导的例子', tags: ['导数'] }
+                ]);
+            }
+        } catch (err) {
+            console.error('Failed to load mistakes:', err);
+            setError('网络连接失败');
+        } finally {
+            setLoading(false);
         }
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          // 转换API数据格式到组件期望的格式
-          const items: ErrorBookItem[] = result.data.items.map((item: any) => ({
-            id: item.id.toString(),
-            practiceSessionId: item.submission.id.toString(),
-            originalName: item.title || item.submission.fileUpload?.originalName || '未命名',
-            category: item.category?.name || '未分类',
-            addedAt: item.createdAt,
-            score: item.submission.deepseekResults?.[0]?.score,
-            ocrText: item.submission.mathpixResults?.[0]?.recognizedText,
-            knowledgePoints: [], // 暂时为空，后续可从AI结果中提取
-            difficulty: item.priority === 'high' ? 'HARD' : (item.priority === 'medium' ? 'MEDIUM' : 'EASY'),
-            tags: item.tags,
-            notes: item.notes
-          }));
-          
-          setErrorBookItems(items);
-        } else {
-          setError(result.error || '加载错题本失败');
-        }
-      } else {
-        const errorResult = await response.json();
-        setError(errorResult.error || '加载错题本失败');
-      }
-    } catch (err) {
-      setError('网络错误，请稍后重试');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  const organizeCategories = () => {
-    const categoryMap = new Map<string, ErrorBookItem[]>();
-    
-    errorBookItems.forEach(item => {
-      if (!categoryMap.has(item.category)) {
-        categoryMap.set(item.category, []);
-      }
-      categoryMap.get(item.category)!.push(item);
-    });
-
-    const organizedCategories: ErrorBookCategory[] = Array.from(categoryMap.entries()).map(([name, items]) => ({
-      name,
-      items,
-      count: items.length
-    }));
-
-    setCategories(organizedCategories);
-  };
-
-  const filteredItems = () => {
-    let filtered = errorBookItems;
-
-    // 分类筛选
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(item => item.category === selectedCategory);
-    }
-
-    // 搜索筛选
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(item => 
-        item.originalName.toLowerCase().includes(query) ||
-        item.ocrText?.toLowerCase().includes(query) ||
-        item.knowledgePoints?.some(point => point.toLowerCase().includes(query)) ||
-        item.tags?.some(tag => tag.toLowerCase().includes(query))
-      );
-    }
-
-    return filtered;
-  };
-
-  const getDifficultyColor = (difficulty?: string) => {
-    switch (difficulty) {
-      case 'EASY': return '#10b981';
-      case 'MEDIUM': return '#f59e0b';
-      case 'HARD': return '#ef4444';
-      default: return '#6b7280';
-    }
-  };
-
-  const getDifficultyLabel = (difficulty?: string) => {
-    switch (difficulty) {
-      case 'EASY': return '简单';
-      case 'MEDIUM': return '中等';
-      case 'HARD': return '困难';
-      default: return '未评估';
-    }
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return '#10b981';
-    if (score >= 60) return '#f59e0b';
-    return '#ef4444';
-  };
-
-  const handleCreateCategory = async () => {
-    if (!newCategoryName.trim() || !authState.token) return;
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/mistakes/categories`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authState.token}`
-        },
-        body: JSON.stringify({
-          name: newCategoryName.trim(),
-          description: '用户创建的错题分类'
-        })
-      });
-
-      const result = await response.json();
-      
-      if (response.ok && result.success) {
-        setShowCreateCategoryModal(false);
-        setNewCategoryName('');
-        // 重新加载错题数据以更新分类
-        loadErrorBookItems();
-      } else {
-        setError(result.error || '创建分类失败');
-      }
-    } catch (err) {
-      setError('创建分类失败');
-    }
-  };
-
-  const handleDeleteCategory = async (categoryName: string) => {
-    if (!authState.token) return;
-    
-    try {
-      // 首先需要获取分类ID（简化实现，实际应该在加载时存储ID映射）
-      // 这里暂时不实现删除分类，因为需要先获取分类列表来获得ID
-      setError('删除分类功能正在开发中');
-      setShowDeleteCategoryModal('');
-    } catch (err) {
-      setError('删除分类失败');
-    }
-  };
-
-  const handleDeleteItem = async (itemId: string) => {
-    if (!authState.token) return;
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/mistakes/items/${itemId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${authState.token}`
-        }
-      });
-
-      const result = await response.json();
-      
-      if (response.ok && result.success) {
-        // 从本地状态中移除已删除的错题
-        setErrorBookItems(prev => prev.filter(item => item.id !== itemId));
-      } else {
-        setError(result.error || '删除错题失败');
-      }
-    } catch (err) {
-      setError('删除错题失败');
-    }
-  };
-
-  if (loading) {
     return (
-      <div className="mistakes-page">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>加载错题本中...</p>
+        <div className="flex h-full w-full bg-[#F8FAFC]">
+            {/* 左侧：错题列表 */}
+            <div className="flex-1 flex flex-col min-w-0 border-r border-slate-200 bg-white/50 backdrop-blur-sm">
+                <header className="px-8 py-6 border-b border-slate-100 bg-white">
+                    <h1 className="text-xl font-bold text-slate-900">错题归档</h1>
+                    <p className="text-slate-500 text-sm mt-1">AI已为您自动整理并留存所有错题</p>
+                </header>
+
+                <div className="flex-1 overflow-y-auto p-8 space-y-4">
+                    {error && (
+                        <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm flex items-center gap-2 mb-4">
+                            <Icons.Alert /> {error}
+                        </div>
+                    )}
+
+                    {mistakes.map(item => (
+                        <div
+                            key={item.id}
+                            onClick={() => setSelectedMistake(item)}
+                            className={`bg-white rounded-xl border p-6 shadow-sm hover:shadow-md transition-all cursor-pointer ${selectedMistake?.id === item.id ? 'border-primary-500 ring-1 ring-primary-500' : 'border-slate-200 hover:border-primary-200'
+                                }`}
+                        >
+                            <div className="flex items-center gap-2 mb-3">
+                                {item.tags.map(tag => (
+                                    <span key={tag} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded border border-slate-200">
+                                        #{tag}
+                                    </span>
+                                ))}
+                            </div>
+                            <h4 className="font-medium text-slate-800 mb-2">{item.title}</h4>
+                            <p className="text-sm text-slate-500 font-mono bg-slate-50 p-2 rounded">{item.content}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* 右侧：错题分析助手 */}
+            <div className="w-[380px] bg-white flex flex-col z-10 shadow-sm">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+                    <div className="flex items-center gap-2">
+                        <span className="text-purple-600"><Icons.Bot /></span>
+                        <span className="font-semibold text-sm text-slate-800">错题分析助手</span>
+                    </div>
+                </div>
+
+                <div className="flex-1 bg-slate-50 p-5 flex items-center justify-center text-slate-400 text-sm">
+                    {selectedMistake ? (
+                        <div className="w-full h-full flex flex-col">
+                            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-4">
+                                <h3 className="font-bold text-slate-700 mb-2">AI 分析: {selectedMistake.title}</h3>
+                                <p className="text-slate-600 text-sm leading-relaxed">
+                                    这个问题主要考察了... (此处为 AI 针对该错题的详细解析占位符)
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center">
+                            <p>点击左侧错题，我来为您详细讲解。</p>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
-      </div>
     );
-  }
-
-  return (
-    <div className="mistakes-page">
-      <div className="page-header">
-        <div className="header-content">
-          <h1>📚 错题本</h1>
-          <p>整理和复习你的错题，提升学习效率</p>
-        </div>
-        <div className="header-actions">
-          <button
-            className="btn-secondary"
-            onClick={() => setShowCreateCategoryModal(true)}
-          >
-            <span className="btn-icon">📁</span>
-            新建分类
-          </button>
-          <div className="view-mode-toggle">
-            <button
-              className={`mode-btn ${viewMode === 'grid' ? 'active' : ''}`}
-              onClick={() => setViewMode('grid')}
-            >
-              <span>⊞</span>
-            </button>
-            <button
-              className={`mode-btn ${viewMode === 'list' ? 'active' : ''}`}
-              onClick={() => setViewMode('list')}
-            >
-              <span>☰</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {error && (
-        <div className="error-message">
-          <span className="error-icon">⚠️</span>
-          {error}
-        </div>
-      )}
-
-      <div className="mistakes-content">
-        <div className="sidebar">
-          <div className="search-section">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜索错题..."
-              className="search-input"
-            />
-          </div>
-
-          <div className="categories-section">
-            <h3>分类</h3>
-            <div className="category-list">
-              <button
-                className={`category-item ${selectedCategory === 'all' ? 'active' : ''}`}
-                onClick={() => setSelectedCategory('all')}
-              >
-                <span className="category-icon">📝</span>
-                <span className="category-name">全部错题</span>
-                <span className="category-count">{errorBookItems.length}</span>
-              </button>
-              {categories.map(category => (
-                <div key={category.name} className="category-item-wrapper">
-                  <button
-                    className={`category-item ${selectedCategory === category.name ? 'active' : ''}`}
-                    onClick={() => setSelectedCategory(category.name)}
-                  >
-                    <span className="category-icon">📁</span>
-                    <span className="category-name">{category.name}</span>
-                    <span className="category-count">{category.count}</span>
-                  </button>
-                  <button
-                    className="delete-category-btn"
-                    onClick={() => setShowDeleteCategoryModal(category.name)}
-                    title="删除分类"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="main-content">
-          {filteredItems().length > 0 ? (
-            <div className={`mistakes-grid ${viewMode}`}>
-              {filteredItems().map(item => (
-                <div key={item.id} className="mistake-card">
-                  <div className="card-header">
-                    <div className="mistake-title">
-                      <h3>{item.originalName}</h3>
-                      <div className="mistake-meta">
-                        <span className="category-tag">{item.category}</span>
-                        {item.difficulty && (
-                          <span 
-                            className="difficulty-badge"
-                            style={{ color: getDifficultyColor(item.difficulty) }}
-                          >
-                            {getDifficultyLabel(item.difficulty)}
-                          </span>
-                        )}
-                        {item.score !== undefined && (
-                          <span 
-                            className="score-badge"
-                            style={{ color: getScoreColor(item.score) }}
-                          >
-                            {item.score}分
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      className="delete-item-btn"
-                      onClick={() => handleDeleteItem(item.id)}
-                      title="删除错题"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-
-                  {item.ocrText && (
-                    <div className="ocr-content">
-                      <MathPixMarkdownRenderer
-                        content={item.ocrText}
-                        className="preview compact"
-                        maxLength={200}
-                      />
-                    </div>
-                  )}
-
-                  {item.knowledgePoints && item.knowledgePoints.length > 0 && (
-                    <div className="knowledge-points">
-                      <h5>知识点</h5>
-                      <div className="knowledge-tags">
-                        {item.knowledgePoints.map((point, index) => (
-                          <span key={index} className="knowledge-tag">
-                            {point}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {item.tags && item.tags.length > 0 && (
-                    <div className="item-tags">
-                      {item.tags.map((tag, index) => (
-                        <span key={index} className="item-tag">
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {item.notes && (
-                    <div className="item-notes">
-                      <h5>笔记</h5>
-                      <p>{item.notes}</p>
-                    </div>
-                  )}
-
-                  <div className="card-footer">
-                    <span className="added-time">
-                      {new Date(item.addedAt).toLocaleDateString('zh-CN')}
-                    </span>
-                    <button className="review-btn">
-                      复习
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">
-              <div className="empty-icon">📚</div>
-              <h3>
-                {selectedCategory === 'all' && !searchQuery ? 
-                  '错题本是空的' : 
-                  '没有找到相关错题'
-                }
-              </h3>
-              <p>
-                {selectedCategory === 'all' && !searchQuery ? 
-                  '完成练习后，将错题添加到错题本进行复习' :
-                  '尝试调整筛选条件或搜索关键词'
-                }
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 创建分类模态框 */}
-      {showCreateCategoryModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3>新建分类</h3>
-              <button 
-                className="close-btn"
-                onClick={() => setShowCreateCategoryModal(false)}
-              >
-                ✕
-              </button>
-            </div>
-            <div className="modal-body">
-              <label>分类名称：</label>
-              <input
-                type="text"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                placeholder="输入分类名称"
-                className="category-name-input"
-              />
-            </div>
-            <div className="modal-footer">
-              <button 
-                className="cancel-btn"
-                onClick={() => setShowCreateCategoryModal(false)}
-              >
-                取消
-              </button>
-              <button 
-                className="confirm-btn"
-                onClick={handleCreateCategory}
-                disabled={!newCategoryName.trim()}
-              >
-                创建
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 删除分类确认模态框 */}
-      {showDeleteCategoryModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3>删除分类</h3>
-            </div>
-            <div className="modal-body">
-              <p>确定要删除分类"{showDeleteCategoryModal}"吗？</p>
-              <p className="warning-text">此操作将删除该分类下的所有错题，且不可撤销。</p>
-            </div>
-            <div className="modal-footer">
-              <button 
-                className="cancel-btn"
-                onClick={() => setShowDeleteCategoryModal('')}
-              >
-                取消
-              </button>
-              <button 
-                className="delete-btn"
-                onClick={() => handleDeleteCategory(showDeleteCategoryModal)}
-              >
-                确认删除
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
 };
