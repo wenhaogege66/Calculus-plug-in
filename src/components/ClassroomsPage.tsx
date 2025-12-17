@@ -1,478 +1,329 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
 
-interface Classroom {
-  id: number;
-  name: string;
-  description?: string;
-  inviteCode?: string;
-  memberCount?: number;
-  assignmentCount?: number;
-  createdAt: string;
-  teacher?: {
-    id: number;
-    username: string;
-  };
-  joinedAt?: string;
-}
+// 图标组件
+const Icons = {
+    School: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m4 6 8-4 8 4" /><path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2" /><path d="M14 22v-4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v4" /><path d="M18 5v17" /><path d="M6 5v17" /></svg>,
+    Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
+    Book: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>,
+    Copy: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>,
+    Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>,
+    Link: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>,
+    Alert: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>,
+    Close: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+};
 
-interface Member {
-  id: number;
-  student: {
+interface Classroom {
     id: number;
-    username: string;
-    email?: string;
-    avatarUrl?: string;
-  };
-  joinedAt: string;
+    name: string;
+    description?: string;
+    inviteCode?: string;
+    memberCount?: number;
+    assignmentCount?: number;
+    createdAt: string;
+    teacher?: {
+        id: number;
+        username: string;
+    };
 }
 
 interface ClassroomsPageProps {
-  authState: AuthState;
-  onPageChange?: (page: string, params?: any) => void;
+    authState: AuthState;
+    onPageChange?: (page: string, params?: any) => void;
 }
 
 export const ClassroomsPage: React.FC<ClassroomsPageProps> = ({ authState, onPageChange }) => {
-  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [selectedClassroom, setSelectedClassroom] = useState<Classroom | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showJoinModal, setShowJoinModal] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    name: '',
-    description: ''
-  });
-  const [joinCode, setJoinCode] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+    const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string>('');
 
-  const isTeacher = authState.user?.role === 'TEACHER';
+    // Modal states
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showJoinModal, setShowJoinModal] = useState(false);
+    const [formData, setFormData] = useState({ name: '', description: '', inviteCode: '' });
+    const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadClassrooms();
-  }, [authState.token]);
+    const isTeacher = authState.user?.role === 'TEACHER';
 
-  const loadClassrooms = async () => {
-    if (!authState.token) return;
+    useEffect(() => {
+        loadClassrooms();
+    }, []);
 
-    try {
-      setLoading(true);
-      setError('');
+    const loadClassrooms = async () => {
+        if (!authState.token) return;
+        try {
+            setLoading(true);
+            setError('');
+            const endpoint = isTeacher ? '/classrooms/teacher' : '/classrooms/student';
 
-      const endpoint = isTeacher ? '/classrooms/teacher' : '/classrooms/student';
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        headers: { 'Authorization': `Bearer ${authState.token}` }
-      });
+            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                headers: { 'Authorization': `Bearer ${authState.token}` }
+            });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setClassrooms(data.data);
-        } else {
-          setError(data.error || '获取班级列表失败');
+            if (response.ok) {
+                const data = await response.json();
+                // 确保 data.data 是数组
+                setClassrooms(Array.isArray(data.data) ? data.data : []);
+            } else {
+                // 即使后端报错，也显示空状态而不是崩溃
+                console.warn('API Error:', response.status);
+                if (response.status === 500) {
+                    setError('服务器暂时无法处理请求，请稍后重试');
+                } else {
+                    setError('无法加载班级列表');
+                }
+                // 使用空数组作为兜底
+                setClassrooms([]);
+            }
+        } catch (err) {
+            console.error('Network Error:', err);
+            setError('网络连接出现问题');
+        } finally {
+            setLoading(false);
         }
-      } else {
-        throw new Error('网络请求失败');
-      }
-    } catch (err) {
-      setError('加载班级列表失败，请刷新重试');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  const loadMembers = async (classroomId: number) => {
-    if (!authState.token || !isTeacher) return;
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/classrooms/${classroomId}/members`, {
-        headers: { 'Authorization': `Bearer ${authState.token}` }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setMembers(data.data);
+    const handleCreate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!authState.token) return;
+        setSubmitting(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/classrooms`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authState.token}`
+                },
+                body: JSON.stringify({ name: formData.name, description: formData.description })
+            });
+            if (response.ok) {
+                setShowCreateModal(false);
+                setFormData({ name: '', description: '', inviteCode: '' });
+                loadClassrooms();
+            }
+        } catch (err) {
+            // 简单处理
+        } finally {
+            setSubmitting(false);
         }
-      }
-    } catch (err) {
-    }
-  };
+    };
 
-  const handleCreateClassroom = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!authState.token || !createForm.name.trim()) return;
+    const handleJoin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!authState.token) return;
+        setSubmitting(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/classrooms/join`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authState.token}`
+                },
+                body: JSON.stringify({ inviteCode: formData.inviteCode })
+            });
+            if (response.ok) {
+                setShowJoinModal(false);
+                setFormData({ name: '', description: '', inviteCode: '' });
+                loadClassrooms();
+            }
+        } catch (err) {
+            // 简单处理
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
-    try {
-      setSubmitting(true);
-      const response = await fetch(`${API_BASE_URL}/classrooms`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authState.token}`
-        },
-        body: JSON.stringify(createForm)
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setShowCreateModal(false);
-        setCreateForm({ name: '', description: '' });
-        await loadClassrooms();
-      } else {
-        setError(data.error || '创建班级失败');
-      }
-    } catch (err) {
-      setError('创建班级失败，请重试');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleJoinClassroom = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!authState.token || !joinCode.trim()) return;
-
-    try {
-      setSubmitting(true);
-      const response = await fetch(`${API_BASE_URL}/classrooms/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authState.token}`
-        },
-        body: JSON.stringify({ inviteCode: joinCode.trim().toUpperCase() })
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setShowJoinModal(false);
-        setJoinCode('');
-        await loadClassrooms();
-      } else {
-        setError(data.error || '加入班级失败');
-      }
-    } catch (err) {
-      setError('加入班级失败，请重试');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const copyInviteCode = async (code: string) => {
-    try {
-      await navigator.clipboard.writeText(code);
-      // 这里可以添加一个 toast 提示
-    } catch (err) {
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
-  };
-
-  if (loading) {
     return (
-      <div className="classrooms-page">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>加载中...</p>
-        </div>
-      </div>
-    );
-  }
+        <div className="flex h-full w-full bg-[#F8FAFC]">
+            <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
 
-  return (
-    <div className="classrooms-page">
-      <div className="page-header">
-        <div className="header-content">
-          <h1>{isTeacher ? '🏫 班级管理' : '🏫 我的班级'}</h1>
-          <p className="page-description">
-            {isTeacher ? '管理您的班级和学生' : '查看已加入的班级信息'}
-          </p>
-        </div>
-        
-        <div className="header-actions">
-          {isTeacher ? (
-            <button
-              className="btn-primary"
-              onClick={() => setShowCreateModal(true)}
-            >
-              <span className="btn-icon">➕</span>
-              <span>创建班级</span>
-            </button>
-          ) : (
-            <button
-              className="btn-primary"
-              onClick={() => setShowJoinModal(true)}
-            >
-              <span className="btn-icon">🔗</span>
-              <span>加入班级</span>
-            </button>
-          )}
-        </div>
-      </div>
+                {/* Header */}
+                <header className="px-8 py-6 bg-white border-b border-slate-200 flex justify-between items-center sticky top-0 z-10">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                            <span className="text-primary-600"><Icons.School /></span>
+                            {isTeacher ? '班级管理' : '我的班级'}
+                        </h1>
+                        <p className="text-slate-500 text-sm mt-1">
+                            {isTeacher ? '创建并管理您的教学班级' : '查看您加入的班级信息'}
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => isTeacher ? setShowCreateModal(true) : setShowJoinModal(true)}
+                        className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+                    >
+                        {isTeacher ? <><Icons.Plus /> 创建班级</> : <><Icons.Link /> 加入班级</>}
+                    </button>
+                </header>
 
-      {error && (
-        <div className="error-message">
-          <span className="error-icon">⚠️</span>
-          {error}
-          <button className="error-close" onClick={() => setError('')}>✕</button>
-        </div>
-      )}
+                {/* Error Banner */}
+                {error && (
+                    <div className="mx-8 mt-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
+                        <Icons.Alert />
+                        <span>{error}</span>
+                        <button onClick={loadClassrooms} className="ml-auto text-sm underline hover:text-red-800">重试</button>
+                    </div>
+                )}
 
-      {classrooms.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">🏫</div>
-          <h3>{isTeacher ? '还没有创建任何班级' : '还没有加入任何班级'}</h3>
-          <p>{isTeacher ? '创建您的第一个班级开始教学' : '使用邀请码加入班级开始学习'}</p>
-        </div>
-      ) : (
-        <div className="classrooms-content">
-          <div className="classrooms-grid">
-            {classrooms.map(classroom => (
-              <div key={classroom.id} className="classroom-card">
-                <div className="card-header">
-                  <div className="classroom-info">
-                    <h3 className="classroom-name">{classroom.name}</h3>
-                    {classroom.description && (
-                      <p className="classroom-description">{classroom.description}</p>
+                {/* Content Grid */}
+                <div className="p-8">
+                    {loading ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {[1, 2, 3].map(i => (
+                                <div key={i} className="h-48 bg-white rounded-xl border border-slate-200 animate-pulse"></div>
+                            ))}
+                        </div>
+                    ) : classrooms.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-dashed border-slate-300">
+                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                                <span className="text-slate-400"><Icons.School /></span>
+                            </div>
+                            <h3 className="text-lg font-medium text-slate-900">暂无班级</h3>
+                            <p className="text-slate-500 text-sm mt-1 mb-6">
+                                {isTeacher ? '您还没有创建任何班级' : '您还没有加入任何班级'}
+                            </p>
+                            <button
+                                onClick={() => isTeacher ? setShowCreateModal(true) : setShowJoinModal(true)}
+                                className="text-primary-600 font-medium hover:underline"
+                            >
+                                {isTeacher ? '立即创建' : '立即加入'}
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {classrooms.map(classroom => (
+                                <div key={classroom.id} className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover:shadow-md hover:border-primary-200 transition-all group relative overflow-hidden">
+                                    {/* Decorator */}
+                                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary-50 to-transparent rounded-bl-full -mr-8 -mt-8 opacity-50"></div>
+
+                                    <div className="relative z-10">
+                                        <h3 className="text-lg font-bold text-slate-800 mb-2 truncate pr-4">{classroom.name}</h3>
+                                        <p className="text-sm text-slate-500 mb-6 line-clamp-2 h-10">
+                                            {classroom.description || '暂无描述'}
+                                        </p>
+
+                                        {/* Invite Code (Teacher Only) */}
+                                        {isTeacher && classroom.inviteCode && (
+                                            <div className="mb-6 bg-slate-50 rounded-lg p-3 border border-slate-100 flex items-center justify-between">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] text-slate-400 uppercase font-semibold">邀请码</span>
+                                                    <span className="font-mono font-bold text-slate-700 tracking-wider">{classroom.inviteCode}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => navigator.clipboard.writeText(classroom.inviteCode!)}
+                                                    className="p-2 text-slate-400 hover:text-primary-600 hover:bg-white rounded-md transition-colors"
+                                                    title="复制"
+                                                >
+                                                    <Icons.Copy />
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Stats */}
+                                        <div className="flex items-center gap-4 border-t border-slate-100 pt-4">
+                                            <div className="flex items-center gap-1.5 text-sm text-slate-600">
+                                                <Icons.Users />
+                                                <span>{classroom.memberCount || 0} 学生</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 text-sm text-slate-600">
+                                                <Icons.Book />
+                                                <span>{classroom.assignmentCount || 0} 作业</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Action */}
+                                        <div className="mt-4 pt-2">
+                                            <button
+                                                onClick={() => onPageChange?.('assignments', { classroomId: classroom.id })}
+                                                className="w-full py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:border-primary-600 hover:text-primary-600 transition-colors"
+                                            >
+                                                进入班级
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     )}
-                  </div>
-                  
-                  {isTeacher && classroom.inviteCode && (
-                    <div className="invite-code-section">
-                      <span className="invite-label">邀请码</span>
-                      <div className="invite-code">
-                        <span className="code-text">{classroom.inviteCode}</span>
-                        <button 
-                          className="copy-btn"
-                          onClick={() => copyInviteCode(classroom.inviteCode!)}
-                          title="复制邀请码"
-                        >
-                          📋
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
-
-                <div className="classroom-stats">
-                  <div className="stat-item">
-                    <span className="stat-icon">👥</span>
-                    <span className="stat-text">{classroom.memberCount || 0}名学生</span>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-icon">📝</span>
-                    <span className="stat-text">{classroom.assignmentCount || 0}个作业</span>
-                  </div>
-                  {!isTeacher && classroom.teacher && (
-                    <div className="stat-item">
-                      <span className="stat-icon">👨‍🏫</span>
-                      <span className="stat-text">{classroom.teacher.username}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="classroom-meta">
-                  <span className="meta-text">
-                    {isTeacher ? `创建于 ${formatDate(classroom.createdAt)}` : 
-                     classroom.joinedAt ? `加入于 ${formatDate(classroom.joinedAt)}` : 
-                     `创建于 ${formatDate(classroom.createdAt)}`}
-                  </span>
-                </div>
-
-                <div className="card-actions">
-                  {isTeacher ? (
-                    <>
-                      <button 
-                        className="btn-secondary small"
-                        onClick={() => {
-                          setSelectedClassroom(classroom);
-                          loadMembers(classroom.id);
-                        }}
-                      >
-                        <span className="btn-icon">👥</span>
-                        <span>查看学生</span>
-                      </button>
-                      <button className="btn-secondary small">
-                        <span className="btn-icon">📊</span>
-                        <span>班级统计</span>
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button 
-                        className="btn-secondary small"
-                        onClick={() => onPageChange?.('assignments', { classroomId: classroom.id, classroomName: classroom.name })}
-                      >
-                        <span className="btn-icon">📝</span>
-                        <span>查看作业</span>
-                      </button>
-                      <button className="btn-secondary small">
-                        <span className="btn-icon">📊</span>
-                        <span>我的成绩</span>
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 创建班级模态框 */}
-      {showCreateModal && (
-        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>创建新班级</h2>
-              <button className="close-btn" onClick={() => setShowCreateModal(false)}>✕</button>
             </div>
-            
-            <form onSubmit={handleCreateClassroom} className="modal-form">
-              <div className="form-group">
-                <label htmlFor="className">班级名称 *</label>
-                <input
-                  id="className"
-                  type="text"
-                  value={createForm.name}
-                  onChange={(e) => setCreateForm({...createForm, name: e.target.value})}
-                  placeholder="如：高等数学A班"
-                  required
-                />
-              </div>
-              
-              <div className="form-group">
-                <label htmlFor="classDescription">班级描述</label>
-                <textarea
-                  id="classDescription"
-                  value={createForm.description}
-                  onChange={(e) => setCreateForm({...createForm, description: e.target.value})}
-                  placeholder="简单描述这个班级..."
-                  rows={3}
-                />
-              </div>
-              
-              <div className="modal-actions">
-                <button 
-                  type="button" 
-                  className="btn-secondary"
-                  onClick={() => setShowCreateModal(false)}
-                  disabled={submitting}
-                >
-                  取消
-                </button>
-                <button 
-                  type="submit" 
-                  className="btn-primary"
-                  disabled={submitting || !createForm.name.trim()}
-                >
-                  {submitting ? '创建中...' : '创建班级'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* 加入班级模态框 */}
-      {showJoinModal && (
-        <div className="modal-overlay" onClick={() => setShowJoinModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>加入班级</h2>
-              <button className="close-btn" onClick={() => setShowJoinModal(false)}>✕</button>
-            </div>
-            
-            <form onSubmit={handleJoinClassroom} className="modal-form">
-              <div className="form-group">
-                <label htmlFor="inviteCode">邀请码 *</label>
-                <input
-                  id="inviteCode"
-                  type="text"
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value)}
-                  placeholder="输入8位邀请码"
-                  maxLength={8}
-                  required
-                />
-                <small className="form-help">请向您的老师索取邀请码</small>
-              </div>
-              
-              <div className="modal-actions">
-                <button 
-                  type="button" 
-                  className="btn-secondary"
-                  onClick={() => setShowJoinModal(false)}
-                  disabled={submitting}
-                >
-                  取消
-                </button>
-                <button 
-                  type="submit" 
-                  className="btn-primary"
-                  disabled={submitting || !joinCode.trim()}
-                >
-                  {submitting ? '加入中...' : '加入班级'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            {/* Modals - 使用 Tailwind 重写 */}
+            {(showCreateModal || showJoinModal) && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 transform transition-all scale-100">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold text-slate-900">
+                                {showCreateModal ? '创建新班级' : '加入班级'}
+                            </h2>
+                            <button
+                                onClick={() => { setShowCreateModal(false); setShowJoinModal(false); }}
+                                className="text-slate-400 hover:text-slate-600"
+                            >
+                                <Icons.Close />
+                            </button>
+                        </div>
 
-      {/* 班级成员模态框 */}
-      {selectedClassroom && (
-        <div className="modal-overlay" onClick={() => setSelectedClassroom(null)}>
-          <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{selectedClassroom.name} - 班级成员</h2>
-              <button className="close-btn" onClick={() => setSelectedClassroom(null)}>✕</button>
-            </div>
-            
-            <div className="members-list">
-              {members.length === 0 ? (
-                <div className="empty-members">
-                  <p>暂无学生加入</p>
+                        <form onSubmit={showCreateModal ? handleCreate : handleJoin}>
+                            {showCreateModal ? (
+                                <>
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">班级名称</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                                            placeholder="例如：高等数学 2024春"
+                                            value={formData.name}
+                                            onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="mb-6">
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">描述（可选）</label>
+                                        <textarea
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all h-24 resize-none"
+                                            placeholder="关于这个班级的简介..."
+                                            value={formData.description}
+                                            onChange={e => setFormData({ ...formData, description: e.target.value })}
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="mb-6">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">班级邀请码</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        maxLength={8}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all font-mono tracking-widest text-center text-lg uppercase"
+                                        placeholder="XXXXXXXX"
+                                        value={formData.inviteCode}
+                                        onChange={e => setFormData({ ...formData, inviteCode: e.target.value.toUpperCase() })}
+                                    />
+                                    <p className="text-xs text-slate-500 mt-2 text-center">请输入老师分享的8位邀请码</p>
+                                </div>
+                            )}
+
+                            <div className="flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowCreateModal(false); setShowJoinModal(false); }}
+                                    className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submitting}
+                                    className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors disabled:opacity-50"
+                                >
+                                    {submitting ? '处理中...' : '确认'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-              ) : (
-                members.map(member => (
-                  <div key={member.id} className="member-item">
-                    <div className="member-info">
-                      <div className="member-avatar">
-                        {member.student.avatarUrl ? (
-                          <img src={member.student.avatarUrl} alt="头像" />
-                        ) : (
-                          <div className="avatar-placeholder">
-                            {member.student.username.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-                      <div className="member-details">
-                        <div className="member-name">{member.student.username}</div>
-                        <div className="member-email">{member.student.email}</div>
-                        <div className="member-date">加入于 {formatDate(member.joinedAt)}</div>
-                      </div>
-                    </div>
-                    <div className="member-actions">
-                      <button className="btn-secondary small">消息</button>
-                      <button className="btn-secondary small danger">移除</button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+            )}
         </div>
-      )}
-    </div>
-  );
+    );
 };

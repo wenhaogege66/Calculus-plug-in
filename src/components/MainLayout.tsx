@@ -10,167 +10,134 @@ import { NotificationProvider } from '../contexts/NotificationContext';
 import { Storage } from '@plasmohq/storage';
 import type { AuthState } from '../common/config/supabase';
 
-import './Navigation.css';
-import './MainLayout.css';
-import './AssignmentsPage.css';
-import './ClassroomsPage.css';
-import './PracticePage.css';
-import './MistakesPage.css';
-import './Notification.css';
-import '../styles/theme.css';  // 导入全局主题变量
 
 interface MainLayoutProps {
-  children: React.ReactNode;
-  authState: AuthState;
-  onLogout: () => void;
-  initialPage?: string;
+    children: React.ReactNode;
+    authState: AuthState;
+    onLogout: () => void;
+    initialPage?: string;
 }
 
-export const MainLayout: React.FC<MainLayoutProps> = ({ 
-  children, 
-  authState, 
-  onLogout,
-  initialPage = 'home'
+export const MainLayout: React.FC<MainLayoutProps> = ({
+    children,
+    authState,
+    onLogout,
+    initialPage = 'home'
 }) => {
-  const [currentPage, setCurrentPage] = useState(initialPage);
-  const [pageParams, setPageParams] = useState<any>(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const storage = new Storage();
-  const {
-    notifications,
-    removeNotification,
-    showSuccess,
-    showError,
-    showWarning,
-    showInfo
-  } = useNotifications();
-
-  // 初始化主题
-  useEffect(() => {
-    const initTheme = async () => {
-      try {
-        const savedTheme = await storage.get('darkMode');
-        if (savedTheme !== undefined) {
-          setIsDarkMode(savedTheme);
-        }
-      } catch (error) {
-      }
+    // 辅助函数：确保 initialPage 有效，处理旧链接映射
+    const normalizePage = (page: string) => {
+        if (page === 'homework') return 'assignments';
+        if (!page) return 'home';
+        return page;
     };
-    
-    initTheme();
-  }, []);
 
-  // 主题切换
-  const toggleDarkMode = async () => {
-    const newMode = !isDarkMode;
-    setIsDarkMode(newMode);
-    try {
-      await storage.set('darkMode', newMode);
-    } catch (error) {
-    }
-  };
+    const [currentPage, setCurrentPage] = useState(normalizePage(initialPage));
+    const [pageParams, setPageParams] = useState<any>(null);
 
-  // 页面切换处理
-  const handlePageChange = (page: string, params?: any) => {
-    setCurrentPage(page);
-    setPageParams(params);
-    // 这里可以添加页面切换的逻辑，比如路由跳转或状态更新
-  };
+    // 这里的 isDarkMode 仅用于控制 UI 主题类名
+    const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // 根据当前页面渲染内容
-  const renderPageContent = () => {
-    switch (currentPage) {
-      case 'home':
-        return React.cloneElement(children as React.ReactElement, { 
-          onPageChange: handlePageChange 
-        }); // HomePage component
-      case 'assignments':
-        return <AssignmentsPage authState={authState} onPageChange={handlePageChange} params={pageParams} />;
-      case 'grading':
-        return (
-          <div className="placeholder-page">
-            <div className="placeholder-content">
-              <div className="placeholder-icon">✏️</div>
-              <h2>批改系统</h2>
-              <p>查看和管理学生作业批改</p>
+    // 监听 initialPage 变化 (例如 hash 改变)，并应用映射
+    useEffect(() => {
+        setCurrentPage(normalizePage(initialPage));
+    }, [initialPage]);
+
+    const {
+        notifications,
+        removeNotification,
+        showSuccess,
+        showError,
+        showWarning,
+        showInfo
+    } = useNotifications();
+
+    // 页面切换处理
+    const handlePageChange = (page: string, params?: any) => {
+        setCurrentPage(page);
+        setPageParams(params);
+    };
+
+    const renderPageContent = () => {
+        switch (currentPage) {
+            case 'home':
+                // 只有在渲染 Dashboard (HomePage) 时才显示传入的 children
+                return React.cloneElement(children as React.ReactElement, {
+                    onPageChange: handlePageChange
+                });
+            case 'assignments':
+                return <AssignmentsPage authState={authState} onPageChange={handlePageChange} params={pageParams} />;
+            case 'grading':
+                return (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                            <span className="text-2xl">✏️</span>
+                        </div>
+                        <h2 className="text-xl font-bold text-slate-700">批改系统</h2>
+                        <p className="mt-2">功能整合中，请从作业列表进入详情</p>
+                        <button
+                            onClick={() => handlePageChange('assignments')}
+                            className="mt-6 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                        >
+                            返回作业列表
+                        </button>
+                    </div>
+                );
+            case 'practice':
+                return <PracticePage authState={authState} />;
+            case 'classrooms':
+                return <ClassroomsPage authState={authState} onPageChange={handlePageChange} />;
+            case 'mistakes':
+                return <MistakesPage authState={authState} />;
+            case 'knowledge':
+                return <KnowledgeGraph authState={authState} isDarkMode={isDarkMode} />;
+            case 'settings':
+            case 'profile':
+                return (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                            <span className="text-2xl">⚙️</span>
+                        </div>
+                        <h2 className="text-xl font-bold text-slate-700">设置页面</h2>
+                        <p className="mt-2">系统设置与个人信息功能正在开发中...</p>
+                    </div>
+                );
+            default:
+                // 兜底显示 Home，防止路由不匹配导致空白
+                return React.cloneElement(children as React.ReactElement, {
+                    onPageChange: handlePageChange
+                });
+        }
+    };
+
+    return (
+        <NotificationProvider value={{ showSuccess, showError, showWarning, showInfo }}>
+            <div className={`flex h-screen bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans ${isDarkMode ? 'dark' : ''}`}>
+
+                {/* 左侧固定侧边栏 */}
+                <Navigation
+                    authState={authState}
+                    currentPage={currentPage}
+                    onPageChange={handlePageChange}
+                    onLogout={onLogout}
+                    isDarkMode={isDarkMode}
+                    onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+                />
+
+                {/* 右侧主内容区域 */}
+                <main className="flex-1 overflow-hidden relative flex flex-col">
+                    <div className="flex-1 overflow-y-auto relative w-full h-full">
+                        <div className="w-full h-full fade-in">
+                            {renderPageContent()}
+                        </div>
+                    </div>
+                </main>
+
+                {/* 全局通知容器 */}
+                <NotificationContainer
+                    notifications={notifications}
+                    onRemove={removeNotification}
+                />
             </div>
-          </div>
-        );
-      case 'practice':
-        return <PracticePage authState={authState} />;
-      case 'classrooms':
-        return <ClassroomsPage authState={authState} onPageChange={handlePageChange} />;
-      case 'mistakes':
-        return <MistakesPage authState={authState} />;
-      case 'knowledge':
-      case 'knowledge-graph':
-        return <KnowledgeGraph authState={authState} isDarkMode={isDarkMode} />;
-      case 'profile':
-        return (
-          <div className="placeholder-page">
-            <div className="placeholder-content">
-              <div className="placeholder-icon">👤</div>
-              <h2>个人信息</h2>
-              <p>个人信息管理功能正在开发中...</p>
-            </div>
-          </div>
-        );
-      case 'settings':
-        return (
-          <div className="placeholder-page">
-            <div className="placeholder-content">
-              <div className="placeholder-icon">⚙️</div>
-              <h2>系统设置</h2>
-              <p>系统设置功能正在开发中...</p>
-            </div>
-          </div>
-        );
-      default:
-        return children;
-    }
-  };
-
-  return (
-    <NotificationProvider value={{ showSuccess, showError, showWarning, showInfo }}>
-      <div className={`main-layout ${isDarkMode ? 'dark' : 'light'}`}>
-        <Navigation
-          authState={authState}
-          currentPage={currentPage}
-          onPageChange={handlePageChange}
-          onLogout={onLogout}
-          isDarkMode={isDarkMode}
-          onToggleDarkMode={toggleDarkMode}
-        />
-        
-        <main className="main-content">
-          <div className="content-body">
-            {renderPageContent()}
-          </div>
-        </main>
-        
-        {/* 通知容器 */}
-        <NotificationContainer
-          notifications={notifications}
-          onRemove={removeNotification}
-        />
-      </div>
-    </NotificationProvider>
-  );
+        </NotificationProvider>
+    );
 };
-
-// 获取页面标题
-function getPageTitle(page: string): string {
-  const titles: Record<string, string> = {
-    home: '欢迎来到AI微积分助教',
-    assignments: '作业管理系统',
-    grading: '作业批改系统',
-    practice: '自主练习系统',
-    classrooms: '班级管理系统',
-    mistakes: '错题本管理',
-    knowledge: '知识图谱',
-    profile: '个人信息',
-    settings: '系统设置'
-  };
-  
-  return titles[page] || '首页';
-}
