@@ -69,16 +69,71 @@
   transform: rotate(-90deg);
 }
 
-/* AI 辅导助手侧边栏 */
+/* AI 辅导助手侧边栏 - 宽度由内联 style 控制，可左右伸缩 */
 .practice-assistant-sidebar {
-  width: 380px;
   flex-shrink: 0;
+  min-width: 280px;
+  max-width: 600px;
   display: flex;
   flex-direction: column;
   background: white;
   border-left: 1px solid #e2e8f0;
   box-shadow: -4px 0 16px rgba(0, 0, 0, 0.06);
   z-index: 5;
+}
+
+/* 侧边栏左侧伸缩条（左右拖拽调整宽度） */
+.practice-assistant-resizer {
+  flex-shrink: 0;
+  width: 8px;
+  cursor: ew-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border-left: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.practice-assistant-resizer:hover,
+.practice-assistant-resizer-active.practice-assistant-resizer {
+  background: #e2e8f0;
+}
+
+.practice-assistant-resizer-handle {
+  display: block;
+  width: 4px;
+  height: 40px;
+  border-radius: 2px;
+  background: #94a3b8;
+  pointer-events: none;
+}
+
+.practice-assistant-resizer:hover .practice-assistant-resizer-handle,
+.practice-assistant-resizer-active .practice-assistant-resizer-handle {
+  background: #64748b;
+}
+
+.main-layout.dark .practice-assistant-resizer {
+  background: #334155;
+  border-left-color: #475569;
+  border-right-color: #475569;
+}
+
+.main-layout.dark .practice-assistant-resizer:hover,
+.main-layout.dark .practice-assistant-resizer-active.practice-assistant-resizer {
+  background: #475569;
+}
+
+.main-layout.dark .practice-assistant-resizer-handle {
+  background: #64748b;
+}
+
+.main-layout.dark .practice-assistant-resizer:hover .practice-assistant-resizer-handle,
+.main-layout.dark .practice-assistant-resizer-active .practice-assistant-resizer-handle {
+  background: #94a3b8;
 }
 
 .main-layout.dark .practice-assistant-sidebar {

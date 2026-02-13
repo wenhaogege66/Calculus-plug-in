@@ -108,8 +108,11 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
   const [questionRatings, setQuestionRatings] = useState<{[key: number]: number}>({});
   const [activeErrorIndex, setActiveErrorIndex] = useState<number | null>(null);
 
-  // AI 辅导助手侧边栏
+  // AI 辅导助手侧边栏（宽度可左右伸缩）
   const [assistantOpen, setAssistantOpen] = useState(true);
+  const [assistantWidth, setAssistantWidth] = useState(380);
+  const [assistantResizing, setAssistantResizing] = useState(false);
+  const layoutRef = useRef<HTMLDivElement>(null);
   const [assistantChatHistory, setAssistantChatHistory] = useState<AssistantChatMessage[]>([
     { role: 'ai', content: '你好！我是本题的 AI 辅导助手。你可以针对当前这道习题的题目、解答或批改结果提问，我会结合识别与批改内容回答。', timestamp: new Date() }
   ]);
@@ -152,6 +155,36 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
       document.body.style.userSelect = '';
     };
   }, [isResizing, splitRatio]);
+
+  const handleAssistantResizerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setAssistantResizing(true);
+  }, []);
+
+  useEffect(() => {
+    if (!assistantResizing) return;
+    const layout = layoutRef.current;
+    if (!layout) return;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      const rect = layout.getBoundingClientRect();
+      const right = rect.right;
+      const width = right - ev.clientX;
+      setAssistantWidth(Math.min(600, Math.max(280, width)));
+    };
+    const onMouseUp = () => setAssistantResizing(false);
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [assistantResizing]);
 
   useEffect(() => {
     assistantChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -618,7 +651,7 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
 
   return (
       <div className="practice-detail-fullpage main-layout light">
-      <div className="practice-detail-layout">
+      <div ref={layoutRef} className="practice-detail-layout">
         <div className="practice-detail-main">
       {/* 顶部导航栏 */}
       <div className="detail-navbar">
@@ -1039,7 +1072,18 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
           </button>
         )}
         {assistantOpen && (
-          <div className="practice-assistant-sidebar">
+          <>
+            <div
+              className={`practice-assistant-resizer ${assistantResizing ? 'practice-assistant-resizer-active' : ''}`}
+              onMouseDown={handleAssistantResizerMouseDown}
+              title="拖拽调整侧边栏宽度"
+            >
+              <span className="practice-assistant-resizer-handle" />
+            </div>
+            <div
+              className="practice-assistant-sidebar"
+              style={{ width: assistantWidth }}
+            >
             <div className="practice-assistant-header">
               <span className="practice-assistant-title">
                 <span className="practice-assistant-title-icon"><AssistantIcons.Sparkles /></span>
@@ -1106,7 +1150,8 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
                 <AssistantIcons.Send />
               </button>
             </div>
-          </div>
+            </div>
+          </>
         )}
       </div>
 
