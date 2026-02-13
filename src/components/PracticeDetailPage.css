@@ -16,6 +16,317 @@
   background: #0f172a;
 }
 
+/* 主布局：左侧主内容 + 右侧可收缩 AI 辅导助手 */
+.practice-detail-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.practice-detail-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* 收起状态下的展开按钮 */
+.practice-assistant-toggle-collapsed {
+  flex-shrink: 0;
+  width: 36px;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 2px;
+  padding: 12px 6px;
+  border: none;
+  border-left: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.practice-assistant-toggle-collapsed:hover {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.practice-assistant-toggle-text {
+  transform: rotate(-180deg);
+  display: inline-block;
+}
+
+.practice-assistant-toggle-collapsed svg {
+  flex-shrink: 0;
+  transform: rotate(-90deg);
+}
+
+/* AI 辅导助手侧边栏 */
+.practice-assistant-sidebar {
+  width: 380px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-left: 1px solid #e2e8f0;
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.06);
+  z-index: 5;
+}
+
+.main-layout.dark .practice-assistant-sidebar {
+  background: #1e293b;
+  border-left-color: #374151;
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.2);
+}
+
+.practice-assistant-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.main-layout.dark .practice-assistant-header {
+  background: #0f172a;
+  border-bottom-color: #374151;
+}
+
+.practice-assistant-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.main-layout.dark .practice-assistant-title {
+  color: #f1f5f9;
+}
+
+.practice-assistant-title-icon {
+  color: #0ea5e9;
+}
+
+.practice-assistant-close {
+  padding: 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.practice-assistant-close:hover {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.main-layout.dark .practice-assistant-close {
+  color: #94a3b8;
+}
+
+.main-layout.dark .practice-assistant-close:hover {
+  background: #374151;
+  color: #e2e8f0;
+}
+
+.practice-assistant-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f8fafc;
+}
+
+.main-layout.dark .practice-assistant-messages {
+  background: #0f172a;
+}
+
+.practice-assistant-msg {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.practice-assistant-msg-user {
+  flex-direction: row-reverse;
+}
+
+.practice-assistant-msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.practice-assistant-msg-avatar-ai {
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #0ea5e9;
+}
+
+.main-layout.dark .practice-assistant-msg-avatar-ai {
+  background: #1e293b;
+  border-color: #374151;
+  color: #38bdf8;
+}
+
+.practice-assistant-msg-avatar-user {
+  background: #0ea5e9;
+  border: 1px solid #0ea5e9;
+  color: white;
+}
+
+.practice-assistant-msg-bubble {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.practice-assistant-msg-bubble-ai {
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  border-top-left-radius: 4px;
+}
+
+.main-layout.dark .practice-assistant-msg-bubble-ai {
+  background: #1e293b;
+  border-color: #374151;
+  color: #e2e8f0;
+}
+
+.practice-assistant-msg-bubble-user {
+  background: #0ea5e9;
+  color: white;
+  border-top-right-radius: 4px;
+}
+
+.practice-assistant-msg-content {
+  word-break: break-word;
+}
+
+.practice-assistant-msg-content-plain {
+  white-space: pre-wrap;
+}
+
+.practice-assistant-typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.practice-assistant-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #94a3b8;
+  animation: practice-assistant-bounce 1.4s ease-in-out infinite both;
+}
+
+.practice-assistant-typing span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.practice-assistant-typing span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes practice-assistant-bounce {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.6;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.practice-assistant-input-wrap {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #e2e8f0;
+  background: white;
+}
+
+.main-layout.dark .practice-assistant-input-wrap {
+  background: #1e293b;
+  border-top-color: #374151;
+}
+
+.practice-assistant-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #1e293b;
+  background: #f8fafc;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.practice-assistant-input:focus {
+  border-color: #0ea5e9;
+}
+
+.practice-assistant-input::placeholder {
+  color: #94a3b8;
+}
+
+.main-layout.dark .practice-assistant-input {
+  background: #0f172a;
+  border-color: #374151;
+  color: #e2e8f0;
+}
+
+.main-layout.dark .practice-assistant-input:focus {
+  border-color: #38bdf8;
+}
+
+.practice-assistant-send {
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: #0ea5e9;
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.practice-assistant-send:hover:not(:disabled) {
+  background: #0284c7;
+}
+
+.practice-assistant-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* 顶部导航栏 */
 .detail-navbar {
   display: flex;
@@ -153,15 +464,78 @@
   transform: scale(1.05);
 }
 
-/* 主内容区域 - 左右分栏 */
+/* 主内容区域 - 上下分栏（分界线可拖拽） */
 .detail-content {
   display: flex;
   flex: 1;
-  gap: 24px;
   padding: 24px;
   overflow: hidden;
 }
 
+.detail-content-vertical {
+  flex-direction: column;
+  gap: 0;
+  padding: 24px;
+}
+
+.top-panel,
+.bottom-panel {
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.top-panel {
+  min-height: 200px;
+  overflow: auto;
+}
+
+.bottom-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* 可拖拽分界线 */
+.detail-resizer {
+  flex-shrink: 0;
+  height: 10px;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.detail-resizer:hover,
+.detail-resizer-active {
+  background: #e2e8f0;
+}
+
+.detail-resizer-handle {
+  display: block;
+  width: 48px;
+  height: 4px;
+  border-radius: 2px;
+  background: #94a3b8;
+  pointer-events: none;
+}
+
+.detail-resizer:hover .detail-resizer-handle,
+.detail-resizer-active .detail-resizer-handle {
+  background: #64748b;
+}
+
+/* 兼容旧类名（若仍有引用） */
 .left-panel,
 .right-panel {
   flex: 1;
@@ -1400,7 +1774,9 @@
   }
   
   .left-panel,
-  .right-panel {
+  .right-panel,
+  .top-panel,
+  .bottom-panel {
     max-width: 100%;
   }
   
@@ -1474,7 +1850,9 @@
   }
 
   .left-panel,
-  .right-panel {
+  .right-panel,
+  .top-panel,
+  .bottom-panel {
     background: white;
     border-color: #e5e7eb;
   }
@@ -1658,7 +2036,9 @@
   }
 
   .left-panel,
-  .right-panel {
+  .right-panel,
+  .top-panel,
+  .bottom-panel {
     background: #1e293b;
     border-color: #374151;
   }
@@ -1670,6 +2050,26 @@
 
   .panel-header h3 {
     color: #f1f5f9;
+  }
+
+  .detail-resizer {
+    background: #334155;
+    border-top-color: #475569;
+    border-bottom-color: #475569;
+  }
+
+  .detail-resizer:hover,
+  .detail-resizer-active.detail-resizer {
+    background: #475569;
+  }
+
+  .detail-resizer-handle {
+    background: #64748b;
+  }
+
+  .detail-resizer:hover .detail-resizer-handle,
+  .detail-resizer-active .detail-resizer-handle {
+    background: #94a3b8;
   }
 
   .file-meta,

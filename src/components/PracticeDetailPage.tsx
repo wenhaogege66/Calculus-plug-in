@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { API_BASE_URL, type AuthState } from '../common/config/supabase';
 import { MathPixMarkdownRenderer } from './MathPixMarkdownRenderer';
 import { ErrorHighlightedOCRText, type DetailedError } from './ErrorHighlightedOCRText';
@@ -66,6 +66,21 @@ interface SimilarQuestionsParams {
   questionCount: number;
 }
 
+interface AssistantChatMessage {
+  role: 'user' | 'ai';
+  content: string;
+  timestamp?: Date;
+}
+
+// 侧边栏用的小图标
+const AssistantIcons = {
+  Sparkles: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" /></svg>,
+  Bot: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" /></svg>,
+  Send: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 3 3 9-3 9 19-9Z" /><path d="M6 12h16" /></svg>,
+  ChevronLeft: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>,
+  ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>,
+};
+
 export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({ 
   sessionId, 
   authState, 
@@ -92,6 +107,108 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
   const [questionAnswers, setQuestionAnswers] = useState<{[key: number]: string}>({});
   const [questionRatings, setQuestionRatings] = useState<{[key: number]: number}>({});
   const [activeErrorIndex, setActiveErrorIndex] = useState<number | null>(null);
+
+  // AI 辅导助手侧边栏
+  const [assistantOpen, setAssistantOpen] = useState(true);
+  const [assistantChatHistory, setAssistantChatHistory] = useState<AssistantChatMessage[]>([
+    { role: 'ai', content: '你好！我是本题的 AI 辅导助手。你可以针对当前这道习题的题目、解答或批改结果提问，我会结合识别与批改内容回答。', timestamp: new Date() }
+  ]);
+  const [assistantChatMessage, setAssistantChatMessage] = useState('');
+  const [assistantThinking, setAssistantThinking] = useState(false);
+  const assistantChatEndRef = useRef<HTMLDivElement>(null);
+
+  // 上下布局分界线比例（0.2~0.8），默认 0.45 即上面 45% 作业识别、下面 55% AI 批改
+  const [splitRatio, setSplitRatio] = useState(0.45);
+  const [isResizing, setIsResizing] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const handleResizerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+    const container = contentRef.current;
+    if (!container) return;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      const rect = container.getBoundingClientRect();
+      const h = rect.height;
+      if (h <= 0) return;
+      const ratio = (ev.clientY - rect.top) / h;
+      setSplitRatio(Math.min(0.8, Math.max(0.2, ratio)));
+    };
+    const onMouseUp = () => setIsResizing(false);
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing, splitRatio]);
+
+  useEffect(() => {
+    assistantChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [assistantChatHistory]);
+
+  const handleAssistantSendMessage = async () => {
+    if (!assistantChatMessage.trim() || assistantThinking || !authState.token) return;
+    const userMessage = assistantChatMessage.trim();
+    setAssistantChatMessage('');
+    setAssistantChatHistory(prev => [...prev, { role: 'user', content: userMessage, timestamp: new Date() }]);
+    setAssistantThinking(true);
+    setAssistantChatHistory(prev => [...prev, { role: 'ai', content: '正在思考中...', timestamp: new Date() }]);
+    try {
+      const response = await fetch(`${API_BASE_URL}/ai/follow-up`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authState.token}`
+        },
+        body: JSON.stringify({
+          submissionId: parseInt(sessionId, 10),
+          question: userMessage
+        })
+      });
+      setAssistantChatHistory(prev => prev.slice(0, -1));
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setAssistantChatHistory(prev => [...prev, {
+            role: 'ai',
+            content: result.data.answer || '抱歉，我无法回答这个问题。',
+            timestamp: new Date()
+          }]);
+        } else {
+          setAssistantChatHistory(prev => [...prev, {
+            role: 'ai',
+            content: result.error || '当前 AI 服务暂时不可用，请稍后再试。',
+            timestamp: new Date()
+          }]);
+        }
+      } else {
+        const err = await response.json().catch(() => ({}));
+        setAssistantChatHistory(prev => [...prev, {
+          role: 'ai',
+          content: (err as any).error || '请求失败，请稍后重试。',
+          timestamp: new Date()
+        }]);
+      }
+    } catch {
+      setAssistantChatHistory(prev => {
+        const next = prev.slice(0, -1);
+        return [...next, { role: 'ai', content: '网络异常，请检查网络后重试。', timestamp: new Date() }];
+      });
+    } finally {
+      setAssistantThinking(false);
+    }
+  };
 
   // 自动刷新 - 处理中状态每5秒刷新一次
   useEffect(() => {
@@ -501,6 +618,8 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
 
   return (
       <div className="practice-detail-fullpage main-layout light">
+      <div className="practice-detail-layout">
+        <div className="practice-detail-main">
       {/* 顶部导航栏 */}
       <div className="detail-navbar">
         <div className="navbar-left">
@@ -539,10 +658,13 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
         </div>
       </div>
 
-      {/* 主内容区域 - 左右分栏 */}
-      <div className="detail-content">
-        {/* 左侧：识别结果 */}
-        <div className="left-panel">
+      {/* 主内容区域 - 上下分栏，分界线可拖拽 */}
+      <div ref={contentRef} className="detail-content detail-content-vertical">
+        {/* 上方：作业识别 */}
+        <div
+          className="top-panel"
+          style={{ height: `${splitRatio * 100}%`, minHeight: 200 }}
+        >
           <div className="panel-header">
             <h3>📋 作业识别</h3>
             <div className="file-meta">
@@ -601,8 +723,16 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
           </div>
         </div>
 
-        {/* 右侧：AI批改结果 */}
-        <div className="right-panel">
+        <div
+          className={`detail-resizer ${isResizing ? 'detail-resizer-active' : ''}`}
+          onMouseDown={handleResizerMouseDown}
+          title="拖拽调整上下区域高度"
+        >
+          <span className="detail-resizer-handle" />
+        </div>
+
+        {/* 下方：AI批改解答 */}
+        <div className="bottom-panel">
           <div className="panel-header">
             <h3>🤖 AI批改解答</h3>
             {session.gradingResult && (
@@ -894,6 +1024,90 @@ export const PracticeDetailPage: React.FC<PracticeDetailProps> = ({
             )}
           </div>
         </div>
+      </div>
+        </div>
+
+        {!assistantOpen && (
+          <button
+            type="button"
+            className="practice-assistant-toggle practice-assistant-toggle-collapsed"
+            onClick={() => setAssistantOpen(true)}
+            title="展开 AI 辅导助手"
+          >
+            <span className="practice-assistant-toggle-text">AI辅导</span>
+            <AssistantIcons.ChevronLeft />
+          </button>
+        )}
+        {assistantOpen && (
+          <div className="practice-assistant-sidebar">
+            <div className="practice-assistant-header">
+              <span className="practice-assistant-title">
+                <span className="practice-assistant-title-icon"><AssistantIcons.Sparkles /></span>
+                AI辅导助手
+              </span>
+              <button
+                type="button"
+                className="practice-assistant-close"
+                onClick={() => setAssistantOpen(false)}
+                title="收起侧边栏"
+              >
+                <AssistantIcons.ChevronRight />
+              </button>
+            </div>
+            <div className="practice-assistant-messages">
+              {assistantChatHistory.map((msg, idx) => (
+                <div key={idx} className={`practice-assistant-msg ${msg.role === 'user' ? 'practice-assistant-msg-user' : ''}`}>
+                  <div className={`practice-assistant-msg-avatar ${msg.role === 'ai' ? 'practice-assistant-msg-avatar-ai' : 'practice-assistant-msg-avatar-user'}`}>
+                    {msg.role === 'ai' ? <AssistantIcons.Bot /> : <span>我</span>}
+                  </div>
+                  <div className={`practice-assistant-msg-bubble ${msg.role === 'ai' ? 'practice-assistant-msg-bubble-ai' : 'practice-assistant-msg-bubble-user'}`}>
+                    {msg.role === 'ai' && (msg.content.includes('$') || msg.content.includes('\\(')) ? (
+                      <MathPixMarkdownRenderer content={msg.content} className="practice-assistant-msg-content" />
+                    ) : (
+                      <div className="practice-assistant-msg-content practice-assistant-msg-content-plain">{msg.content}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {assistantThinking && (
+                <div className="practice-assistant-msg practice-assistant-msg-ai">
+                  <div className="practice-assistant-msg-avatar practice-assistant-msg-avatar-ai"><AssistantIcons.Bot /></div>
+                  <div className="practice-assistant-msg-bubble practice-assistant-msg-bubble-ai">
+                    <div className="practice-assistant-typing">
+                      <span /><span /><span />
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={assistantChatEndRef} />
+            </div>
+            <div className="practice-assistant-input-wrap">
+              <input
+                type="text"
+                value={assistantChatMessage}
+                onChange={(e) => setAssistantChatMessage(e.target.value)}
+                placeholder="针对本题提问..."
+                className="practice-assistant-input"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && assistantChatMessage.trim() && !assistantThinking) {
+                    e.preventDefault();
+                    handleAssistantSendMessage();
+                  }
+                }}
+                disabled={assistantThinking}
+              />
+              <button
+                type="button"
+                className="practice-assistant-send"
+                onClick={handleAssistantSendMessage}
+                disabled={assistantThinking || !assistantChatMessage.trim()}
+                title="发送"
+              >
+                <AssistantIcons.Send />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 全页面底部进度指示器 - 处理中显示 */}

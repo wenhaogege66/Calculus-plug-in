@@ -23,6 +23,12 @@ interface Assignment {
     updatedAt: string;
 }
 
+interface ChatMessage {
+    role: 'user' | 'ai';
+    content: string;
+    timestamp?: Date;
+}
+
 interface AssignmentsPageProps {
     authState: AuthState;
     onPageChange?: (page: string) => void;
@@ -34,15 +40,24 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
     const [assignments, setAssignments] = useState<Assignment[]>([]);
     const [loading, setLoading] = useState(true);
     const [chatMessage, setChatMessage] = useState('');
-    const [chatHistory, setChatHistory] = useState([
-        { role: 'ai', content: '同学你好！我是你的课程AI助教。关于刚才上传的作业，或者其他课程问题，随时问我。' }
+    const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
+        { role: 'ai', content: '同学你好！我是你的课程AI助教。关于刚才上传的作业，或者其他课程问题，随时问我。', timestamp: new Date() }
     ]);
+    const [isThinking, setIsThinking] = useState(false);
+    const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
+    const [selectedSubmissionId, setSelectedSubmissionId] = useState<number | null>(null);
+    const chatEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // 加载数据
     useEffect(() => {
         loadAssignments();
     }, []);
+
+    // 自动滚动到聊天底部
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [chatHistory]);
 
     const loadAssignments = async () => {
         if (!authState.token) return;
@@ -108,6 +123,145 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
         }
     };
 
+    // 获取作业的提交记录
+    const loadSubmissionForAssignment = async (assignmentId: number) => {
+        if (!authState.token) return null;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/submissions?assignmentId=${assignmentId}`, {
+                headers: { 'Authorization': `Bearer ${authState.token}` }
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success && result.data?.submissions && result.data.submissions.length > 0) {
+                    // 返回最新的提交记录ID
+                    return result.data.submissions[0].id;
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load submission:', error);
+        }
+        return null;
+    };
+
+    // 处理作业选择
+    const handleAssignmentSelect = async (assignmentId: number) => {
+        if (selectedAssignmentId === assignmentId) {
+            // 如果点击的是已选中的作业，取消选择
+            setSelectedAssignmentId(null);
+            setSelectedSubmissionId(null);
+            return;
+        }
+
+        setSelectedAssignmentId(assignmentId);
+
+        // 获取该作业的提交记录
+        const submissionId = await loadSubmissionForAssignment(assignmentId);
+        setSelectedSubmissionId(submissionId);
+
+        // 更新欢迎消息
+        const assignment = assignments.find(a => a.id === assignmentId);
+        if (assignment && submissionId) {
+            setChatHistory([{
+                role: 'ai',
+                content: `你好！我现在可以帮你解答关于"${assignment.title}"的问题。你可以问我关于这道作业的任何问题。`,
+                timestamp: new Date()
+            }]);
+        } else if (assignment) {
+            setChatHistory([{
+                role: 'ai',
+                content: `你好！你选择了"${assignment.title}"，但我还没有找到你的提交记录。你可以先上传作业，然后再来问我问题。`,
+                timestamp: new Date()
+            }]);
+        }
+    };
+
+    // 处理AI聊天
+    const handleSendMessage = async () => {
+        if (!chatMessage.trim() || isThinking || !authState.token) return;
+
+        const userMessage = chatMessage.trim();
+        setChatMessage('');
+
+        // 添加用户消息到历史
+        setChatHistory(prev => [...prev, {
+            role: 'user',
+            content: userMessage,
+            timestamp: new Date()
+        }]);
+
+        // 显示思考状态
+        setIsThinking(true);
+        setChatHistory(prev => [...prev, {
+            role: 'ai',
+            content: '正在思考中...',
+            timestamp: new Date()
+        }]);
+
+        try {
+            // 使用选中的提交ID，如果没有则使用通用搜索模式（0）
+            const submissionId = selectedSubmissionId || 0;
+
+            const response = await fetch(`${API_BASE_URL}/ai/follow-up`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authState.token}`
+                },
+                body: JSON.stringify({
+                    submissionId: submissionId,
+                    question: userMessage
+                })
+            });
+
+            // 移除"正在思考中..."消息
+            setChatHistory(prev => prev.slice(0, -1));
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success && result.data) {
+                    // 添加AI回答
+                    setChatHistory(prev => [...prev, {
+                        role: 'ai',
+                        content: result.data.answer || '抱歉，我无法回答这个问题。',
+                        timestamp: new Date()
+                    }]);
+                } else {
+                    // API返回失败
+                    setChatHistory(prev => [...prev, {
+                        role: 'ai',
+                        content: result.error || '抱歉，当前AI服务暂时不可用，请稍后再试。',
+                        timestamp: new Date()
+                    }]);
+                    showError(result.error || 'AI服务暂时不可用');
+                }
+            } else {
+                // HTTP错误
+                const errorResult = await response.json().catch(() => ({}));
+                setChatHistory(prev => [...prev, {
+                    role: 'ai',
+                    content: errorResult.error || '抱歉，网络请求失败，请稍后重试。',
+                    timestamp: new Date()
+                }]);
+                showError(errorResult.error || '请求失败');
+            }
+        } catch (error) {
+            // 网络错误
+            setChatHistory(prev => {
+                const newHistory = prev.slice(0, -1); // 移除"正在思考中..."
+                return [...newHistory, {
+                    role: 'ai',
+                    content: '抱歉，网络连接出现问题，请检查网络后重试。',
+                    timestamp: new Date()
+                }];
+            });
+            showError('网络连接失败');
+        } finally {
+            setIsThinking(false);
+        }
+    };
+
     return (
         <div className="flex h-full w-full bg-[#F8FAFC]">
             {/* 左侧：作业列表与上传 (Flex-1) */}
@@ -147,7 +301,14 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
                             <div className="text-center py-8 text-slate-400">暂无作业记录</div>
                         ) : (
                             assignments.map(assignment => (
-                                <div key={assignment.id} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:shadow-md hover:border-primary-200 transition-all cursor-pointer group flex justify-between items-center">
+                                <div
+                                    key={assignment.id}
+                                    className={`bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group flex justify-between items-center ${selectedAssignmentId === assignment.id
+                                        ? 'border-primary-400 bg-primary-50/30'
+                                        : 'border-slate-200 hover:border-primary-200'
+                                        }`}
+                                    onClick={() => handleAssignmentSelect(assignment.id)}
+                                >
                                     <div className="flex items-center gap-4">
                                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center border ${assignment.status === 'submitted' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-slate-50 text-slate-400 border-slate-100'
                                             }`}>
@@ -183,22 +344,61 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
 
                 <div className="flex-1 bg-slate-50 p-5 space-y-4 overflow-y-auto">
                     {chatHistory.map((msg, idx) => (
-                        <div key={idx} className="flex gap-3">
+                        <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm border ${msg.role === 'ai' ? 'bg-white border-slate-200 text-primary-600' : 'bg-primary-600 border-primary-600 text-white'
                                 }`}>
-                                {msg.role === 'ai' ? <Icons.Bot /> : <span className="text-xs">我</span>}
+                                {msg.role === 'ai' ? <Icons.Bot /> : <span className="text-xs font-bold">我</span>}
                             </div>
                             <div className={`p-3 rounded-2xl text-sm shadow-sm max-w-[85%] ${msg.role === 'ai'
-                                    ? 'bg-white border border-slate-200 text-slate-600 rounded-tl-none'
-                                    : 'bg-primary-600 text-white rounded-tr-none'
+                                ? 'bg-white border border-slate-200 text-slate-600 rounded-tl-none'
+                                : 'bg-primary-600 text-white rounded-tr-none'
                                 }`}>
-                                {msg.content}
+                                {msg.role === 'ai' && msg.content.includes('$') ? (
+                                    <MathPixMarkdownRenderer
+                                        content={msg.content}
+                                        className="text-sm"
+                                    />
+                                ) : (
+                                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                                )}
                             </div>
                         </div>
                     ))}
+                    {isThinking && (
+                        <div className="flex gap-3">
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm border bg-white border-slate-200 text-primary-600">
+                                <Icons.Bot />
+                            </div>
+                            <div className="p-3 rounded-2xl rounded-tl-none text-sm shadow-sm bg-white border border-slate-200 text-slate-600">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 bg-primary-600 rounded-full animate-bounce"></div>
+                                    <div className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                                    <div className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    <div ref={chatEndRef} />
                 </div>
 
                 <div className="p-4 bg-white border-t border-slate-100">
+                    {selectedAssignmentId && (
+                        <div className="mb-2 px-3 py-1.5 bg-primary-50 border border-primary-200 rounded-lg flex items-center justify-between">
+                            <span className="text-xs text-primary-700 font-medium">
+                                正在讨论: {assignments.find(a => a.id === selectedAssignmentId)?.title}
+                                {!selectedSubmissionId && ' (未找到提交记录)'}
+                            </span>
+                            <button
+                                onClick={() => {
+                                    setSelectedAssignmentId(null);
+                                    setSelectedSubmissionId(null);
+                                }}
+                                className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                            >
+                                取消
+                            </button>
+                        </div>
+                    )}
                     <div className="flex gap-2 bg-slate-100 p-2 rounded-xl focus-within:ring-1 focus-within:ring-primary-200 transition-all">
                         <input
                             type="text"
@@ -207,16 +407,21 @@ export const AssignmentsPage: React.FC<AssignmentsPageProps> = ({ authState }) =
                             placeholder="输入您的问题..."
                             className="flex-1 bg-transparent border-none text-sm focus:outline-none px-2 text-slate-700 placeholder:text-slate-400"
                             onKeyDown={(e) => {
-                                if (e.key === 'Enter' && chatMessage.trim()) {
-                                    setChatHistory(prev => [...prev, { role: 'user', content: chatMessage }]);
-                                    setChatMessage('');
-                                    setTimeout(() => {
-                                        setChatHistory(prev => [...prev, { role: 'ai', content: '我已收到你的问题，正在思考中...' }]);
-                                    }, 1000);
+                                if (e.key === 'Enter' && !e.shiftKey && chatMessage.trim() && !isThinking) {
+                                    e.preventDefault();
+                                    handleSendMessage();
                                 }
                             }}
+                            disabled={isThinking}
                         />
-                        <button className="p-2 text-primary-600 hover:bg-white rounded-lg transition-colors">
+                        <button
+                            className={`p-2 rounded-lg transition-colors ${isThinking || !chatMessage.trim()
+                                ? 'text-slate-400 cursor-not-allowed'
+                                : 'text-primary-600 hover:bg-white'
+                                }`}
+                            onClick={handleSendMessage}
+                            disabled={isThinking || !chatMessage.trim()}
+                        >
                             <Icons.Send />
                         </button>
                     </div>

@@ -83,11 +83,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                     </div>
                 );
             case 'practice':
-                return <PracticePage authState={authState} />;
+                return <PracticePage authState={authState} onPageChange={handlePageChange} params={pageParams} />;
             case 'classrooms':
                 return <ClassroomsPage authState={authState} onPageChange={handlePageChange} />;
             case 'mistakes':
-                return <MistakesPage authState={authState} />;
+                return <MistakesPage authState={authState} onPageChange={handlePageChange} />;
             case 'knowledge':
                 return <KnowledgeGraph authState={authState} isDarkMode={isDarkMode} />;
             case 'settings':
