@@ -530,35 +530,36 @@ const mistakeRoutes: FastifyPluginAsync = async (fastify) => {
                 icon: true
               }
             },
-            submission: {
-              include: {
-                fileUpload: {
-                  select: {
-                    id: true,
-                    originalName: true,
-                    createdAt: true
-                  }
-                },
-                deepseekResults: {
-                  take: 1,
-                  orderBy: { createdAt: 'desc' },
-                  select: {
-                    score: true,
-                    feedback: true,
-                    errors: true,
-                    suggestions: true
-                  }
-                },
-                mathpixResults: {
-                  take: 1,
-                  orderBy: { createdAt: 'desc' },
-                  select: {
-                    recognizedText: true,
-                    confidence: true
+                submission: {
+                include: {
+                  fileUpload: {
+                    select: {
+                      id: true,
+                      originalName: true,
+                      createdAt: true
+                    }
+                  },
+                  deepseekResults: {
+                    take: 1,
+                    orderBy: { createdAt: 'desc' },
+                    select: {
+                      score: true,
+                      maxScore: true,
+                      feedback: true,
+                      errors: true
+                    }
+                  },
+                  mathpixResults: {
+                    take: 1,
+                    orderBy: { createdAt: 'desc' },
+                    select: {
+                      recognizedText: true,
+                      mathLatex: true,
+                      confidence: true
+                    }
                   }
                 }
               }
-            }
           }
         }),
         prisma.mistakeItem.count({ where })

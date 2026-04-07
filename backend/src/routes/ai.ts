@@ -624,36 +624,29 @@ function buildFollowUpPrompt(
 2. 保持简短，1-2句话即可`;
   }
 
-  // 对于数学相关问题，提供完整上下文
-  const questionSection = originalQuestion ? `
-原题目内容：
-${originalQuestion}
-` : '';
+  // 截断过长上下文，避免 prompt 过长导致回答趋同、且易超 token
+  const maxLen = { question: 350, answer: 450, feedback: 400, suggestions: 150 };
+  const truncate = (s: string, max: number) => {
+    const t = (s || '').trim();
+    if (t.length <= max) return t;
+    return t.slice(0, max) + '…（后文省略）';
+  };
+  const shortQuestion = originalQuestion ? truncate(originalQuestion, maxLen.question) : '';
+  const shortAnswer = truncate(studentAnswer, maxLen.answer);
+  const shortFeedback = truncate(previousFeedback, maxLen.feedback);
+  const shortSuggestions = (previousSuggestions || '').trim().length > 0
+    ? truncate(previousSuggestions, maxLen.suggestions)
+    : '';
+
+  const questionSection = shortQuestion ? `\n【题目摘要】\n${shortQuestion}\n` : '';
+  const suggestionsSection = shortSuggestions ? `\n【改进建议摘要】\n${shortSuggestions}\n` : '';
 
   return `
-你是一位资深的微积分教师，学生基于之前的批改结果向你提出了进一步的问题。请结合相关信息给出清晰、有帮助的回答。
+你是微积分辅导老师，用简短、引导式回答学生问题。上下文已做摘要，请紧扣学生当前问题作答，不要复述大段材料。
 
-${questionSection}
-学生的解答：
-${studentAnswer}
+${questionSection}【学生解答摘要】\n${shortAnswer}\n【批改反馈摘要】\n${shortFeedback}${suggestionsSection}【学生当前问题】\n${userQuestion}
 
-之前的批改反馈：
-${previousFeedback}
-
-之前的改进建议：
-${previousSuggestions}
-
-学生的问题：
-${userQuestion}
-
-请回答学生的问题，要求：
-1. 回答要准确、清晰、有针对性
-2. 如果问题与题目相关，结合具体的数学概念和公式进行解释
-3. 如果问题比较一般化，可以适当简化回答
-4. 如果涉及计算错误，请给出正确的步骤
-5. 语言要通俗易懂，适合学生理解
-
-请直接回答问题，不需要特殊格式。
+回答要求：分步引导、先给思路再给细节、语气亲切；可结尾一句话小结。直接输出回答，不必加标题或序号。
 `;
 }
 

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作业批改详情 - AI微积分助教</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+        
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #CBD5E1; }
+
+        .fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Latex 模拟样式 */
+        .latex-block {
+            background-color: #F8FAFC;
+            border-left: 3px solid #0EA5E9;
+            color: #334155;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { 50: '#F0F9FF', 100: '#E0F2FE', 500: '#0EA5E9', 600: '#0284C7', 700: '#0369A1' },
+                        slate: { 850: '#1E293B' }
+                    },
+                    boxShadow: {
+                        'figma': '0 2px 5px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-[#F1F5F9] text-slate-800 h-screen flex overflow-hidden selection:bg-primary-100 selection:text-primary-700">
+
+    <!-- 侧边栏 (保持导航一致性，折叠状态示意) -->
+    <aside class="w-[60px] lg:w-[240px] bg-white border-r border-slate-200 flex flex-col z-20 flex-shrink-0 transition-all duration-300">
+        <div class="h-16 flex items-center px-4 lg:px-6 border-b border-slate-100 overflow-hidden">
+            <div class="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex-shrink-0 flex items-center justify-center shadow-lg shadow-primary-500/20 mr-3">
+                <i data-lucide="sigma" class="text-white w-5 h-5"></i>
+            </div>
+            <span class="text-lg font-bold text-slate-900 tracking-tight whitespace-nowrap hidden lg:block">AI 微积分助教</span>
+        </div>
+        <nav class="flex-1 px-2 lg:px-3 py-6 space-y-1">
+            <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 transition-colors">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                <span class="hidden lg:block">班级管理</span>
+            </button>
+            <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-primary-50 text-primary-700 transition-colors">
+                <i data-lucide="folder-check" class="w-5 h-5"></i>
+                <span class="hidden lg:block">课程作业管理</span>
+            </button>
+            <!-- 其他导航省略 -->
+        </nav>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 flex overflow-hidden relative">
+        
+        <!-- 中央滚动区域：识别结果 + 批改报告 -->
+        <div class="flex-1 h-full overflow-y-auto p-4 lg:p-8 scroll-smooth" id="main-content">
+            
+            <!-- 面包屑导航 -->
+            <div class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                <button class="hover:text-primary-600 flex items-center gap-1">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i> 返回列表
+                </button>
+                <span>/</span>
+                <span>傅里叶级数展开习题</span>
+                <span>/</span>
+                <span class="text-slate-800 font-medium">批改详情</span>
+            </div>
+
+            <!-- 模块一：作业识别 (Top) -->
+            <section class="bg-white rounded-2xl border border-slate-200 shadow-figma mb-6 fade-in">
+                <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-2xl">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="file-scan" class="w-5 h-5 text-primary-600"></i>
+                        <h2 class="font-bold text-slate-800">作业识别结果</h2>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs text-slate-400">上传时间: 2025/08/13 10:02</span>
+                        <div class="bg-blue-50 text-primary-700 text-xs px-2 py-1 rounded border border-blue-100 font-medium flex items-center gap-1">
+                            <i data-lucide="check-circle-2" class="w-3 h-3"></i> 识别置信度: 98.2%
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="p-6">
+                    <div class="flex gap-6">
+                        <!-- 左侧：模拟缩略图 -->
+                        <div class="w-32 h-40 bg-slate-100 rounded-lg border border-slate-200 flex-shrink-0 flex items-center justify-center text-slate-400">
+                            <i data-lucide="image" class="w-8 h-8"></i>
+                            <span class="text-xs block mt-2">原始图片</span>
+                        </div>
+                        
+                        <!-- 右侧：识别文本 -->
+                        <div class="flex-1 font-mono text-sm leading-relaxed overflow-x-auto">
+                            <div class="latex-block p-4 rounded-lg">
+                                <p class="text-slate-500 mb-2">// 识别到的 LaTeX 源码</p>
+                                <p>1. 将下列函数展开为傅里叶级数：</p>
+                                <p class="my-2">$ f(x) = \left\{ \begin{array}{ll} A, & 0 < x < l, \\ 0, & l < x < 2l \end{array} \right. $</p>
+                                <p>其中 A 为常数。</p>
+                                <br>
+                                <p>解：由于 $f(x)$ 是以 $2l$ 为周期的函数...</p>
+                                <p class="my-2">$ a_n = \frac{1}{l} \int_{0}^{2l} f(x) \cos \frac{n \pi x}{l} dx $</p>
+                                <p class="my-2">$ = \frac{1}{l} \int_{0}^{l} A \cos \frac{n \pi x}{l} dx + \int_{l}^{2l} 0 \cdot dx $</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 模块二：AI 批改解答 (Bottom) -->
+            <section class="bg-white rounded-2xl border border-slate-200 shadow-figma fade-in" style="animation-delay: 0.1s;">
+                <!-- 头部：分数与统计 -->
+                <div class="px-6 py-5 border-b border-slate-100 flex flex-wrap justify-between items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="bot" class="w-6 h-6 text-indigo-600"></i>
+                        <h2 class="font-bold text-lg text-slate-800">AI 批改解答</h2>
+                    </div>
+                    
+                    <!-- 统计数据块 (参考图片红框) -->
+                    <div class="flex items-center border border-red-100 bg-red-50/50 rounded-lg px-4 py-2 gap-4">
+                        <div class="text-sm text-slate-600">
+                            题目数: <span class="font-bold text-slate-900">3</span>
+                        </div>
+                        <div class="w-px h-4 bg-red-200"></div>
+                        <div class="text-sm text-green-700">
+                            正确: <span class="font-bold">1</span>
+                        </div>
+                        <div class="w-px h-4 bg-red-200"></div>
+                        <div class="text-sm text-red-600">
+                            错误: <span class="font-bold">2</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-6 space-y-8">
+                    
+                    <!-- 1. 涉及知识点 -->
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2 mb-3">
+                            <i data-lucide="tags" class="w-4 h-4 text-purple-500"></i> 涉及知识点
+                        </h3>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="px-3 py-1 bg-purple-50 text-purple-600 text-xs font-medium rounded-full border border-purple-100">傅里叶级数</span>
+                            <span class="px-3 py-1 bg-purple-50 text-purple-600 text-xs font-medium rounded-full border border-purple-100">定积分的概念</span>
+                            <span class="px-3 py-1 bg-purple-50 text-purple-600 text-xs font-medium rounded-full border border-purple-100">周期函数</span>
+                        </div>
+                    </div>
+
+                    <!-- 2. AI 分析反馈 -->
+                    <div class="bg-blue-50/50 rounded-xl p-5 border border-blue-100">
+                        <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2 mb-2">
+                            <i data-lucide="sparkles" class="w-4 h-4 text-amber-500"></i> AI 分析反馈
+                        </h3>
+                        <p class="text-sm text-slate-600 leading-relaxed">
+                            学生对傅里叶级数的展开定义有一定理解，但在系数 $a_n$ 和 $b_n$ 的积分计算过程中存在混淆。特别是对于积分区间的拆分处理不够熟练。建议加强不定积分的基础运算练习，并复习奇偶函数的积分性质。
+                        </p>
+                    </div>
+
+                    <!-- 3. 错误详情 (参考图片红色区域) -->
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
+                            <i data-lucide="alert-circle" class="w-4 h-4 text-red-500"></i> 错误详情
+                        </h3>
+                        
+                        <!-- 错误卡片 -->
+                        <div class="bg-red-50 rounded-xl border border-red-100 p-5 mb-4">
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-red-200 text-red-800 text-[10px] px-2 py-0.5 rounded font-bold">严重</span>
+                                <span class="text-sm font-bold text-red-800">公式应用错误 - 系数计算</span>
+                            </div>
+                            
+                            <div class="bg-white/60 rounded-lg p-4 border border-red-100/50 mb-3 text-center">
+                                <p class="text-xs text-slate-500 mb-2">问题内容</p>
+                                <p class="font-mono text-sm text-slate-800">
+                                    $ a_n = \frac{2}{l} \int_{0}^{2l} f(x) \cos ... dx $
+                                </p>
+                            </div>
+                            
+                            <div class="flex gap-2">
+                                <div class="w-1 bg-red-400 rounded-full"></div>
+                                <p class="text-xs text-red-700 leading-relaxed">
+                                    <strong>AI 纠错：</strong> 在非奇偶函数的一般周期展开中，系数前应为 $1/l$ 而不是 $2/l$。只有当函数为偶函数且在对称区间展开时，才使用倍数公式。请重新检查课本第 142 页公式定义。
+                                </p>
+                            </div>
+                            
+                            <!-- 针对错误的快捷提问按钮 -->
+                            <div class="mt-4 flex justify-end">
+                                <button onclick="openChatWithQuery('为什么这里的系数是1/l而不是2/l？')" class="text-xs bg-white border border-red-200 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-1 shadow-sm">
+                                    <i data-lucide="message-circle" class="w-3 h-3"></i> 问问 AI 助教
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+        </div>
+
+        <!-- 侧边栏：AI 助手问答 (Right - Collapsible) -->
+        <div id="ai-sidebar" class="w-[340px] bg-white border-l border-slate-200 flex flex-col shadow-xl z-30 transition-all duration-300 transform translate-x-0 relative">
+            
+            <!-- 切换按钮 (收起时显示在外部) -->
+            <button onclick="toggleSidebar()" id="toggle-btn-closed" class="absolute -left-10 top-6 bg-white border border-slate-200 p-2 rounded-l-lg shadow-md text-primary-600 hidden hover:text-primary-700 z-50">
+                <i data-lucide="message-square" class="w-5 h-5"></i>
+            </button>
+
+            <!-- Header -->
+            <div class="px-4 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center">
+                        <i data-lucide="sparkles" class="w-3 h-3"></i>
+                    </div>
+                    <span class="font-bold text-slate-800 text-sm">AI 助教</span>
+                </div>
+                <button onclick="toggleSidebar()" class="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-100 transition-colors">
+                    <i data-lucide="panel-right-close" class="w-4 h-4"></i>
+                </button>
+            </div>
+            
+            <!-- Chat Area -->
+            <div class="flex-1 bg-slate-50 p-4 space-y-4 overflow-y-auto">
+                <!-- AI Welcome -->
+                <div class="flex gap-3">
+                    <div class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center flex-shrink-0 shadow-sm mt-1">
+                        <i data-lucide="bot" class="w-4 h-4 text-primary-600"></i>
+                    </div>
+                    <div class="space-y-1 max-w-[85%]">
+                        <span class="text-[10px] text-slate-400 ml-1">AI 助教 · 刚刚</span>
+                        <div class="bg-white border border-slate-200 p-3 rounded-2xl rounded-tl-none text-sm text-slate-600 shadow-sm">
+                            批改已完成！看起来你在 <span class="text-primary-600 font-medium">傅里叶系数</span> 的计算上遇到了一些困难。需要我为你详细推导一遍积分过程吗？
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Query (Example) -->
+                <div class="flex gap-3 flex-row-reverse">
+                    <div class="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0 text-white text-xs font-bold mt-1">我</div>
+                    <div class="space-y-1 max-w-[85%] text-right">
+                        <div class="bg-primary-600 text-white p-3 rounded-2xl rounded-tr-none text-sm shadow-sm text-left inline-block">
+                            能不能解释一下那个红色的错误？
+                        </div>
+                    </div>
+                </div>
+
+                 <!-- AI Reply -->
+                 <div class="flex gap-3">
+                    <div class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center flex-shrink-0 shadow-sm mt-1">
+                        <i data-lucide="bot" class="w-4 h-4 text-primary-600"></i>
+                    </div>
+                    <div class="space-y-1 max-w-[85%]">
+                        <div class="bg-white border border-slate-200 p-3 rounded-2xl rounded-tl-none text-sm text-slate-600 shadow-sm">
+                            当然。问题出在公式的选择上。<br><br>
+                            题目中 $f(x)$ 定义在 $(0, 2l)$ 上，且并未声明是偶延拓。因此我们计算的是一般形式的傅里叶级数。<br>
+                            正确的系数公式是：<br>
+                            $a_n = \frac{1}{l}\int f(x)\dots$<br>
+                            你多乘了一个 2，这通常是“偶函数”在对称区间 $(-l, l)$ 上的简化公式，这里不适用。
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="p-4 bg-white border-t border-slate-100">
+                <div class="flex gap-2 bg-slate-100 p-2 rounded-xl focus-within:ring-2 focus-within:ring-primary-100 focus-within:bg-white transition-all border border-transparent focus-within:border-primary-200">
+                    <input id="chat-input" type="text" placeholder="输入问题..." class="flex-1 bg-transparent border-none text-sm focus:outline-none px-2 text-slate-700">
+                    <button class="p-2 bg-primary-600 text-white rounded-lg shadow-sm hover:bg-primary-700 transition-colors">
+                        <i data-lucide="send-horizontal" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        lucide.createIcons();
+
+        const sidebar = document.getElementById('ai-sidebar');
+        const openBtn = document.getElementById('toggle-btn-closed');
+
+        function toggleSidebar() {
+            if (sidebar.classList.contains('translate-x-full')) {
+                // Open
+                sidebar.classList.remove('translate-x-full', 'w-0', 'p-0', 'opacity-0');
+                sidebar.classList.add('w-[340px]');
+                openBtn.classList.add('hidden');
+            } else {
+                // Close
+                sidebar.classList.add('translate-x-full', 'w-0', 'p-0');
+                sidebar.classList.remove('w-[340px]');
+                // Wait for transition to finish slightly before showing button or just show immediate
+                setTimeout(() => {
+                    openBtn.classList.remove('hidden');
+                }, 300);
+            }
+        }
+
+        // 模拟点击“问问AI”自动填入输入框
+        function openChatWithQuery(text) {
+            // 确保侧边栏打开
+            if (sidebar.classList.contains('translate-x-full')) {
+                toggleSidebar();
+            }
+            const input = document.getElementById('chat-input');
+            input.value = text;
+            input.focus();
+        }
+    </script>
+</body>
+</html>

@@ -96,6 +96,12 @@ Required Supabase Storage buckets (create manually in Supabase Dashboard):
 ### Authentication
 Uses Supabase built-in GitHub OAuth provider (no custom JWT implementation needed).
 
+**Chrome 扩展 GitHub 登录**：若出现 "Authorization page could not be loaded"，需在 Supabase 控制台配置重定向 URL：
+1. 打开 [Supabase Dashboard](https://supabase.com/dashboard) → 项目 → **Authentication** → **URL Configuration**
+2. 在 **Redirect URLs** 中添加：`https://<扩展ID>.chromiumapp.org/provider_cb`
+3. 扩展 ID 获取：Chrome 地址栏打开 `chrome://extensions`，找到本扩展即可看到 ID（开发与打包后 ID 可能不同，可分别添加两条）
+4. 保存后重试登录。若弹窗仍失败，扩展会自动改用新标签页完成登录。
+
 ## Key Configuration
 
 ### Environment Variables
