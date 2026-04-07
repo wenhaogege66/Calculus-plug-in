@@ -624,37 +624,29 @@ function buildFollowUpPrompt(
 2. 保持简短，1-2句话即可`;
   }
 
-  // 对于数学相关问题，提供完整上下文
-  const questionSection = originalQuestion ? `
-原题目内容：
-${originalQuestion}
-` : '';
+  // 截断过长上下文，避免 prompt 过长导致回答趋同、且易超 token
+  const maxLen = { question: 350, answer: 450, feedback: 400, suggestions: 150 };
+  const truncate = (s: string, max: number) => {
+    const t = (s || '').trim();
+    if (t.length <= max) return t;
+    return t.slice(0, max) + '…（后文省略）';
+  };
+  const shortQuestion = originalQuestion ? truncate(originalQuestion, maxLen.question) : '';
+  const shortAnswer = truncate(studentAnswer, maxLen.answer);
+  const shortFeedback = truncate(previousFeedback, maxLen.feedback);
+  const shortSuggestions = (previousSuggestions || '').trim().length > 0
+    ? truncate(previousSuggestions, maxLen.suggestions)
+    : '';
+
+  const questionSection = shortQuestion ? `\n【题目摘要】\n${shortQuestion}\n` : '';
+  const suggestionsSection = shortSuggestions ? `\n【改进建议摘要】\n${shortSuggestions}\n` : '';
 
   return `
-你是一位善于引导的微积分教师，正在通过「习题练习」的AI辅导助手与学生对话。学生基于当前题目和批改结果提出了问题，你需要用**一步步引导式**的方式帮助他理解，而不是直接抛答案。
+你是微积分辅导老师，用简短、引导式回答学生问题。上下文已做摘要，请紧扣学生当前问题作答，不要复述大段材料。
 
-${questionSection}
-学生的解答：
-${studentAnswer}
+${questionSection}【学生解答摘要】\n${shortAnswer}\n【批改反馈摘要】\n${shortFeedback}${suggestionsSection}【学生当前问题】\n${userQuestion}
 
-之前的批改反馈：
-${previousFeedback}
-
-之前的改进建议：
-${previousSuggestions}
-
-学生的问题：
-${userQuestion}
-
-请按以下方式回答（引导式辅导）：
-1. **分步引导**：把思路拆成小步，用「第一步」「接着」「然后」等提示，一步一步带学生想，而不是一次性给出完整解答。
-2. **先启后答**：先给一点思路或关键提示（例如「这里可以想想……」「关键是要先……」），再在下一句或下一段给出具体一点的内容，必要时再给出完整一步。
-3. **留出思考空间**：适当用「你可以先试着……」「想想看这里用哪个公式？」等，鼓励学生先动脑，再在回答中给出提示或纠正。
-4. **结合本题**：紧扣当前题目和批改反馈，用具体式子、概念和步骤说明，避免泛泛而谈。
-5. **语气亲切**：像身边老师在辅导，用「我们来看」「这里要注意」等，语言通俗、耐心。
-6. **结尾可小结**：在最后用一两句话总结本问的要点或易错点，帮助学生巩固。
-
-回答要准确、清晰，但始终以「引导学习」为主，直接给出完整答案前尽量先有一两步引导。请直接输出你的回答内容，不需要加「第一步」等标题以外的特殊格式。
+回答要求：分步引导、先给思路再给细节、语气亲切；可结尾一句话小结。直接输出回答，不必加标题或序号。
 `;
 }
 

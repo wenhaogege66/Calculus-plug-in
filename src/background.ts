@@ -63,14 +63,31 @@ async function handleInitiateAuth() {
     throw new Error('重定向URL中未找到access_token');
   }
 
-  // 4. 将token发送到后端以换取应用JWT
-  const processResponse = await fetch(`${API_BASE_URL}/auth/github/process-token`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ access_token, refresh_token })
-  });
+  // 4. 将token发送到后端以换取应用JWT（localhost 连不上时自动用 127.0.0.1 重试）
+  const processTokenUrl = `${API_BASE_URL}/auth/github/process-token`;
+  const fallbackUrl = processTokenUrl.replace(/localhost/i, '127.0.0.1');
+  const urlsToTry = processTokenUrl === fallbackUrl ? [processTokenUrl] : [processTokenUrl, fallbackUrl];
+
+  let processResponse: Response | null = null;
+  let lastError: string = '';
+  for (const url of urlsToTry) {
+    try {
+      processResponse = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token, refresh_token })
+      });
+      break;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  if (!processResponse) {
+    throw new Error(
+      `无法连接后端，已尝试 ${urlsToTry.join('、')}。请确认：1) 在 backend 目录执行 npm run dev；2) 在浏览器打开 http://127.0.0.1:3000/api/health 能返回 JSON。`
+    );
+  }
 
   const processResult = await processResponse.json();
 

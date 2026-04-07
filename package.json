@@ -41,6 +41,7 @@
   "manifest": {
     "host_permissions": [
       "http://localhost:3000/*",
+      "http://127.0.0.1:3000/*",
       "https://yzetwnpvqioonmlibaqt.supabase.co/*"
     ],
     "permissions": [
@@ -54,7 +55,7 @@
       "service_worker": "/background/index.ts"
     },
     "content_security_policy": {
-      "extension_pages": "script-src 'self' http://localhost:3000; object-src 'self'; connect-src 'self' http://localhost:* https://yzetwnpvqioonmlibaqt.supabase.co https://api.github.com;"
+      "extension_pages": "script-src 'self' http://localhost:3000; object-src 'self'; connect-src 'self' http://localhost:* http://127.0.0.1:* https://yzetwnpvqioonmlibaqt.supabase.co https://api.github.com;"
     }
   },
   "plasmo": {
